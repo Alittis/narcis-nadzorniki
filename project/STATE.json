@@ -1,0 +1,11 @@
+{
+  "deployment_type": "manual build",
+  "process_manager": "",
+  "reverse_proxy": "",
+  "containerized": false,
+  "primary_port": "",
+  "requires_build_step": true,
+  "external_services": [],
+  "env_required": [],
+  "ci_detected": false
+}
