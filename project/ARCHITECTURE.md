@@ -44,3 +44,11 @@
 - Backend/API endpoints and contracts.
 - Release pipeline/signing/distribution process.
 - CI/CD workflow (none detected in repository root scope).
+
+## Documentation Authority
+The /project directory is the single source of truth for:
+- Architecture
+- Deployment
+- Operational procedures
+
+All structural changes must update these documents.
