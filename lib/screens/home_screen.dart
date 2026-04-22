@@ -7,6 +7,7 @@ import 'package:narcis_nadzorniki/screens/form_screen.dart';
 import 'package:narcis_nadzorniki/screens/record_list_screen.dart';
 import 'package:narcis_nadzorniki/services/location_service.dart';
 import 'package:narcis_nadzorniki/state/app_state.dart';
+import 'package:narcis_nadzorniki/widgets/basemap.dart';
 import 'package:provider/provider.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -21,6 +22,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _locationService = LocationService();
   LatLng _center = const LatLng(45.75, 14.39);
   LatLng? _userLocation;
+  BasemapMode _basemapMode = BasemapMode.osm;
 
   @override
   void initState() {
@@ -190,6 +192,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
+              BasemapToggleButton(
+                mode: _basemapMode,
+                onChanged: (mode) => setState(() => _basemapMode = mode),
+              ),
               IconButton(
                 tooltip: 'Sinhroniziraj',
                 onPressed: state.isSyncing ? null : state.syncPending,
@@ -234,10 +240,7 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
             children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'si.narcis.nadzorniki',
-              ),
+              ...basemapTileLayers(_basemapMode),
               MarkerLayer(markers: markers),
             ],
           ),

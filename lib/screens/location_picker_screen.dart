@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:narcis_nadzorniki/widgets/basemap.dart';
 
 class LocationPickerScreen extends StatefulWidget {
   const LocationPickerScreen({
@@ -16,6 +17,7 @@ class LocationPickerScreen extends StatefulWidget {
 
 class _LocationPickerScreenState extends State<LocationPickerScreen> {
   late LatLng _selected;
+  BasemapMode _basemapMode = BasemapMode.osm;
 
   @override
   void initState() {
@@ -29,6 +31,10 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       appBar: AppBar(
         title: const Text('Izberi lokacijo'),
         actions: [
+          BasemapToggleButton(
+            mode: _basemapMode,
+            onChanged: (mode) => setState(() => _basemapMode = mode),
+          ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(_selected),
             child: const Text('Potrdi'),
@@ -46,10 +52,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
           },
         ),
         children: [
-          TileLayer(
-            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-            userAgentPackageName: 'si.narcis.nadzorniki',
-          ),
+          ...basemapTileLayers(_basemapMode),
           MarkerLayer(
             markers: [
               Marker(

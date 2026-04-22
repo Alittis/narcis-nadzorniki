@@ -13,6 +13,7 @@
   - Oracle database behind APEX/ORDS (managed externally).
 - External Services
   - ORDS REST endpoints (see §9 below).
+  - Online basemap tile providers (see §10 below).
 - Infrastructure Components
   - Flutter toolchain build system.
 
@@ -55,6 +56,23 @@
   - 401 with `{"authenticated":false,"message":"Invalid credentials"}` otherwise
   - CORS: `Access-Control-Allow-Origin: *`
   - Purpose: temporary login probe for Flutter client; replace before production.
+
+## 10. Basemap Tile Providers
+Online basemap tiles are requested directly from public tile servers via `flutter_map` `TileLayer`s. Two modes, switchable at runtime by the user:
+
+- `osm` (default): OpenStreetMap standard tiles
+  - `https://tile.openstreetmap.org/{z}/{x}/{y}.png`
+  - Max zoom 19. Subject to the OpenStreetMap Tile Usage Policy.
+- `satellite`: Esri ArcGIS Online (two stacked layers)
+  - Imagery: `https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}`
+  - Labels overlay: `https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}`
+  - Max zoom 19. Subject to Esri World Imagery terms of use.
+
+Shared implementation: `lib/widgets/basemap.dart` (`BasemapMode`, `basemapTileLayers`, `BasemapToggleButton`). Used by `home_screen.dart` and `location_picker_screen.dart`. Additional overlays (disturbance markers, etc.) are layered on top in each screen's `FlutterMap.children` after the basemap layers.
+
+`userAgentPackageName` sent with tile requests: `si.narcis.nadzorniki`.
+
+No API key is required for either provider at this time. STATUS: UNKNOWN – REQUIRES CONFIRMATION whether Esri terms permit production/commercial use of this app without licensing.
 
 ## Documentation Authority
 The /project directory is the single source of truth for:

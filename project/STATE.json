@@ -17,6 +17,24 @@
           "status": "test-only"
         }
       ]
+    },
+    {
+      "name": "OpenStreetMap tile server",
+      "base_url": "https://tile.openstreetmap.org/",
+      "purpose": "OSM basemap tiles (BasemapMode.osm)",
+      "auth": "none",
+      "commercial_terms_confirmed": false
+    },
+    {
+      "name": "Esri ArcGIS Online",
+      "base_url": "https://services.arcgisonline.com/ArcGIS/rest/services/",
+      "purpose": "Satellite imagery + labels overlay (BasemapMode.satellite)",
+      "layers": [
+        "World_Imagery/MapServer",
+        "Reference/World_Boundaries_and_Places/MapServer"
+      ],
+      "auth": "none",
+      "commercial_terms_confirmed": false
     }
   ],
   "env_required": [],
