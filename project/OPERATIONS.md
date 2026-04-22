@@ -33,4 +33,16 @@ flutter run -d <device_id>
 ## 7. Failure Scenarios
 - Build failures: verify Flutter SDK and dependencies.
 - Runtime permission issues: validate platform permission configuration.
-- Backend/network failures: endpoint/config details unknown.
+- Backend/network failures: ORDS base `https://storitve.igea.si/narcis/ords/narcis/`.
+  - Probe auth endpoint:
+    ```bash
+    curl -sS -i -H "username: alexis.zrimec@gov.si" \
+      "https://storitve.igea.si/narcis/ords/narcis/test/auth"
+    ```
+  - Expected: HTTP 200, JSON `{"authenticated":true,...}`.
+  - 401 for any other email means the endpoint is up and rejecting correctly.
+
+## 8. Authentication (Test Phase)
+- Only `alexis.zrimec@gov.si` is accepted by `/test/auth`; password is ignored.
+- Session is kept in memory (`AppState._currentUser`); app restart requires re-login.
+- Must be replaced before production (see ARCHITECTURE §8 Known Unknowns).

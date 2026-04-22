@@ -5,19 +5,23 @@ import 'package:flutter/material.dart';
 import 'package:narcis_nadzorniki/data/local_store.dart';
 import 'package:narcis_nadzorniki/data/remote_api.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
+import 'package:narcis_nadzorniki/services/auth_service.dart';
 
 class AppState extends ChangeNotifier {
   AppState({
     LocalStore? localStore,
     RemoteApi? remoteApi,
     Connectivity? connectivity,
+    AuthService? authService,
   })  : _localStore = localStore ?? LocalStore(),
         _remoteApi = remoteApi ?? RemoteApi(),
-        _connectivity = connectivity ?? Connectivity();
+        _connectivity = connectivity ?? Connectivity(),
+        _authService = authService ?? AuthService();
 
   final LocalStore _localStore;
   final RemoteApi _remoteApi;
   final Connectivity _connectivity;
+  final AuthService _authService;
 
   List<Disturbance> _records = [];
   bool _offlineOverride = false;
@@ -25,11 +29,28 @@ class AppState extends ChangeNotifier {
   ConnectivityResult _connectivityResult = ConnectivityResult.none;
   StreamSubscription<dynamic>? _connectivitySub;
   List<String> _lastObservers = [];
+  String? _currentUser;
 
   List<Disturbance> get records => List.unmodifiable(_records);
   bool get offlineOverride => _offlineOverride;
   bool get isSyncing => _isSyncing;
   List<String> get lastObservers => List.unmodifiable(_lastObservers);
+  String? get currentUser => _currentUser;
+  bool get isAuthenticated => _currentUser != null;
+
+  Future<AuthResult> login(String email, String password) async {
+    final result = await _authService.login(email, password);
+    if (result.success) {
+      _currentUser = result.user;
+      notifyListeners();
+    }
+    return result;
+  }
+
+  void logout() {
+    _currentUser = null;
+    notifyListeners();
+  }
 
   bool get isOnline => !_offlineOverride && _connectivityResult != ConnectivityResult.none;
 

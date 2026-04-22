@@ -82,6 +82,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   title: const Text('Offline način'),
                   subtitle: const Text('Shranjuj lokalno in čakati na sinhronizacijo.'),
                 ),
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.logout),
+                  title: const Text('Odjava'),
+                  subtitle: Text(state.currentUser ?? ''),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    state.logout();
+                  },
+                ),
               ],
             ),
           ),

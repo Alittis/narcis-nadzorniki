@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:narcis_nadzorniki/screens/home_screen.dart';
+import 'package:narcis_nadzorniki/screens/login_screen.dart';
 import 'package:narcis_nadzorniki/state/app_state.dart';
 import 'package:provider/provider.dart';
 
@@ -21,7 +22,10 @@ class MotenjApp extends StatelessWidget {
           colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2A6F97)),
           useMaterial3: true,
         ),
-        home: const HomeScreen(),
+        home: Consumer<AppState>(
+          builder: (context, state, _) =>
+              state.isAuthenticated ? const HomeScreen() : const LoginScreen(),
+        ),
       ),
     );
   }

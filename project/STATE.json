@@ -5,7 +5,26 @@
   "containerized": false,
   "primary_port": "",
   "requires_build_step": true,
-  "external_services": [],
+  "external_services": [
+    {
+      "name": "ORDS / Oracle APEX",
+      "base_url": "https://storitve.igea.si/narcis/ords/narcis/",
+      "endpoints": [
+        {
+          "path": "test/auth",
+          "method": "GET",
+          "auth": "none (test stub)",
+          "status": "test-only"
+        }
+      ]
+    }
+  ],
   "env_required": [],
-  "ci_detected": false
+  "ci_detected": false,
+  "auth": {
+    "status": "test stub",
+    "current_allowed_user": "alexis.zrimec@gov.si",
+    "password_enforced": false,
+    "session_persistence": "in-memory (not persisted across app restarts)"
+  }
 }
