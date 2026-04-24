@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
+import 'package:narcis_nadzorniki/models/legacy_disturbance.dart';
 import 'package:narcis_nadzorniki/screens/detail_screen.dart';
 import 'package:narcis_nadzorniki/screens/form_screen.dart';
+import 'package:narcis_nadzorniki/screens/legacy_detail_screen.dart';
 import 'package:narcis_nadzorniki/screens/record_list_screen.dart';
 import 'package:narcis_nadzorniki/services/location_service.dart';
 import 'package:narcis_nadzorniki/state/app_state.dart';
@@ -53,6 +55,14 @@ class _HomeScreenState extends State<HomeScreen> {
     return Colors.blue;
   }
 
+  void _openLegacyDetail(BuildContext context, LegacyDisturbance record) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => LegacyDetailScreen(record: record),
+      ),
+    );
+  }
+
   void _openForm(BuildContext context, AppState state) {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -83,6 +93,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   onChanged: state.setOfflineOverride,
                   title: const Text('Offline način'),
                   subtitle: const Text('Shranjuj lokalno in čakati na sinhronizacijo.'),
+                ),
+                SwitchListTile(
+                  value: state.showLegacy,
+                  onChanged: state.setShowLegacy,
+                  title: const Text('Prikaži zgodovinske zapise'),
+                  subtitle: Text(
+                    'Notranjski regijski park, 2025 (${state.legacyRecords.length} zapisov).',
+                  ),
                 ),
                 const Divider(),
                 ListTile(
@@ -140,6 +158,22 @@ class _HomeScreenState extends State<HomeScreen> {
     return Consumer<AppState>(
       builder: (context, state, _) {
         final markers = <Marker>[
+          if (state.showLegacy)
+            ...state.legacyRecords.map(
+              (record) => Marker(
+                point: LatLng(record.latitude, record.longitude),
+                width: 30,
+                height: 30,
+                child: GestureDetector(
+                  onTap: () => _openLegacyDetail(context, record),
+                  child: const Icon(
+                    Icons.circle,
+                    color: Colors.deepPurple,
+                    size: 14,
+                  ),
+                ),
+              ),
+            ),
           ...state.records.map(
             (record) => Marker(
               point: LatLng(record.latitude, record.longitude),

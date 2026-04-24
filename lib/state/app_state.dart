@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:narcis_nadzorniki/data/legacy_records.dart';
 import 'package:narcis_nadzorniki/data/local_store.dart';
 import 'package:narcis_nadzorniki/data/remote_api.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
+import 'package:narcis_nadzorniki/models/legacy_disturbance.dart';
 import 'package:narcis_nadzorniki/services/auth_service.dart';
 
 class AppState extends ChangeNotifier {
@@ -13,17 +15,22 @@ class AppState extends ChangeNotifier {
     RemoteApi? remoteApi,
     Connectivity? connectivity,
     AuthService? authService,
+    LegacyRecordsLoader? legacyLoader,
   })  : _localStore = localStore ?? LocalStore(),
         _remoteApi = remoteApi ?? RemoteApi(),
         _connectivity = connectivity ?? Connectivity(),
-        _authService = authService ?? AuthService();
+        _authService = authService ?? AuthService(),
+        _legacyLoader = legacyLoader ?? LegacyRecordsLoader();
 
   final LocalStore _localStore;
   final RemoteApi _remoteApi;
   final Connectivity _connectivity;
   final AuthService _authService;
+  final LegacyRecordsLoader _legacyLoader;
 
   List<Disturbance> _records = [];
+  List<LegacyDisturbance> _legacyRecords = [];
+  bool _showLegacy = true;
   bool _offlineOverride = false;
   bool _isSyncing = false;
   ConnectivityResult _connectivityResult = ConnectivityResult.none;
@@ -32,6 +39,8 @@ class AppState extends ChangeNotifier {
   String? _currentUser;
 
   List<Disturbance> get records => List.unmodifiable(_records);
+  List<LegacyDisturbance> get legacyRecords => List.unmodifiable(_legacyRecords);
+  bool get showLegacy => _showLegacy;
   bool get offlineOverride => _offlineOverride;
   bool get isSyncing => _isSyncing;
   List<String> get lastObservers => List.unmodifiable(_lastObservers);
@@ -60,6 +69,11 @@ class AppState extends ChangeNotifier {
     _records = await _localStore.load();
     if (_records.isNotEmpty) {
       _lastObservers = _records.last.observers;
+    }
+    try {
+      _legacyRecords = await _legacyLoader.load();
+    } catch (_) {
+      _legacyRecords = const [];
     }
     final result = await _connectivity.checkConnectivity();
     _connectivityResult = _normalizeConnectivity(result);
@@ -92,6 +106,11 @@ class AppState extends ChangeNotifier {
     if (isOnline) {
       syncPending();
     }
+  }
+
+  void setShowLegacy(bool value) {
+    _showLegacy = value;
+    notifyListeners();
   }
 
   Future<void> addRecord(Disturbance record) async {

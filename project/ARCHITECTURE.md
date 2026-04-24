@@ -22,7 +22,8 @@
 - `android/`, `ios/` — mobile platform projects
 - `web/`, `linux/`, `macos/`, `windows/` — platform targets
 - `test/` — Flutter tests
-- `assets/` (present in `kolpa`) — bundled resources
+- `assets/legacy/` — bundled read-only historical datasets (see §11)
+- `tools/` — one-off import/conversion scripts (Python)
 - `pubspec.yaml` — dependencies and metadata
 
 ## 4. Runtime Architecture
@@ -73,6 +74,25 @@ Shared implementation: `lib/widgets/basemap.dart` (`BasemapMode`, `basemapTileLa
 `userAgentPackageName` sent with tile requests: `si.narcis.nadzorniki`.
 
 No API key is required for either provider at this time. STATUS: UNKNOWN – REQUIRES CONFIRMATION whether Esri terms permit production/commercial use of this app without licensing.
+
+## 11. Legacy Data (Read-Only Historical Context)
+Historical disturbance records from another app (Notranjski regijski park's WordPress Formidable form at `nadzor.notranjski-park.si`) are bundled as a read-only JSON asset so observers can see prior field activity on the map.
+
+- Asset path: `assets/legacy/notranjski_park_2025.json` (703 records, ~408 KB, covers Mar–Aug 2025).
+- Model: [lib/models/legacy_disturbance.dart](../lib/models/legacy_disturbance.dart).
+- Loader: [lib/data/legacy_records.dart](../lib/data/legacy_records.dart) — loads once at `AppState.init()`.
+- Display: small purple dots on `HomeScreen` map; tap opens [lib/screens/legacy_detail_screen.dart](../lib/screens/legacy_detail_screen.dart). Toggled via `AppState.showLegacy` in the settings sheet.
+- Category values are preserved verbatim from the source (free-text, typos included, not mapped to the app's codebook). The detail view renders them grouped by our group names.
+- Photo URLs point to the original WordPress uploads at `https://nadzor.notranjski-park.si/wp-content/uploads/...` and require online access to render.
+- Source CSV is NOT committed. To regenerate the asset from a new CSV export:
+  ```
+  python3 tools/import_notranjski_csv.py \
+    --input "/path/to/formidable_entries.csv" \
+    --output assets/legacy/notranjski_park_2025.json
+  ```
+  Dependencies: `openlocationcode` (for Plus Code → lat/lon decoding on rows without explicit coordinates). Reference anchor: Cerknica (45.79, 14.36).
+- Dropped on import: rows with `Entry Status=3` (drafts), rows with no category selected, rows with no resolvable coordinates.
+- These records are explicitly **not** writable from the app and do not sync to ORDS. They exist only to give observers map context for work already done by the other app.
 
 ## Documentation Authority
 The /project directory is the single source of truth for:

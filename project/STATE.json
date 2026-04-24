@@ -35,6 +35,21 @@
       ],
       "auth": "none",
       "commercial_terms_confirmed": false
+    },
+    {
+      "name": "Notranjski park WordPress uploads",
+      "base_url": "https://nadzor.notranjski-park.si/wp-content/uploads/formidable/",
+      "purpose": "Source for photo URLs referenced by bundled legacy records (read-only)",
+      "auth": "none",
+      "note": "Photos are displayed in the LegacyDetailScreen; the URLs are baked into assets/legacy/notranjski_park_2025.json"
+    }
+  ],
+  "bundled_assets": [
+    {
+      "path": "assets/legacy/notranjski_park_2025.json",
+      "purpose": "Read-only historical disturbance records (703 entries, Mar-Aug 2025) from Notranjski regijski park Formidable form",
+      "size_kb": 409,
+      "regenerated_by": "tools/import_notranjski_csv.py"
     }
   ],
   "env_required": [],
