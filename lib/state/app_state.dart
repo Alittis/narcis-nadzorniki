@@ -48,7 +48,11 @@ class AppState extends ChangeNotifier {
   bool get isAuthenticated => _currentUser != null;
 
   Future<AuthResult> login(String email, String password) async {
-    final result = await _authService.login(email, password);
+    final result = await _authService.login(
+      email,
+      password,
+      online: isOnline,
+    );
     if (result.success) {
       _currentUser = result.user;
       notifyListeners();
@@ -56,8 +60,11 @@ class AppState extends ChangeNotifier {
     return result;
   }
 
-  void logout() {
+  Future<void> logout() async {
     _currentUser = null;
+    // Wipe the offline credential cache too, so a logged-out device cannot
+    // re-login offline with the previous user's password.
+    await _authService.clearCache();
     notifyListeners();
   }
 
