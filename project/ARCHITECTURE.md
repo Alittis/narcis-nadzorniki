@@ -44,7 +44,7 @@
 - Client-first architecture in current repository.
 
 ## 8. Known Unknowns
-- Login handler still carries debug instrumentation (`narcis_auth_debug` table + per-request env dump). DO NOT REMOVE until the Flutter cutover has run against real-device / real-network traffic and confirmed clean — the env dump is our only window into how mobile carriers / proxies might mangle the X-Narcis-Auth header. Cleanup checklist when the time comes:
+- Login handler still carries debug instrumentation (`narcis_auth_debug` table + per-request env dump). A56 real-device validation passed cleanly on 2026-04-25; credentials are now redacted in the dump (auth-bearing headers logged as `<REDACTED len=NN>`, `auth_hdr_prefix` reduced to `Basic ` for the conformant case), so the instrumentation is safe to keep on while we widen device/carrier coverage. Cleanup checklist, to run once we're satisfied with that coverage:
   1. Strip the `OWA.cgi_var_*` snapshot block and the three dead `HTTP_*` fallbacks from `tools/ords/auth_login.sql`; keep only `OWA_UTIL.get_cgi_env('X-NARCIS-AUTH')`.
   2. Strip the `narcis_auth_debug` INSERT block from the handler.
   3. Redeploy the handler.
@@ -66,7 +66,7 @@
 - 401: `{"authenticated":false,"message":"Neveljavni podatki za prijavo."}`
 - CORS: inherited from ORDS pool (`Access-Control-Allow-Origin: *`, confirmed live).
 - Source: [tools/ords/auth_login.sql](../tools/ords/auth_login.sql).
-- Status: deployed and smoke-tested (2026-04-25). All four probes pass: no header → 401, bad creds → 401, empty password → 401, valid creds → 200 with `{"authenticated":true,"user":"..."}`. Currently still carries debug instrumentation (`narcis_auth_debug` table + per-request env dump); to be removed once the Flutter client cutover lands.
+- Status: deployed and smoke-tested (2026-04-25). All four probes pass: no header → 401, bad creds → 401, empty password → 401, valid creds → 200 with `{"authenticated":true,"user":"..."}`. A56 real-device validation also passed on the same date. Currently still carries debug instrumentation (`narcis_auth_debug` table + per-request env dump); credentials redacted as of 2026-04-25, see §8 for cleanup checklist gating.
 - Why a custom header instead of the standard `Authorization`: this ORDS instance consumes `Authorization: Basic` upstream of the handler PL/SQL (verified 2026-04-25 via debug logging — `OWA_UTIL.get_cgi_env('HTTP_AUTHORIZATION')` returned NULL on every request, even when the client sent a valid Basic header). A custom `X-Narcis-Auth` header bypasses ORDS's auth filter while preserving the same base64 encoding scheme.
 - Quirk: ORDS exposes this custom header under its raw HTTP name (`x-narcis-auth`), NOT under the canonical CGI form `HTTP_X_NARCIS_AUTH`. Standard headers get both forms; custom headers only get the raw form. The handler reads it via `OWA_UTIL.get_cgi_env('X-NARCIS-AUTH')` (the function is case-insensitive). Verified by enumerating `OWA.cgi_var_name(i)` / `cgi_var_val(i)` on a live request.
 - Known cosmetic gap: response `Content-Type` header comes back as `text/html;charset=utf-8` instead of `application/json`. The `:content_type` HEADER OUT bind doesn't appear to take effect in this ORDS configuration. The body itself is valid JSON and `jsonDecode` parses it fine, so this is non-blocking.

@@ -21,7 +21,7 @@
           "method": "GET",
           "host": "narcis.gov.si",
           "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
-          "status": "deployed and smoke-tested 2026-04-25; debug instrumentation still in place pending Flutter cutover"
+          "status": "deployed; A56 real-device validation passed 2026-04-25; debug instrumentation remains (credentials redacted) for broader-device coverage"
         }
       ]
     },

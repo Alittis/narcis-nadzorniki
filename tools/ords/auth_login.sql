@@ -88,15 +88,29 @@ BEGIN
   -- DEBUG: snapshot every CGI variable ORDS exposes, so we can see exactly
   -- which name (if any) the X-Narcis-Auth header arrives under. Cheap, runs
   -- before any auth logic so it always populates.
+  -- Credential-bearing headers (X-Narcis-Auth, Authorization) are redacted to
+  -- name + length only — Basic <base64(email:password)> is trivially reversible.
   BEGIN
     DBMS_LOB.createtemporary(l_env_dump, TRUE);
-    FOR i IN 1 .. NVL(OWA.num_cgi_vars, 0) LOOP
-      DBMS_LOB.append(
-        l_env_dump,
-        OWA.cgi_var_name(i) || '=' ||
-          SUBSTR(NVL(OWA.cgi_var_val(i), ''), 1, 200) || CHR(10)
-      );
-    END LOOP;
+    DECLARE
+      l_var_name VARCHAR2(200);
+      l_var_val  VARCHAR2(4000);
+    BEGIN
+      FOR i IN 1 .. NVL(OWA.num_cgi_vars, 0) LOOP
+        l_var_name := OWA.cgi_var_name(i);
+        l_var_val  := NVL(OWA.cgi_var_val(i), '');
+        IF UPPER(l_var_name) IN ('HTTP_AUTHORIZATION', 'AUTHORIZATION')
+           OR INSTR(UPPER(l_var_name), 'NARCIS-AUTH') > 0
+           OR INSTR(UPPER(l_var_name), 'NARCIS_AUTH') > 0
+        THEN
+          l_var_val := '<REDACTED len=' || LENGTH(l_var_val) || '>';
+        END IF;
+        DBMS_LOB.append(
+          l_env_dump,
+          l_var_name || '=' || SUBSTR(l_var_val, 1, 200) || CHR(10)
+        );
+      END LOOP;
+    END;
   EXCEPTION
     WHEN OTHERS THEN NULL;  -- never let diagnostics break the handler
   END;
@@ -213,7 +227,14 @@ BEGIN
       sep_pos, decoded_email, pw_length, app_user_found, env_dump
     ) VALUES (
       l_step,
-      SUBSTR(l_auth_header, 1, 20),
+      -- For "Basic ..." (the normal case) store the scheme name only; the
+      -- 14 base64 chars after it would leak the start of email:password.
+      -- For non-conformant prefixes keep the first 20 raw chars to surface
+      -- carrier-mangling.
+      CASE WHEN SUBSTR(l_auth_header, 1, 6) = 'Basic '
+           THEN 'Basic '
+           ELSE SUBSTR(l_auth_header, 1, 20)
+      END,
       LENGTH(l_auth_header),
       LENGTH(l_decoded),
       l_sep_pos,
