@@ -107,9 +107,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   leading: const Icon(Icons.logout),
                   title: const Text('Odjava'),
                   subtitle: Text(state.currentUser ?? ''),
-                  onTap: () {
+                  onTap: () async {
                     Navigator.of(context).pop();
-                    state.logout();
+                    await state.logout();
                   },
                 ),
               ],
