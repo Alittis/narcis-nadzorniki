@@ -1,8 +1,12 @@
 --------------------------------------------------------------------------------
 -- ORDS module: narcis_disturbances
---   POST   /ords/narcis/disturbances/        - create
---   PUT    /ords/narcis/disturbances/:id     - update
---   DELETE /ords/narcis/disturbances/:id     - delete
+--   GET    /ords/narcis/disturbances/                       - list (caller's org)
+--   POST   /ords/narcis/disturbances/                       - create
+--   PUT    /ords/narcis/disturbances/:id                    - update
+--   DELETE /ords/narcis/disturbances/:id                    - delete
+--   POST   /ords/narcis/disturbances/:id/photos/:photoId    - upload photo BLOB
+--   GET    /ords/narcis/disturbances/:id/photos/:photoId    - download photo BLOB
+--   DELETE /ords/narcis/disturbances/:id/photos/:photoId    - delete photo
 --
 -- Auth: X-Narcis-Auth: Basic <base64(email:password)> on every call.
 --   Same wire format as /app-auth/login. Re-validating the password on each
@@ -32,7 +36,24 @@
 --     "actionTaken": "...",
 --     "proposedType": "..." | null
 --   }
---   (createdAt, groupName/typeName, photoPaths, pendingSync are ignored.)
+--   (createdAt, groupName/typeName, photos, pendingSync are ignored.)
+--
+-- GET /  response shape (caller's org only; photos returned as IDs+MIME, BLOBs
+-- are fetched lazily via the photo endpoint):
+--   { "records": [
+--       { "id": "...",
+--         "latitude": <num>, "longitude": <num>,
+--         "locationAccuracy": "...",
+--         "observedAt": "<ISO-8601 UTC>",
+--         "types":      [{ "groupCode": "...", "typeCode": "..." }, ...],
+--         "description": "...",
+--         "observers":  ["...", ...],
+--         "actionTaken": "...",
+--         "proposedType": "..." | null,
+--         "photos":     [{ "id": "...", "mimeType": "image/jpeg" }, ...]
+--       },
+--       ...
+--     ] }
 --
 -- Idempotent: existing module is dropped first, so re-running this script
 -- is safe.
@@ -54,13 +75,130 @@ BEGIN
   );
 
   ----------------------------------------------------------------------------
-  -- POST disturbances/
+  -- GET disturbances/   (list - caller's org only)
   ----------------------------------------------------------------------------
   ORDS.DEFINE_TEMPLATE(
     p_module_name => 'narcis_disturbances',
     p_pattern     => '/'
   );
 
+  ORDS.DEFINE_HANDLER(
+    p_module_name => 'narcis_disturbances',
+    p_pattern     => '/',
+    p_method      => 'GET',
+    p_source_type => ORDS.source_type_plsql,
+    p_source      => q'~
+DECLARE
+  l_ctx pkg_tb_auth.t_auth_ctx;
+  l_out CLOB;
+BEGIN
+  BEGIN
+    l_ctx := pkg_tb_auth.authenticate;
+  EXCEPTION
+    WHEN pkg_tb_auth.e_unauthorized THEN
+      :status_code  := 401;
+      :content_type := 'application/json';
+      HTP.prn('{"error":"unauthorized"}');
+      RETURN;
+  END;
+
+  APEX_JSON.free_output;
+  APEX_JSON.initialize_clob_output;
+  APEX_JSON.open_object;
+  APEX_JSON.open_array('records');
+  FOR rec IN (
+    SELECT motnja_id, geo_sirina, geo_dolzina, natancnost_lok,
+           cas_opazovanja, opis, ukrepanje, predlog_tipa, ustvarjen
+      FROM tb_motnje
+     WHERE org_id = l_ctx.org_id
+     ORDER BY cas_opazovanja DESC, ustvarjen DESC
+  ) LOOP
+    APEX_JSON.open_object;
+    APEX_JSON.write('id',               rec.motnja_id);
+    APEX_JSON.write('latitude',         rec.geo_sirina);
+    APEX_JSON.write('longitude',        rec.geo_dolzina);
+    APEX_JSON.write('locationAccuracy', rec.natancnost_lok);
+    APEX_JSON.write('observedAt',
+      TO_CHAR(SYS_EXTRACT_UTC(CAST(rec.cas_opazovanja AS TIMESTAMP WITH TIME ZONE)),
+              'YYYY-MM-DD"T"HH24:MI:SS.FF3"Z"'));
+    APEX_JSON.write('createdAt',
+      TO_CHAR(SYS_EXTRACT_UTC(CAST(rec.ustvarjen AS TIMESTAMP WITH TIME ZONE)),
+              'YYYY-MM-DD"T"HH24:MI:SS.FF3"Z"'));
+    APEX_JSON.write('description',  rec.opis);
+    APEX_JSON.write('actionTaken',  rec.ukrepanje);
+    APEX_JSON.write('proposedType', rec.predlog_tipa);
+
+    APEX_JSON.open_array('types');
+    FOR t IN (
+      SELECT skupina_koda, tip_koda
+        FROM tb_motnje_tipi_dogodka
+       WHERE motnja_id = rec.motnja_id
+       ORDER BY skupina_koda, tip_koda
+    ) LOOP
+      APEX_JSON.open_object;
+      APEX_JSON.write('groupCode', t.skupina_koda);
+      APEX_JSON.write('typeCode',  t.tip_koda);
+      APEX_JSON.close_object;
+    END LOOP;
+    APEX_JSON.close_array;
+
+    APEX_JSON.open_array('observers');
+    FOR o IN (
+      SELECT ime_opazovalca
+        FROM tb_motnje_opazovalci
+       WHERE motnja_id = rec.motnja_id
+       ORDER BY ime_opazovalca
+    ) LOOP
+      APEX_JSON.write(o.ime_opazovalca);
+    END LOOP;
+    APEX_JSON.close_array;
+
+    APEX_JSON.open_array('photos');
+    FOR p IN (
+      SELECT foto_id, mime_type
+        FROM tb_motnje_foto
+       WHERE motnja_id = rec.motnja_id
+       ORDER BY ustvarjen
+    ) LOOP
+      APEX_JSON.open_object;
+      APEX_JSON.write('id',       p.foto_id);
+      APEX_JSON.write('mimeType', p.mime_type);
+      APEX_JSON.close_object;
+    END LOOP;
+    APEX_JSON.close_array;
+
+    APEX_JSON.close_object;
+  END LOOP;
+  APEX_JSON.close_array;
+  APEX_JSON.close_object;
+  l_out := APEX_JSON.get_clob_output;
+  APEX_JSON.free_output;
+
+  :status_code  := 200;
+  :content_type := 'application/json';
+  HTP.prn(l_out);
+EXCEPTION
+  WHEN OTHERS THEN
+    :status_code  := 500;
+    :content_type := 'application/json';
+    HTP.prn('{"error":"server_error","sqlcode":' || SQLCODE
+            || ',"sqlerrm":"' || REPLACE(SUBSTR(SQLERRM, 1, 400), '"', '\"') || '"}');
+END;
+~'
+  );
+
+  ORDS.DEFINE_PARAMETER(p_module_name => 'narcis_disturbances', p_pattern => '/',
+    p_method => 'GET', p_name => 'X-ORDS-STATUS-CODE',
+    p_bind_variable_name => 'status_code', p_source_type => 'HEADER',
+    p_param_type => 'INT', p_access_method => 'OUT');
+  ORDS.DEFINE_PARAMETER(p_module_name => 'narcis_disturbances', p_pattern => '/',
+    p_method => 'GET', p_name => 'Content-Type',
+    p_bind_variable_name => 'content_type', p_source_type => 'HEADER',
+    p_param_type => 'STRING', p_access_method => 'OUT');
+
+  ----------------------------------------------------------------------------
+  -- POST disturbances/
+  ----------------------------------------------------------------------------
   ORDS.DEFINE_HANDLER(
     p_module_name => 'narcis_disturbances',
     p_pattern     => '/',
@@ -505,6 +643,274 @@ END;
     p_bind_variable_name => 'status_code', p_source_type => 'HEADER',
     p_param_type => 'INT', p_access_method => 'OUT');
   ORDS.DEFINE_PARAMETER(p_module_name => 'narcis_disturbances', p_pattern => ':id',
+    p_method => 'DELETE', p_name => 'Content-Type',
+    p_bind_variable_name => 'content_type', p_source_type => 'HEADER',
+    p_param_type => 'STRING', p_access_method => 'OUT');
+
+  ----------------------------------------------------------------------------
+  -- POST disturbances/:id/photos/:photoId  (upload binary; idempotent on photoId)
+  ----------------------------------------------------------------------------
+  ORDS.DEFINE_TEMPLATE(
+    p_module_name => 'narcis_disturbances',
+    p_pattern     => ':id/photos/:photoId'
+  );
+
+  ORDS.DEFINE_HANDLER(
+    p_module_name => 'narcis_disturbances',
+    p_pattern     => ':id/photos/:photoId',
+    p_method      => 'POST',
+    p_source_type => ORDS.source_type_plsql,
+    p_source      => q'~
+DECLARE
+  l_ctx          pkg_tb_auth.t_auth_ctx;
+  l_motnja_id    VARCHAR2(36) := :id;
+  l_foto_id      VARCHAR2(36) := :photoId;
+  l_existing_org NUMBER;
+  l_existing_ph  NUMBER;
+  l_blob         BLOB := :body;
+  l_size         NUMBER;
+  l_mime         VARCHAR2(80);
+  l_status       PLS_INTEGER := 201;
+BEGIN
+  BEGIN
+    l_ctx := pkg_tb_auth.authenticate;
+  EXCEPTION
+    WHEN pkg_tb_auth.e_unauthorized THEN
+      :status_code  := 401;
+      :content_type := 'application/json';
+      HTP.prn('{"error":"unauthorized"}');
+      RETURN;
+  END;
+
+  -- Confirm parent record exists and is ours. 404 if missing or cross-tenant.
+  BEGIN
+    SELECT org_id INTO l_existing_org
+      FROM tb_motnje
+     WHERE motnja_id = l_motnja_id;
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+      :status_code  := 404;
+      :content_type := 'application/json';
+      HTP.prn('{"error":"not_found"}');
+      RETURN;
+  END;
+  IF l_existing_org <> l_ctx.org_id THEN
+    :status_code  := 404;
+    :content_type := 'application/json';
+    HTP.prn('{"error":"not_found"}');
+    RETURN;
+  END IF;
+
+  IF l_blob IS NULL OR DBMS_LOB.getlength(l_blob) = 0 THEN
+    :status_code  := 400;
+    :content_type := 'application/json';
+    HTP.prn('{"error":"empty_body"}');
+    RETURN;
+  END IF;
+
+  l_size := DBMS_LOB.getlength(l_blob);
+  -- 10 MB hard cap. Compressed phone photos are ~200-500 KB so anything
+  -- larger is almost certainly an uncompressed upload by mistake.
+  IF l_size > 10485760 THEN
+    :status_code  := 413;
+    :content_type := 'application/json';
+    HTP.prn('{"error":"payload_too_large","limit":10485760}');
+    RETURN;
+  END IF;
+
+  -- ORDS doesn't let us bind two header params with the same name (we already
+  -- bind Content-Type as OUT for the response), so we read the inbound type
+  -- straight from the CGI env. Strip any "; charset=..." suffix.
+  l_mime := LOWER(NVL(OWA_UTIL.get_cgi_env('CONTENT_TYPE'), 'image/jpeg'));
+  IF INSTR(l_mime, ';') > 0 THEN
+    l_mime := TRIM(SUBSTR(l_mime, 1, INSTR(l_mime, ';') - 1));
+  END IF;
+  IF l_mime NOT IN ('image/jpeg','image/png','image/webp','image/heic') THEN
+    :status_code  := 415;
+    :content_type := 'application/json';
+    HTP.prn('{"error":"unsupported_mime","received":"' || REPLACE(l_mime, '"', '\"') || '"}');
+    RETURN;
+  END IF;
+
+  -- Idempotency: same foto_id arriving again is a no-op (200), regardless of
+  -- whether the bytes match. Lets the offline upload queue retry safely.
+  SELECT COUNT(*) INTO l_existing_ph FROM tb_motnje_foto WHERE foto_id = l_foto_id;
+  IF l_existing_ph > 0 THEN
+    l_status := 200;
+  ELSE
+    INSERT INTO tb_motnje_foto (foto_id, motnja_id, vsebina, mime_type, velikost, ustvarjen_od)
+    VALUES (l_foto_id, l_motnja_id, l_blob, l_mime, l_size, l_ctx.email);
+    COMMIT;
+  END IF;
+
+  :status_code  := l_status;
+  :content_type := 'application/json';
+  HTP.prn('{"id":"' || l_foto_id || '","status":"'
+          || CASE WHEN l_status = 201 THEN 'created' ELSE 'exists' END
+          || '"}');
+EXCEPTION
+  WHEN OTHERS THEN
+    ROLLBACK;
+    :status_code  := 500;
+    :content_type := 'application/json';
+    HTP.prn('{"error":"server_error","sqlcode":' || SQLCODE
+            || ',"sqlerrm":"' || REPLACE(SUBSTR(SQLERRM, 1, 400), '"', '\"') || '"}');
+END;
+~'
+  );
+
+  ORDS.DEFINE_PARAMETER(p_module_name => 'narcis_disturbances', p_pattern => ':id/photos/:photoId',
+    p_method => 'POST', p_name => 'X-ORDS-STATUS-CODE',
+    p_bind_variable_name => 'status_code', p_source_type => 'HEADER',
+    p_param_type => 'INT', p_access_method => 'OUT');
+  ORDS.DEFINE_PARAMETER(p_module_name => 'narcis_disturbances', p_pattern => ':id/photos/:photoId',
+    p_method => 'POST', p_name => 'Content-Type',
+    p_bind_variable_name => 'content_type', p_source_type => 'HEADER',
+    p_param_type => 'STRING', p_access_method => 'OUT');
+  -- Inbound Content-Type is read via OWA_UTIL.get_cgi_env('CONTENT_TYPE') in
+  -- the handler body. ORDS doesn't allow rebinding the same header name with
+  -- a different access method.
+
+  ----------------------------------------------------------------------------
+  -- GET disturbances/:id/photos/:photoId  (download binary)
+  ----------------------------------------------------------------------------
+  ORDS.DEFINE_HANDLER(
+    p_module_name => 'narcis_disturbances',
+    p_pattern     => ':id/photos/:photoId',
+    p_method      => 'GET',
+    p_source_type => ORDS.source_type_plsql,
+    p_source      => q'~
+DECLARE
+  l_ctx          pkg_tb_auth.t_auth_ctx;
+  l_motnja_id    VARCHAR2(36) := :id;
+  l_foto_id      VARCHAR2(36) := :photoId;
+  l_existing_org NUMBER;
+  l_blob         BLOB;
+  l_mime         VARCHAR2(80);
+BEGIN
+  BEGIN
+    l_ctx := pkg_tb_auth.authenticate;
+  EXCEPTION
+    WHEN pkg_tb_auth.e_unauthorized THEN
+      :status_code  := 401;
+      :content_type := 'application/json';
+      HTP.prn('{"error":"unauthorized"}');
+      RETURN;
+  END;
+
+  -- Org-scoped lookup: photo must belong to a record owned by the caller.
+  BEGIN
+    SELECT m.org_id, f.vsebina, f.mime_type
+      INTO l_existing_org, l_blob, l_mime
+      FROM tb_motnje_foto f
+      JOIN tb_motnje      m ON m.motnja_id = f.motnja_id
+     WHERE f.foto_id   = l_foto_id
+       AND f.motnja_id = l_motnja_id;
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+      :status_code  := 404;
+      :content_type := 'application/json';
+      HTP.prn('{"error":"not_found"}');
+      RETURN;
+  END;
+  IF l_existing_org <> l_ctx.org_id THEN
+    :status_code  := 404;
+    :content_type := 'application/json';
+    HTP.prn('{"error":"not_found"}');
+    RETURN;
+  END IF;
+
+  :status_code  := 200;
+  :content_type := l_mime;
+  -- Same pattern APEX uses for BLOB downloads: hand the BLOB to WPG_DOCLOAD
+  -- and let it stream back to the client in chunks.
+  WPG_DOCLOAD.download_file(l_blob);
+EXCEPTION
+  WHEN OTHERS THEN
+    :status_code  := 500;
+    :content_type := 'application/json';
+    HTP.prn('{"error":"server_error","sqlcode":' || SQLCODE
+            || ',"sqlerrm":"' || REPLACE(SUBSTR(SQLERRM, 1, 400), '"', '\"') || '"}');
+END;
+~'
+  );
+
+  ORDS.DEFINE_PARAMETER(p_module_name => 'narcis_disturbances', p_pattern => ':id/photos/:photoId',
+    p_method => 'GET', p_name => 'X-ORDS-STATUS-CODE',
+    p_bind_variable_name => 'status_code', p_source_type => 'HEADER',
+    p_param_type => 'INT', p_access_method => 'OUT');
+  ORDS.DEFINE_PARAMETER(p_module_name => 'narcis_disturbances', p_pattern => ':id/photos/:photoId',
+    p_method => 'GET', p_name => 'Content-Type',
+    p_bind_variable_name => 'content_type', p_source_type => 'HEADER',
+    p_param_type => 'STRING', p_access_method => 'OUT');
+
+  ----------------------------------------------------------------------------
+  -- DELETE disturbances/:id/photos/:photoId
+  ----------------------------------------------------------------------------
+  ORDS.DEFINE_HANDLER(
+    p_module_name => 'narcis_disturbances',
+    p_pattern     => ':id/photos/:photoId',
+    p_method      => 'DELETE',
+    p_source_type => ORDS.source_type_plsql,
+    p_source      => q'~
+DECLARE
+  l_ctx          pkg_tb_auth.t_auth_ctx;
+  l_motnja_id    VARCHAR2(36) := :id;
+  l_foto_id      VARCHAR2(36) := :photoId;
+  l_existing_org NUMBER;
+BEGIN
+  BEGIN
+    l_ctx := pkg_tb_auth.authenticate;
+  EXCEPTION
+    WHEN pkg_tb_auth.e_unauthorized THEN
+      :status_code  := 401;
+      :content_type := 'application/json';
+      HTP.prn('{"error":"unauthorized"}');
+      RETURN;
+  END;
+
+  BEGIN
+    SELECT m.org_id INTO l_existing_org
+      FROM tb_motnje_foto f
+      JOIN tb_motnje      m ON m.motnja_id = f.motnja_id
+     WHERE f.foto_id   = l_foto_id
+       AND f.motnja_id = l_motnja_id
+       FOR UPDATE OF f.foto_id;
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+      :status_code  := 404;
+      :content_type := 'application/json';
+      HTP.prn('{"error":"not_found"}');
+      RETURN;
+  END;
+  IF l_existing_org <> l_ctx.org_id THEN
+    :status_code  := 404;
+    :content_type := 'application/json';
+    HTP.prn('{"error":"not_found"}');
+    RETURN;
+  END IF;
+
+  DELETE FROM tb_motnje_foto WHERE foto_id = l_foto_id;
+  COMMIT;
+
+  :status_code  := 204;
+  :content_type := 'application/json';
+EXCEPTION
+  WHEN OTHERS THEN
+    ROLLBACK;
+    :status_code  := 500;
+    :content_type := 'application/json';
+    HTP.prn('{"error":"server_error","sqlcode":' || SQLCODE
+            || ',"sqlerrm":"' || REPLACE(SUBSTR(SQLERRM, 1, 400), '"', '\"') || '"}');
+END;
+~'
+  );
+
+  ORDS.DEFINE_PARAMETER(p_module_name => 'narcis_disturbances', p_pattern => ':id/photos/:photoId',
+    p_method => 'DELETE', p_name => 'X-ORDS-STATUS-CODE',
+    p_bind_variable_name => 'status_code', p_source_type => 'HEADER',
+    p_param_type => 'INT', p_access_method => 'OUT');
+  ORDS.DEFINE_PARAMETER(p_module_name => 'narcis_disturbances', p_pattern => ':id/photos/:photoId',
     p_method => 'DELETE', p_name => 'Content-Type',
     p_bind_variable_name => 'content_type', p_source_type => 'HEADER',
     p_param_type => 'STRING', p_access_method => 'OUT');

@@ -80,7 +80,7 @@ Operational consequences:
 
 - A user who logged in offline (PBKDF2 cache hit) cannot sync queued
   records. Records continue to accumulate locally until the next online
-  login, at which point `AppState.login` triggers `syncPending()` and the
+  login, at which point `AppState.login` triggers `syncAll()` and the
   queue drains. This is not a bug — it's the deliberate trade for not
   storing plaintext passwords on disk.
 - A 401 from any disturbance endpoint clears the in-memory password AND
@@ -89,6 +89,52 @@ Operational consequences:
 - Edits and deletes made *while offline* are NOT queued — they apply only
   to the local row and never reach Oracle. Only creates queue. Operators
   who care about an edit being preserved must perform it while online.
+
+### Recovery after app reinstall (sync icon UX)
+After an app reinstall or `flutter clean` on a user's device, local storage
+is wiped — but Oracle still has the records and photo BLOBs. Recovery is
+automatic:
+
+- On the next online login, `AppState.init()` runs `syncAll`, which calls
+  `GET /disturbances/` and merges every server-side record back into the
+  local store. Photos return as `{id, mimeType}` stubs — the BLOBs are
+  fetched lazily when the user opens a record's detail view (saves
+  bandwidth on cellular).
+- The cloud-icon top-right of the map indicates the divergence state. While
+  the user is offline-only or has just logged in for the first time, the
+  icon shows an orange `cloud_download` glyph with a count badge meaning
+  "remote has N records I haven't pulled yet". One tap on the icon (or the
+  "Sinhroniziraj zdaj" tile in the Profile screen) drains both directions.
+- On a brand-new device, type/observer junctions and proposed-type free
+  text come back verbatim. Type display **names** are resolved against the
+  bundled codebook in [lib/data/disturbance_types.dart](../lib/data/disturbance_types.dart);
+  if the server has historical type codes that aren't in the codebook
+  (e.g. an org-specific addition) the UI falls back to the raw code.
+
+### Photo storage operational notes
+- Photos live in `TB_MOTNJE_FOTO.VSEBINA` as SECUREFILE BLOBs with
+  `ENABLE STORAGE IN ROW` (small photos inline, large ones out-of-line).
+  LOB-level `COMPRESS LOW` / `DEDUPLICATE` were considered but raise
+  ORA-00439 on this instance (Advanced Compression option not licensed),
+  and JPEGs are already compressed so it's a small loss. The client
+  compresses to ~200–500 KB per photo before upload; the endpoint
+  hard-caps at 10 MB and rejects unknown MIME types.
+- Operators monitoring DB growth should track `SUM(VELIKOST)` in
+  `TB_MOTNJE_FOTO`. There is currently no rate-limit on photo upload —
+  STATUS: UNKNOWN – REQUIRES CONFIRMATION whether ORDS pool defaults are
+  sufficient.
+- A user removing a photo from a synced record only deletes server-side
+  when they're online (same caveat as record edit/delete above). Photos
+  removed from a not-yet-synced record never reach the server.
+- After a deploy of `disturbance_endpoints.sql` and `disturbance_schema.sql`,
+  smoke-test the photo lifecycle:
+  ```
+  APP_AUTH_EMAIL=... APP_AUTH_PASSWORD=... \
+      bash tools/ords/test_disturbances.sh
+  ```
+  The script POSTs a 1×1 PNG, asserts duplicate-POST returns 200, GETs
+  the bytes back with an image MIME, then DELETEs the photo and asserts
+  the next GET returns 404.
 
 ### Probing the disturbance endpoints
 Failure-path probes (no creds needed):
@@ -105,14 +151,18 @@ The full lifecycle creates and then deletes a record with a freshly
 `uuidgen`'d ID, so it leaves no residue in `TB_MOTNJE` on success.
 
 ### Re-deploying to Oracle
-The disturbance endpoints were deployed and smoke-tested on 2026-04-26.
+The disturbance record endpoints (POST/PUT/DELETE) were deployed and
+smoke-tested on 2026-04-26. The GET-list endpoint and photo CRUD endpoints
+landed in source on 2026-04-26 and require a re-deploy of the schema and
+endpoints scripts before the new sync-icon UX functions end-to-end.
+
 For a fresh deploy or a re-deploy, run these SQL files in this order
 against the same schema where `narcis_uporabniki` and `narcis_organizacije`
 live:
 ```
-tools/ords/disturbance_schema.sql           # tables, indexes, sequence
+tools/ords/disturbance_schema.sql           # tables, indexes, sequence (now includes TB_MOTNJE_FOTO)
 tools/ords/disturbance_codebook_seed.sql    # global codebook (groups + types)
 tools/ords/disturbance_auth_pkg.sql         # pkg_tb_auth helper package
-tools/ords/disturbance_endpoints.sql        # ORDS module narcis_disturbances
+tools/ords/disturbance_endpoints.sql        # ORDS module narcis_disturbances (now includes GET list + photo endpoints)
 ```
-All four are idempotent. After deploying, run `bash tools/ords/test_disturbances.sh` (with creds) for the lifecycle smoke test.
+All four are idempotent. After deploying, run `bash tools/ords/test_disturbances.sh` (with creds) for the lifecycle smoke test — the script now exercises GET list, photo upload (incl. duplicate-idempotency), photo download, and photo delete in addition to the original record CRUD probes.

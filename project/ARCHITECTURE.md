@@ -53,7 +53,6 @@
 - No rate limiting / account lockout on the login endpoint — STATUS: UNKNOWN – REQUIRES CONFIRMATION whether `pkg_narcis_uporabniki.preveri_geslo` enforces this internally.
 - No session/bearer token mechanism yet; the disturbance CRUD endpoints (§9.3) re-validate `X-Narcis-Auth: Basic` on every call. This is intentional for now; bearer-token migration is a follow-up. Implication: `RemoteApi` calls re-run `pkg_narcis_uporabniki.preveri_geslo` server-side per record synced.
 - Codebook fetch endpoint (PDF §6.c.ii — "ob vsakem zagonu aplikacije naj se na telefonu posodobi seznam tipov motenj") is NOT YET IMPLEMENTED. Until it is, `lib/data/disturbance_types.dart` and `tools/ords/disturbance_codebook_seed.sql` are dual-maintained: any change to the Dart codebook must be mirrored in the seed script. Per-org codebook additions (`TB_SIF_MOTNJE_TIPI.ORG_ID` non-null) are not yet visible to the client.
-- Photo upload (BLOBs into `TB_MOTNJE_FOTO`) is OUT OF SCOPE for the current sync iteration. `Disturbance.photoPaths` is preserved on the device but stripped from the wire payload; photos do not reach Oracle.
 - Offline updates and offline deletes do not queue: `AppState.updateRecord` / `deleteRecord` only push to ORDS when `isOnline && canSync`. Edits made while offline persist locally but never reach the server. Tracked as a separate follow-up to the offline-create queue.
 - Release pipeline/signing/distribution process.
 - CI/CD workflow (none detected in repository root scope).
@@ -85,14 +84,20 @@ ORDS module: `narcis_disturbances`, base path `disturbances/`. Source: [tools/or
 
 | Method | Pattern | Purpose | Success | Failure |
 |---|---|---|---|---|
+| GET | `/` | List caller's records (with photo metadata) | 200 `{records:[...]}` | 401, 500 |
 | POST | `/` | Create (idempotent on `id`) | 201 created, 200 if same UUID already exists | 400 bad body, 401 |
-| PUT | `:id` | Update fields + replace junctions | 200 | 400 bad body, 401, 404 (incl. cross-org) |
-| DELETE | `:id` | Delete (junctions cascade) | 204 | 401, 404 |
+| PUT | `:id` | Update fields + replace junctions (photos untouched) | 200 | 400 bad body, 401, 404 (incl. cross-org) |
+| DELETE | `:id` | Delete (junctions + photos cascade) | 204 | 401, 404 |
+| POST | `:id/photos/:photoId` | Upload binary photo (idempotent on `photoId`) | 201 created, 200 already exists | 400 empty, 401, 404 record, 413 too large, 415 bad MIME |
+| GET | `:id/photos/:photoId` | Download photo BLOB | 200 with image MIME | 401, 404 |
+| DELETE | `:id/photos/:photoId` | Delete photo | 204 | 401, 404 |
 
 - Auth: same `X-Narcis-Auth: Basic <base64(email:password)>` header as §9.1, on every call. `pkg_tb_auth.authenticate` raises `e_unauthorized` on any failure — handler returns 401 with `{"error":"unauthorized"}`. Same TERENSKA-BELEZNICA gate as login.
-- `ORG_ID` is stamped server-side from `narcis_uporabniki.organizacija`; the client never sends it. PUT/DELETE silently 404 when the target row's org doesn't match the caller's — "not yours" is indistinguishable from "not found".
-- Idempotency: POST with an already-known `motnja_id` is a no-op and returns 200 instead of 201. Lets the Flutter sync queue retry safely after a lost response.
-- Wire payload (matches `Disturbance.toJson()` minus `pendingSync`/`photoPaths`/`createdAt`). Note: `locationAccuracy` and `actionTaken` carry the **Slovenian display labels** verbatim from the Flutter dropdowns (`form_screen.dart`), not normalized codes - the `CK_TB_MOTNJE_LOC` constraint and the column values match those labels.
+- `ORG_ID` is stamped server-side from `narcis_uporabniki.organizacija`; the client never sends it. PUT/DELETE/photo-* silently 404 when the target row's org doesn't match the caller's — "not yours" is indistinguishable from "not found".
+- Idempotency: POST with an already-known `motnja_id` is a no-op and returns 200 instead of 201. Same goes for photo upload on a known `photoId`. Lets the Flutter sync queue retry safely after a lost response.
+- GET `/` response shape: `{"records":[{...record fields...,"photos":[{"id":"<uuid>","mimeType":"image/jpeg"},...]}]}`. Photo BLOBs are NOT inlined — the client lazy-fetches each one via the per-photo GET when the user opens the detail view.
+- Photo upload limits: `Content-Type` must be `image/jpeg`, `image/png`, `image/webp`, or `image/heic` (415 otherwise). Body cap is 10 MB (413 otherwise) — the client compresses to ~200–500 KB via `image_picker` `maxWidth=1600, imageQuality=85` so the cap is a defense against accidental original-resolution uploads.
+- Wire payload for record CRUD (matches `Disturbance.toJson()` minus `pendingSync`/`photos`/`createdAt`). Note: `locationAccuracy` and `actionTaken` carry the **Slovenian display labels** verbatim from the Flutter dropdowns (`form_screen.dart`), not normalized codes - the `CK_TB_MOTNJE_LOC` constraint and the column values match those labels.
   ```json
   {
     "id": "<uuid>",
@@ -109,8 +114,9 @@ ORDS module: `narcis_disturbances`, base path `disturbances/`. Source: [tools/or
   Allowed `locationAccuracy` values: `Natančna`, `Približna`.
   Allowed `actionTaken` values: `Brez ukrepanja`, `Ustno opozorilo`, `Pisno opozorilo`, `Drugo` (currently no CHECK constraint, just a free `VARCHAR2(50)`).
 - Each handler has a top-level `WHEN OTHERS` guard that ROLLBACKs and returns HTTP 500 with `{"error":"server_error","sqlcode":...,"sqlerrm":"..."}`. Without it, an unhandled PL/SQL exception in this ORDS instance returns 200 with no body - which the Flutter client would mistake for a successful sync (a real silent-failure bug bit us on 2026-04-26 with a `CK_TB_MOTNJE_LOC` violation).
-- Smoke test: `bash tools/ords/test_disturbances.sh` (failure paths only without creds; full lifecycle when `APP_AUTH_EMAIL` + `APP_AUTH_PASSWORD` are exported).
-- Status: deployed and smoke-tested 2026-04-26. All 9 probes passed initially; constraint/error-handling bugs found via on-device sync test the same day, fixed in [disturbance_fix_check.sql](../tools/ords/disturbance_fix_check.sql) and the `WHEN OTHERS` guards. Phone sync re-tested online and offline 2026-04-26 - both paths work.
+- Smoke test: `bash tools/ords/test_disturbances.sh` (failure paths only without creds; full lifecycle including photo upload/download/delete when `APP_AUTH_EMAIL` + `APP_AUTH_PASSWORD` are exported).
+- Status: deployed and smoke-tested 2026-04-26. GET-list, photo CRUD, and `TB_MOTNJE_FOTO` all landed and verified — full 17-probe lifecycle (incl. photo upload/duplicate-idempotency/download/delete/404-after-delete) passes against production.
+- Known cosmetic quirk on the photo GET: response `Content-Type` comes back as `image/jpeg` regardless of what was stored in `MIME_TYPE`, because `WPG_DOCLOAD.download_file` overrides the `:content_type` HEADER OUT bind (similar pattern to the §9.1 quirk on the auth endpoint). The actual bytes are correct, and the client identifies the format from the on-disk file extension when rendering, so this is non-blocking. Investigate by switching to `OWA_UTIL.mime_header` before `WPG_DOCLOAD.download_file` if/when we start ingesting non-JPEG photos and need accurate MIME on the wire.
 
 ## 9bis. Client Authentication (Flutter)
 
@@ -192,27 +198,37 @@ Defined in [tools/ords/disturbance_schema.sql](../tools/ords/disturbance_schema.
 - `TB_MOTNJE` — main records. **PK is `MOTNJA_ID VARCHAR2(36)` — the client-generated UUID, NOT a server sequence**. Off Oracle convention but lets POST be naturally idempotent on retry without a separate dedupe column. `ORG_ID` is stamped server-side from the authenticated user's `narcis_uporabniki.organizacija`. `OPIS CLOB` for the long description; lat/lon as `NUMBER(10,7)`; `CAS_OPAZOVANJA TIMESTAMP`. `NATANCNOST_LOK VARCHAR2(20)` constrained to `'Natančna'` / `'Približna'` (verbatim Slovenian labels from the Flutter form). `UKREPANJE VARCHAR2(50)` is unconstrained free text; expected values are the four dropdown labels (`Brez ukrepanja`, `Ustno opozorilo`, `Pisno opozorilo`, `Drugo`). Audit columns: `USTVARJEN_OD/USTVARJEN`, `SPREMENJEN_OD/SPREMENJEN`. Indexes on `(ORG_ID, CAS_OPAZOVANJA DESC)` and `USTVARJEN_OD`.
 - `TB_MOTNJE_TIPI_DOGODKA` — junction (record × selected types). Composite PK `(MOTNJA_ID, SKUPINA_KODA, TIP_KODA)`. **Intentionally NOT a FK to `TB_SIF_MOTNJE_TIPI`** so historical records keep their type codes even if a codebook row is later renamed or deactivated.
 - `TB_MOTNJE_OPAZOVALCI` — junction (record × observers). Composite PK `(MOTNJA_ID, IME_OPAZOVALCA)`. `IME_OPAZOVALCA` is the free-text name as the user typed it on the phone; `UPORABNIK_ID` is a nullable FK to `narcis_uporabniki.id` for resolution to a system user (resolution logic is a follow-up — currently always NULL).
+- `TB_MOTNJE_FOTO` — photos. **PK `FOTO_ID VARCHAR2(36)` is a client-generated UUID**, same pattern as `TB_MOTNJE.MOTNJA_ID` — lets the photo upload endpoint be naturally idempotent on retry. `VSEBINA BLOB` stored as SECUREFILE with `ENABLE STORAGE IN ROW` (small photos inline; large ones offline). `MIME_TYPE` constrained to `image/jpeg|png|webp|heic`. `VELIKOST` is the byte length, used by clients/operators to budget storage; CHECK ensures it's positive. `USTVARJEN_OD` is the uploader's email. **Note:** SECUREFILE `COMPRESS LOW` + `DEDUPLICATE` would be ideal but require the Advanced Compression option license (raises ORA-00439 on this instance); JPEGs are already compressed so plain SECUREFILE is the right default until/unless that license is added.
 
-Cascading delete: `TB_MOTNJE → TB_MOTNJE_TIPI_DOGODKA, TB_MOTNJE_OPAZOVALCI` are `ON DELETE CASCADE`.
-
-**Photo storage** (`TB_MOTNJE_FOTO` with `BLOB`) is reserved for a follow-up iteration and is NOT created by the schema script.
+Cascading delete: `TB_MOTNJE → TB_MOTNJE_TIPI_DOGODKA, TB_MOTNJE_OPAZOVALCI, TB_MOTNJE_FOTO` are all `ON DELETE CASCADE`.
 
 ## 13. Sync Model (Flutter `RemoteApi` + `AppState`)
 [lib/data/remote_api.dart](../lib/data/remote_api.dart) talks to §9.3. [lib/state/app_state.dart](../lib/state/app_state.dart) owns the queue.
 
 **Session credentials.** The disturbance endpoints re-authenticate every call via `X-Narcis-Auth: Basic <base64(email:password)>`. The plaintext password is required, but `AuthService` only stores a one-way PBKDF2 hash on disk (see §9bis). Resolution: `AppState` keeps the plaintext password **in memory only**, set on a successful **online** login (`AuthResult.wasOffline == false`), cleared on logout, on app exit, and on a sync 401. Never written to disk. `AppState.canSync` is true iff `_currentUser != null && _sessionPassword != null`.
 
-**Queue lifecycle.**
-1. `addRecord` writes the local row with `pendingSync = !(isOnline && canSync)`. If we have a sync path, it tries to push immediately via `_sendAndMarkSynced`.
-2. On a successful POST (201 or 200 idempotent), `pendingSync` flips to false.
-3. On `RemoteApiException` with `isUnauthorized`: clear `_sessionPassword`, wipe the offline cache (`_authService.clearCache()`), leave the row pending. Subsequent sync attempts no-op until the user logs in online again.
-4. On `RemoteApiException` with `isNetwork` or 5xx: leave the row pending. Connectivity changes (`Connectivity.onConnectivityChanged`) re-trigger `syncPending`.
-5. `syncPending` short-circuits when `!isOnline || _isSyncing || !canSync`.
+**`syncAll` (the sync icon's tap-target).** Single entry point that runs three phases under one `_isSyncing` flag:
+1. **Push pending records.** Drain `_records.where(pendingSync)` via POST `/disturbances/`. Server's idempotent-on-UUID semantics mean retries are safe.
+2. **Drain pending photo uploads.** For every record with a `pendingUpload` photo, read the local file and POST it to `/disturbances/:id/photos/:photoId`. Photos can't be uploaded before the parent record exists, hence the strict ordering.
+3. **Pull remote list and merge.** GET `/disturbances/`, build a `_lastRemoteIds` set, and merge each `RemoteDisturbance` into `_records`. Local-only `pendingSync` records are kept; for IDs known to both sides, server wins on the record fields and we preserve any cached photo `localPath`s. Photos return without `localPath` and are lazy-fetched via `ensurePhotoCached` when the user opens the detail screen.
+
+**Divergence indicator.** The icon at [home_screen.dart:520](lib/screens/home_screen.dart:520) reads three numbers off `AppState`:
+- `pendingPushCount` — records with `pendingSync` OR any `pendingUpload` photo.
+- `missingLocalCount` — `|_lastRemoteIds \ localIds|` (zero until first successful pull).
+- `pendingCount` — sum, shown as the badge.
+Three visual states: green `cloud_done` when in sync, orange `cloud_upload` when there's anything to push, orange `cloud_download` when only the remote has more. Grey `cloud_off` when offline.
+
+**Photo lifecycle.**
+1. Form picks a photo via `image_picker` (`maxWidth=1600`, `quality=85`) → temp path.
+2. `addRecord` calls `PhotoStorage.savePicked` to copy the file to `<docs>/disturbance_photos/<motnja_id>/<foto_id>.<ext>` so it survives across app restarts. The new `DisturbancePhoto` lands with `pendingUpload=true`.
+3. Next `syncAll` reads the file and POSTs the bytes. Success flips `pendingUpload=false`.
+4. `ensurePhotoCached` (called from `DetailScreen.initState`) downloads any photo with no `localPath` and writes it under the same canonical layout.
 
 **Implications.**
 - Records created during an *offline* login session stay queued until the next *online* login. Records created during an online session are pushed immediately (or queued briefly across a connectivity blip).
+- After a fresh install + online login, `init()` runs `syncAll`, which pulls all of the user's records from Oracle. Photos download lazily on first detail view.
 - Update / delete are NOT queued: they only fire when online + `canSync`. Edits made offline persist locally but don't reach Oracle. (Tracked as a follow-up; the create queue is the priority since it's the field-data path.)
-- Photo uploads do not happen yet (see §8).
+- Photo deletes also fire only online; offline removal in the form doesn't queue. Photos that exist on the server but not locally still render in the detail view as a placeholder + lazy-fetch.
 
 ## Documentation Authority
 The /project directory is the single source of truth for:

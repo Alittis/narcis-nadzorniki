@@ -25,6 +25,15 @@
         },
         {
           "path": "disturbances/",
+          "method": "GET",
+          "host": "narcis.gov.si",
+          "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
+          "scoping": "ORG_ID stamped from caller's narcis_uporabniki.organizacija; cross-org rows never returned",
+          "response_shape": "{ records: [ { id, latitude, longitude, locationAccuracy, observedAt, createdAt, description, actionTaken, proposedType, types[], observers[], photos[{id,mimeType}] } ] }",
+          "status": "deployed 2026-04-26; smoke test 17/17 (full record + photo lifecycle)"
+        },
+        {
+          "path": "disturbances/",
           "method": "POST",
           "host": "narcis.gov.si",
           "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
@@ -46,6 +55,33 @@
           "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
           "scoping": "404 if target row's ORG_ID != caller's ORG_ID",
           "status": "deployed 2026-04-26; smoke test 9/9"
+        },
+        {
+          "path": "disturbances/:id/photos/:photoId",
+          "method": "POST",
+          "host": "narcis.gov.si",
+          "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
+          "body": "raw image bytes; Content-Type from request (image/jpeg|png|webp|heic)",
+          "idempotency": "client UUID as PK; duplicate POST returns 200 instead of 201",
+          "limits": "10 MB max body; 415 on unknown MIME",
+          "status": "deployed 2026-04-26; smoke test 17/17 (full record + photo lifecycle)"
+        },
+        {
+          "path": "disturbances/:id/photos/:photoId",
+          "method": "GET",
+          "host": "narcis.gov.si",
+          "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
+          "response": "binary image with Content-Type from row",
+          "scoping": "404 if record or photo not in caller's ORG_ID",
+          "status": "deployed 2026-04-26; smoke test 17/17 (full record + photo lifecycle)"
+        },
+        {
+          "path": "disturbances/:id/photos/:photoId",
+          "method": "DELETE",
+          "host": "narcis.gov.si",
+          "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
+          "scoping": "404 if record or photo not in caller's ORG_ID",
+          "status": "deployed 2026-04-26; smoke test 17/17 (full record + photo lifecycle)"
         }
       ]
     },
@@ -134,9 +170,15 @@
       {
         "name": "TB_MOTNJE_OPAZOVALCI",
         "purpose": "junction (record × observers); free-text name + nullable FK to narcis_uporabniki"
+      },
+      {
+        "name": "TB_MOTNJE_FOTO",
+        "purpose": "photo BLOBs; PK = client-generated UUID for idempotent POST retries; SECUREFILE storage with ENABLE STORAGE IN ROW; ON DELETE CASCADE from TB_MOTNJE. (COMPRESS LOW + DEDUPLICATE removed because Advanced Compression option not licensed on this DB - ORA-00439.)",
+        "added": "2026-04-26"
       }
     ],
-    "photos_in_scope": false,
+    "photos_in_scope": true,
+    "photos_status": "deployed and smoke-tested 2026-04-26; 17/17 lifecycle probes passed (upload/duplicate/download/delete/404). Known cosmetic: response Content-Type on photo GET always reports image/jpeg regardless of stored MIME (WPG_DOCLOAD overrides the :content_type bind) — non-blocking until non-JPEG photos enter the pipeline",
     "codebook_fetch_endpoint_in_scope": false
   }
 }
