@@ -85,10 +85,10 @@ probe() {
 
 # 1. Failure paths (no credentials needed).
 probe 'POST without auth header' POST '' 401 \
-  '{"id":"00000000-0000-0000-0000-000000000000","latitude":45.79,"longitude":14.36,"locationAccuracy":"natancna","observedAt":"2026-04-25T12:00:00Z","types":[],"description":"x","observers":["x"],"actionTaken":"brez"}'
+  '{"id":"00000000-0000-0000-0000-000000000000","latitude":45.79,"longitude":14.36,"locationAccuracy":"Natančna","observedAt":"2026-04-25T12:00:00Z","types":[],"description":"x","observers":["x"],"actionTaken":"Brez ukrepanja"}'
 
 probe 'POST with bogus creds' POST '' 401 \
-  '{"id":"00000000-0000-0000-0000-000000000000","latitude":45.79,"longitude":14.36,"locationAccuracy":"natancna","observedAt":"2026-04-25T12:00:00Z","types":[],"description":"x","observers":["x"],"actionTaken":"brez"}' \
+  '{"id":"00000000-0000-0000-0000-000000000000","latitude":45.79,"longitude":14.36,"locationAccuracy":"Natančna","observedAt":"2026-04-25T12:00:00Z","types":[],"description":"x","observers":["x"],"actionTaken":"Brez ukrepanja"}' \
   'noone@example.invalid' 'wrong'
 
 probe 'DELETE without auth header' DELETE '00000000-0000-0000-0000-000000000000' 401
@@ -99,7 +99,7 @@ if [ -n "${APP_AUTH_EMAIL:-}" ] && [ -n "${APP_AUTH_PASSWORD:-}" ]; then
   printf '\n(test record id: %s)\n' "$TEST_ID"
 
   POST_BODY=$(cat <<EOF
-{"id":"${TEST_ID}","latitude":45.79,"longitude":14.36,"locationAccuracy":"natancna","observedAt":"2026-04-25T12:00:00Z","types":[{"groupCode":"1","typeCode":"a"}],"description":"smoke test","observers":["Smoke Test"],"actionTaken":"brez","proposedType":null}
+{"id":"${TEST_ID}","latitude":45.79,"longitude":14.36,"locationAccuracy":"Natančna","observedAt":"2026-04-25T12:00:00Z","types":[{"groupCode":"1","typeCode":"a"}],"description":"smoke test","observers":["Smoke Test"],"actionTaken":"Brez ukrepanja","proposedType":null}
 EOF
 )
 
@@ -110,7 +110,7 @@ EOF
     "$APP_AUTH_EMAIL" "$APP_AUTH_PASSWORD"
 
   PUT_BODY=$(cat <<EOF
-{"latitude":45.80,"longitude":14.37,"locationAccuracy":"priblizna","observedAt":"2026-04-25T13:00:00Z","types":[{"groupCode":"1","typeCode":"b"}],"description":"smoke test (updated)","observers":["Smoke Test"],"actionTaken":"ustno"}
+{"latitude":45.80,"longitude":14.37,"locationAccuracy":"Približna","observedAt":"2026-04-25T13:00:00Z","types":[{"groupCode":"1","typeCode":"b"}],"description":"smoke test (updated)","observers":["Smoke Test"],"actionTaken":"Ustno opozorilo"}
 EOF
 )
 

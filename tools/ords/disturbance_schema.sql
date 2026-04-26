@@ -122,7 +122,7 @@ BEGIN
                                      REFERENCES narcis_organizacije (id),
         CONSTRAINT ck_tb_motnje_lat  CHECK (geo_sirina  BETWEEN -90  AND 90),
         CONSTRAINT ck_tb_motnje_lon  CHECK (geo_dolzina BETWEEN -180 AND 180),
-        CONSTRAINT ck_tb_motnje_loc  CHECK (natancnost_lok IN ('natancna','priblizna'))
+        CONSTRAINT ck_tb_motnje_loc  CHECK (natancnost_lok IN ('Natančna','Približna'))
       )
     ~';
     EXECUTE IMMEDIATE 'CREATE INDEX ix_tb_motnje_org_cas ON tb_motnje (org_id, cas_opazovanja DESC)';

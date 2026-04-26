@@ -92,22 +92,25 @@ ORDS module: `narcis_disturbances`, base path `disturbances/`. Source: [tools/or
 - Auth: same `X-Narcis-Auth: Basic <base64(email:password)>` header as §9.1, on every call. `pkg_tb_auth.authenticate` raises `e_unauthorized` on any failure — handler returns 401 with `{"error":"unauthorized"}`. Same TERENSKA-BELEZNICA gate as login.
 - `ORG_ID` is stamped server-side from `narcis_uporabniki.organizacija`; the client never sends it. PUT/DELETE silently 404 when the target row's org doesn't match the caller's — "not yours" is indistinguishable from "not found".
 - Idempotency: POST with an already-known `motnja_id` is a no-op and returns 200 instead of 201. Lets the Flutter sync queue retry safely after a lost response.
-- Wire payload (matches `Disturbance.toJson()` minus `pendingSync`/`photoPaths`/`createdAt`):
+- Wire payload (matches `Disturbance.toJson()` minus `pendingSync`/`photoPaths`/`createdAt`). Note: `locationAccuracy` and `actionTaken` carry the **Slovenian display labels** verbatim from the Flutter dropdowns (`form_screen.dart`), not normalized codes - the `CK_TB_MOTNJE_LOC` constraint and the column values match those labels.
   ```json
   {
     "id": "<uuid>",
     "latitude": 45.79, "longitude": 14.36,
-    "locationAccuracy": "natancna",
+    "locationAccuracy": "Natančna",
     "observedAt": "2026-04-25T12:00:00.000Z",
     "types": [{"groupCode": "1", "typeCode": "a"}],
     "description": "...",
     "observers": ["..."],
-    "actionTaken": "brez",
+    "actionTaken": "Brez ukrepanja",
     "proposedType": null
   }
   ```
+  Allowed `locationAccuracy` values: `Natančna`, `Približna`.
+  Allowed `actionTaken` values: `Brez ukrepanja`, `Ustno opozorilo`, `Pisno opozorilo`, `Drugo` (currently no CHECK constraint, just a free `VARCHAR2(50)`).
+- Each handler has a top-level `WHEN OTHERS` guard that ROLLBACKs and returns HTTP 500 with `{"error":"server_error","sqlcode":...,"sqlerrm":"..."}`. Without it, an unhandled PL/SQL exception in this ORDS instance returns 200 with no body - which the Flutter client would mistake for a successful sync (a real silent-failure bug bit us on 2026-04-26 with a `CK_TB_MOTNJE_LOC` violation).
 - Smoke test: `bash tools/ords/test_disturbances.sh` (failure paths only without creds; full lifecycle when `APP_AUTH_EMAIL` + `APP_AUTH_PASSWORD` are exported).
-- Status: deployed and smoke-tested 2026-04-26. All 9 probes passed: 3 failure-path 401s (no header / bogus creds / DELETE without header) and the full lifecycle (POST 201 → POST same UUID 200 idempotent → PUT 200 → DELETE 204 → PUT-after-delete 404 → DELETE-after-delete 404).
+- Status: deployed and smoke-tested 2026-04-26. All 9 probes passed initially; constraint/error-handling bugs found via on-device sync test the same day, fixed in [disturbance_fix_check.sql](../tools/ords/disturbance_fix_check.sql) and the `WHEN OTHERS` guards. Phone sync re-tested online and offline 2026-04-26 - both paths work.
 
 ## 9bis. Client Authentication (Flutter)
 
@@ -186,7 +189,7 @@ Defined in [tools/ords/disturbance_schema.sql](../tools/ords/disturbance_schema.
 **Tables:**
 - `TB_SIF_MOTNJE_SKUPINE` — group codebook. PK `SKUPINA_KODA VARCHAR2(2)`. Universal (no per-org variation by design — confirmed 2026-04-25).
 - `TB_SIF_MOTNJE_TIPI` — type codebook. Synthetic PK `TIP_ID NUMBER`. Unique on `(SKUPINA_KODA, TIP_KODA, NVL(ORG_ID, 0))` — same `(group, type)` pair can exist once globally (`ORG_ID NULL`) and once per organization. Per-org additions live alongside the global codebook.
-- `TB_MOTNJE` — main records. **PK is `MOTNJA_ID VARCHAR2(36)` — the client-generated UUID, NOT a server sequence**. Off Oracle convention but lets POST be naturally idempotent on retry without a separate dedupe column. `ORG_ID` is stamped server-side from the authenticated user's `narcis_uporabniki.organizacija`. `OPIS CLOB` for the long description; lat/lon as `NUMBER(10,7)`; `CAS_OPAZOVANJA TIMESTAMP`. Audit columns: `USTVARJEN_OD/USTVARJEN`, `SPREMENJEN_OD/SPREMENJEN`. Indexes on `(ORG_ID, CAS_OPAZOVANJA DESC)` and `USTVARJEN_OD`.
+- `TB_MOTNJE` — main records. **PK is `MOTNJA_ID VARCHAR2(36)` — the client-generated UUID, NOT a server sequence**. Off Oracle convention but lets POST be naturally idempotent on retry without a separate dedupe column. `ORG_ID` is stamped server-side from the authenticated user's `narcis_uporabniki.organizacija`. `OPIS CLOB` for the long description; lat/lon as `NUMBER(10,7)`; `CAS_OPAZOVANJA TIMESTAMP`. `NATANCNOST_LOK VARCHAR2(20)` constrained to `'Natančna'` / `'Približna'` (verbatim Slovenian labels from the Flutter form). `UKREPANJE VARCHAR2(50)` is unconstrained free text; expected values are the four dropdown labels (`Brez ukrepanja`, `Ustno opozorilo`, `Pisno opozorilo`, `Drugo`). Audit columns: `USTVARJEN_OD/USTVARJEN`, `SPREMENJEN_OD/SPREMENJEN`. Indexes on `(ORG_ID, CAS_OPAZOVANJA DESC)` and `USTVARJEN_OD`.
 - `TB_MOTNJE_TIPI_DOGODKA` — junction (record × selected types). Composite PK `(MOTNJA_ID, SKUPINA_KODA, TIP_KODA)`. **Intentionally NOT a FK to `TB_SIF_MOTNJE_TIPI`** so historical records keep their type codes even if a codebook row is later renamed or deactivated.
 - `TB_MOTNJE_OPAZOVALCI` — junction (record × observers). Composite PK `(MOTNJA_ID, IME_OPAZOVALCA)`. `IME_OPAZOVALCA` is the free-text name as the user typed it on the phone; `UPORABNIK_ID` is a nullable FK to `narcis_uporabniki.id` for resolution to a system user (resolution logic is a follow-up — currently always NULL).
 

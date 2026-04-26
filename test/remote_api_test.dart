@@ -26,7 +26,7 @@ Disturbance _sample({String id = '11111111-2222-3333-4444-555555555555'}) {
     id: id,
     latitude: 45.79,
     longitude: 14.36,
-    locationAccuracy: 'natancna',
+    locationAccuracy: 'Natančna',
     observedAt: DateTime.utc(2026, 4, 25, 12, 0, 0),
     types: const [
       SelectedDisturbanceType(
@@ -39,7 +39,7 @@ Disturbance _sample({String id = '11111111-2222-3333-4444-555555555555'}) {
     description: 'Test',
     photoPaths: const [],
     observers: const ['Alexis Zrimec'],
-    actionTaken: 'brez',
+    actionTaken: 'Brez ukrepanja',
     pendingSync: false,
     createdAt: DateTime.utc(2026, 4, 25, 12, 0, 0),
   );
@@ -79,9 +79,9 @@ void main() {
       expect(body['id'], '11111111-2222-3333-4444-555555555555');
       expect(body['latitude'], 45.79);
       expect(body['longitude'], 14.36);
-      expect(body['locationAccuracy'], 'natancna');
+      expect(body['locationAccuracy'], 'Natančna');
       expect(body['observedAt'], '2026-04-25T12:00:00.000Z');
-      expect(body['actionTaken'], 'brez');
+      expect(body['actionTaken'], 'Brez ukrepanja');
       expect(body['observers'], const ['Alexis Zrimec']);
       // Wire payload trims types to just the codes — names are derivable
       // from the codebook on the server.
