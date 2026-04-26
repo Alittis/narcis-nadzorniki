@@ -71,3 +71,47 @@ valid for offline login until the configured max-offline window expires
 - First-time login is always online and gated by the server's
   `TERENSKA-BELEZNICA` check, so an unauthorized user can never establish an
   offline-capable cache in the first place.
+
+## 10. Disturbance Sync — Operational Caveats
+The disturbance CRUD endpoints (ARCHITECTURE.md §9.3) require the user's
+plaintext password on every call (no bearer tokens yet). The Flutter client
+keeps that password in memory only after a successful **online** login.
+Operational consequences:
+
+- A user who logged in offline (PBKDF2 cache hit) cannot sync queued
+  records. Records continue to accumulate locally until the next online
+  login, at which point `AppState.login` triggers `syncPending()` and the
+  queue drains. This is not a bug — it's the deliberate trade for not
+  storing plaintext passwords on disk.
+- A 401 from any disturbance endpoint clears the in-memory password AND
+  wipes the offline cache (same wipe path as a §9.1 401). The user must log
+  in online again. Records remain queued.
+- Edits and deletes made *while offline* are NOT queued — they apply only
+  to the local row and never reach Oracle. Only creates queue. Operators
+  who care about an edit being preserved must perform it while online.
+
+### Probing the disturbance endpoints
+Failure-path probes (no creds needed):
+```bash
+bash tools/ords/test_disturbances.sh
+```
+Full lifecycle (POST → POST again → PUT → DELETE → 404 checks):
+```bash
+APP_AUTH_EMAIL=alexis.zrimec@gov.si \
+APP_AUTH_PASSWORD='...' \
+    bash tools/ords/test_disturbances.sh
+```
+The full lifecycle creates and then deletes a record with a freshly
+`uuidgen`'d ID, so it leaves no residue in `TB_MOTNJE` on success.
+
+### First-time deployment to Oracle
+The disturbance endpoints are **not yet deployed**. To deploy, run these
+SQL files in this order against the same schema where `narcis_uporabniki`
+and `narcis_organizacije` live:
+```
+tools/ords/disturbance_schema.sql           # tables, indexes, sequence
+tools/ords/disturbance_codebook_seed.sql    # global codebook (groups + types)
+tools/ords/disturbance_auth_pkg.sql         # pkg_tb_auth helper package
+tools/ords/disturbance_endpoints.sql        # ORDS module narcis_disturbances
+```
+All four are idempotent. After deploying, run `bash tools/ords/test_disturbances.sh` (with creds) for the lifecycle smoke test.

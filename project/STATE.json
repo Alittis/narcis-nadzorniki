@@ -22,6 +22,30 @@
           "host": "narcis.gov.si",
           "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
           "status": "deployed; A56 real-device validation passed 2026-04-25; debug instrumentation remains (credentials redacted) for broader-device coverage"
+        },
+        {
+          "path": "disturbances/",
+          "method": "POST",
+          "host": "narcis.gov.si",
+          "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
+          "idempotency": "client UUID as PK; duplicate POST returns 200 instead of 201",
+          "status": "designed and SQL written; NOT YET DEPLOYED to ORDS"
+        },
+        {
+          "path": "disturbances/:id",
+          "method": "PUT",
+          "host": "narcis.gov.si",
+          "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
+          "scoping": "404 if target row's ORG_ID != caller's ORG_ID (no cross-tenant leak)",
+          "status": "designed and SQL written; NOT YET DEPLOYED to ORDS"
+        },
+        {
+          "path": "disturbances/:id",
+          "method": "DELETE",
+          "host": "narcis.gov.si",
+          "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
+          "scoping": "404 if target row's ORG_ID != caller's ORG_ID",
+          "status": "designed and SQL written; NOT YET DEPLOYED to ORDS"
         }
       ]
     },
@@ -73,7 +97,46 @@
       "hash": "PBKDF2-HMAC-SHA256, 100000 iters, 32-byte salt, 32-byte key",
       "algo_version_tag": "pbkdf2_sha256_100k_v1",
       "max_offline_window_days": 14,
-      "wiped_on": ["explicit logout", "online HTTP 401"]
+      "wiped_on": ["explicit logout", "online HTTP 401", "sync HTTP 401"]
+    },
+    "sync_session": {
+      "plaintext_password_held": "in-memory only, set on online login (AuthResult.wasOffline=false)",
+      "cleared_on": ["logout", "app exit", "RemoteApiException with isUnauthorized"],
+      "implication": "records created during offline-only login sessions stay queued until next online login"
     }
+  },
+  "disturbance_schema": {
+    "status": "DDL written; NOT YET DEPLOYED to Oracle",
+    "deploy_order": [
+      "tools/ords/disturbance_schema.sql",
+      "tools/ords/disturbance_codebook_seed.sql",
+      "tools/ords/disturbance_auth_pkg.sql",
+      "tools/ords/disturbance_endpoints.sql"
+    ],
+    "table_prefix": "TB_",
+    "tables": [
+      {
+        "name": "TB_SIF_MOTNJE_SKUPINE",
+        "purpose": "group codebook (universal)"
+      },
+      {
+        "name": "TB_SIF_MOTNJE_TIPI",
+        "purpose": "type codebook; ORG_ID NULL = global, ORG_ID set = per-org addition"
+      },
+      {
+        "name": "TB_MOTNJE",
+        "purpose": "main records; PK = client-generated UUID for idempotent POST retries; ORG_ID stamped from narcis_uporabniki.organizacija"
+      },
+      {
+        "name": "TB_MOTNJE_TIPI_DOGODKA",
+        "purpose": "junction (record × selected types); intentionally not FK to codebook so historical records survive codebook changes"
+      },
+      {
+        "name": "TB_MOTNJE_OPAZOVALCI",
+        "purpose": "junction (record × observers); free-text name + nullable FK to narcis_uporabniki"
+      }
+    ],
+    "photos_in_scope": false,
+    "codebook_fetch_endpoint_in_scope": false
   }
 }

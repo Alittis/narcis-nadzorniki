@@ -51,8 +51,10 @@
   4. `DROP TABLE narcis_auth_debug PURGE;`
   5. Delete `tools/ords/auth_debug_table.sql`.
 - No rate limiting / account lockout on the login endpoint — STATUS: UNKNOWN – REQUIRES CONFIRMATION whether `pkg_narcis_uporabniki.preveri_geslo` enforces this internally.
-- No session/bearer token mechanism yet; subsequent CRUD endpoints will need one (re-sending Basic creds on every call is the wrong long-term answer).
-- Disturbance CRUD endpoints on ORDS — not yet implemented; `RemoteApi` is a stub with delays only.
+- No session/bearer token mechanism yet; the disturbance CRUD endpoints (§9.3) re-validate `X-Narcis-Auth: Basic` on every call. This is intentional for now; bearer-token migration is a follow-up. Implication: `RemoteApi` calls re-run `pkg_narcis_uporabniki.preveri_geslo` server-side per record synced.
+- Codebook fetch endpoint (PDF §6.c.ii — "ob vsakem zagonu aplikacije naj se na telefonu posodobi seznam tipov motenj") is NOT YET IMPLEMENTED. Until it is, `lib/data/disturbance_types.dart` and `tools/ords/disturbance_codebook_seed.sql` are dual-maintained: any change to the Dart codebook must be mirrored in the seed script. Per-org codebook additions (`TB_SIF_MOTNJE_TIPI.ORG_ID` non-null) are not yet visible to the client.
+- Photo upload (BLOBs into `TB_MOTNJE_FOTO`) is OUT OF SCOPE for the current sync iteration. `Disturbance.photoPaths` is preserved on the device but stripped from the wire payload; photos do not reach Oracle.
+- Offline updates and offline deletes do not queue: `AppState.updateRecord` / `deleteRecord` only push to ORDS when `isOnline && canSync`. Edits made while offline persist locally but never reach the server. Tracked as a separate follow-up to the offline-create queue.
 - Release pipeline/signing/distribution process.
 - CI/CD workflow (none detected in repository root scope).
 
@@ -77,6 +79,35 @@
 - 401 with `{"authenticated":false,"message":"Invalid credentials"}` otherwise
 - CORS: `Access-Control-Allow-Origin: *`
 - Status: superseded by §9.1 as of the Flutter cutover (2026-04-25). The Flutter client no longer calls this endpoint. Stub may be removed from ORDS at any time.
+
+### 9.3 Disturbance CRUD — `https://narcis.gov.si/ords/narcis/disturbances/`
+ORDS module: `narcis_disturbances`, base path `disturbances/`. Source: [tools/ords/disturbance_endpoints.sql](../tools/ords/disturbance_endpoints.sql). Auth helper: [tools/ords/disturbance_auth_pkg.sql](../tools/ords/disturbance_auth_pkg.sql) (`pkg_tb_auth`). Schema: [tools/ords/disturbance_schema.sql](../tools/ords/disturbance_schema.sql). Codebook seed: [tools/ords/disturbance_codebook_seed.sql](../tools/ords/disturbance_codebook_seed.sql).
+
+| Method | Pattern | Purpose | Success | Failure |
+|---|---|---|---|---|
+| POST | `/` | Create (idempotent on `id`) | 201 created, 200 if same UUID already exists | 400 bad body, 401 |
+| PUT | `:id` | Update fields + replace junctions | 200 | 400 bad body, 401, 404 (incl. cross-org) |
+| DELETE | `:id` | Delete (junctions cascade) | 204 | 401, 404 |
+
+- Auth: same `X-Narcis-Auth: Basic <base64(email:password)>` header as §9.1, on every call. `pkg_tb_auth.authenticate` raises `e_unauthorized` on any failure — handler returns 401 with `{"error":"unauthorized"}`. Same TERENSKA-BELEZNICA gate as login.
+- `ORG_ID` is stamped server-side from `narcis_uporabniki.organizacija`; the client never sends it. PUT/DELETE silently 404 when the target row's org doesn't match the caller's — "not yours" is indistinguishable from "not found".
+- Idempotency: POST with an already-known `motnja_id` is a no-op and returns 200 instead of 201. Lets the Flutter sync queue retry safely after a lost response.
+- Wire payload (matches `Disturbance.toJson()` minus `pendingSync`/`photoPaths`/`createdAt`):
+  ```json
+  {
+    "id": "<uuid>",
+    "latitude": 45.79, "longitude": 14.36,
+    "locationAccuracy": "natancna",
+    "observedAt": "2026-04-25T12:00:00.000Z",
+    "types": [{"groupCode": "1", "typeCode": "a"}],
+    "description": "...",
+    "observers": ["..."],
+    "actionTaken": "brez",
+    "proposedType": null
+  }
+  ```
+- Smoke test: `bash tools/ords/test_disturbances.sh` (failure paths only without creds; full lifecycle when `APP_AUTH_EMAIL` + `APP_AUTH_PASSWORD` are exported).
+- Status: schema designed and SQL written; **NOT YET DEPLOYED** to the production ORDS instance. STATUS: UNKNOWN – REQUIRES CONFIRMATION until `tools/ords/disturbance_schema.sql`, `disturbance_codebook_seed.sql`, `disturbance_auth_pkg.sql`, and `disturbance_endpoints.sql` are run against the live database in that order.
 
 ## 9bis. Client Authentication (Flutter)
 
@@ -148,6 +179,37 @@ Historical disturbance records from another app (Notranjski regijski park's Word
   Dependencies: `openlocationcode` (for Plus Code → lat/lon decoding on rows without explicit coordinates). Reference anchor: Cerknica (45.79, 14.36).
 - Dropped on import: rows with `Entry Status=3` (drafts), rows with no category selected, rows with no resolvable coordinates.
 - These records are explicitly **not** writable from the app and do not sync to ORDS. They exist only to give observers map context for work already done by the other app.
+
+## 12. Disturbance Schema (Oracle, prefix `TB_`)
+Defined in [tools/ords/disturbance_schema.sql](../tools/ords/disturbance_schema.sql). All tables prefixed `TB_` for "Terenska beležka" so the app's tables are easy to distinguish from other tables in the shared `narcis` schema.
+
+**Tables:**
+- `TB_SIF_MOTNJE_SKUPINE` — group codebook. PK `SKUPINA_KODA VARCHAR2(2)`. Universal (no per-org variation by design — confirmed 2026-04-25).
+- `TB_SIF_MOTNJE_TIPI` — type codebook. Synthetic PK `TIP_ID NUMBER`. Unique on `(SKUPINA_KODA, TIP_KODA, NVL(ORG_ID, 0))` — same `(group, type)` pair can exist once globally (`ORG_ID NULL`) and once per organization. Per-org additions live alongside the global codebook.
+- `TB_MOTNJE` — main records. **PK is `MOTNJA_ID VARCHAR2(36)` — the client-generated UUID, NOT a server sequence**. Off Oracle convention but lets POST be naturally idempotent on retry without a separate dedupe column. `ORG_ID` is stamped server-side from the authenticated user's `narcis_uporabniki.organizacija`. `OPIS CLOB` for the long description; lat/lon as `NUMBER(10,7)`; `CAS_OPAZOVANJA TIMESTAMP`. Audit columns: `USTVARJEN_OD/USTVARJEN`, `SPREMENJEN_OD/SPREMENJEN`. Indexes on `(ORG_ID, CAS_OPAZOVANJA DESC)` and `USTVARJEN_OD`.
+- `TB_MOTNJE_TIPI_DOGODKA` — junction (record × selected types). Composite PK `(MOTNJA_ID, SKUPINA_KODA, TIP_KODA)`. **Intentionally NOT a FK to `TB_SIF_MOTNJE_TIPI`** so historical records keep their type codes even if a codebook row is later renamed or deactivated.
+- `TB_MOTNJE_OPAZOVALCI` — junction (record × observers). Composite PK `(MOTNJA_ID, IME_OPAZOVALCA)`. `IME_OPAZOVALCA` is the free-text name as the user typed it on the phone; `UPORABNIK_ID` is a nullable FK to `narcis_uporabniki.id` for resolution to a system user (resolution logic is a follow-up — currently always NULL).
+
+Cascading delete: `TB_MOTNJE → TB_MOTNJE_TIPI_DOGODKA, TB_MOTNJE_OPAZOVALCI` are `ON DELETE CASCADE`.
+
+**Photo storage** (`TB_MOTNJE_FOTO` with `BLOB`) is reserved for a follow-up iteration and is NOT created by the schema script.
+
+## 13. Sync Model (Flutter `RemoteApi` + `AppState`)
+[lib/data/remote_api.dart](../lib/data/remote_api.dart) talks to §9.3. [lib/state/app_state.dart](../lib/state/app_state.dart) owns the queue.
+
+**Session credentials.** The disturbance endpoints re-authenticate every call via `X-Narcis-Auth: Basic <base64(email:password)>`. The plaintext password is required, but `AuthService` only stores a one-way PBKDF2 hash on disk (see §9bis). Resolution: `AppState` keeps the plaintext password **in memory only**, set on a successful **online** login (`AuthResult.wasOffline == false`), cleared on logout, on app exit, and on a sync 401. Never written to disk. `AppState.canSync` is true iff `_currentUser != null && _sessionPassword != null`.
+
+**Queue lifecycle.**
+1. `addRecord` writes the local row with `pendingSync = !(isOnline && canSync)`. If we have a sync path, it tries to push immediately via `_sendAndMarkSynced`.
+2. On a successful POST (201 or 200 idempotent), `pendingSync` flips to false.
+3. On `RemoteApiException` with `isUnauthorized`: clear `_sessionPassword`, wipe the offline cache (`_authService.clearCache()`), leave the row pending. Subsequent sync attempts no-op until the user logs in online again.
+4. On `RemoteApiException` with `isNetwork` or 5xx: leave the row pending. Connectivity changes (`Connectivity.onConnectivityChanged`) re-trigger `syncPending`.
+5. `syncPending` short-circuits when `!isOnline || _isSyncing || !canSync`.
+
+**Implications.**
+- Records created during an *offline* login session stay queued until the next *online* login. Records created during an online session are pushed immediately (or queued briefly across a connectivity blip).
+- Update / delete are NOT queued: they only fire when online + `canSync`. Edits made offline persist locally but don't reach Oracle. (Tracked as a follow-up; the create queue is the priority since it's the field-data path.)
+- Photo uploads do not happen yet (see §8).
 
 ## Documentation Authority
 The /project directory is the single source of truth for:
