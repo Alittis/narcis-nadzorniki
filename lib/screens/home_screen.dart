@@ -6,11 +6,56 @@ import 'package:narcis_nadzorniki/models/legacy_disturbance.dart';
 import 'package:narcis_nadzorniki/screens/detail_screen.dart';
 import 'package:narcis_nadzorniki/screens/form_screen.dart';
 import 'package:narcis_nadzorniki/screens/legacy_detail_screen.dart';
-import 'package:narcis_nadzorniki/screens/record_list_screen.dart';
+import 'package:narcis_nadzorniki/screens/place_search_screen.dart';
+import 'package:narcis_nadzorniki/screens/profile_screen.dart';
 import 'package:narcis_nadzorniki/services/location_service.dart';
+import 'package:narcis_nadzorniki/services/place_search_service.dart';
 import 'package:narcis_nadzorniki/state/app_state.dart';
 import 'package:narcis_nadzorniki/widgets/basemap.dart';
 import 'package:provider/provider.dart';
+
+enum AppMode { motnje, sprehod, mode3, mode4 }
+
+class _ModeDef {
+  const _ModeDef({
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.enabled,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String label;
+  final bool enabled;
+}
+
+const Map<AppMode, _ModeDef> _modeDefs = {
+  AppMode.motnje: _ModeDef(
+    icon: Icons.report_problem,
+    color: Colors.red,
+    label: 'Motnje',
+    enabled: true,
+  ),
+  AppMode.sprehod: _ModeDef(
+    icon: Icons.directions_walk,
+    color: Colors.green,
+    label: 'Sprehod',
+    enabled: false,
+  ),
+  AppMode.mode3: _ModeDef(
+    icon: Icons.help_outline,
+    color: Colors.grey,
+    label: 'Način 3',
+    enabled: false,
+  ),
+  AppMode.mode4: _ModeDef(
+    icon: Icons.help_outline,
+    color: Colors.grey,
+    label: 'Način 4',
+    enabled: false,
+  ),
+};
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -25,6 +70,10 @@ class _HomeScreenState extends State<HomeScreen> {
   LatLng _center = const LatLng(45.75, 14.39);
   LatLng? _userLocation;
   BasemapMode _basemapMode = BasemapMode.osm;
+  bool _locating = false;
+
+  AppMode _activeMode = AppMode.motnje;
+  bool _showMotnje = true;
 
   @override
   void initState() {
@@ -41,29 +90,44 @@ class _HomeScreenState extends State<HomeScreen> {
       _userLocation = location;
       _center = location;
     });
+    _mapController.move(location, _mapController.camera.zoom);
+  }
+
+  Future<void> _recenterOnUser() async {
+    setState(() => _locating = true);
+    final location = await _locationService.getCurrentLocation();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _locating = false;
+      if (location != null) {
+        _userLocation = location;
+        _center = location;
+      }
+    });
+    if (location == null) {
+      _showSnack('GPS lokacije ni mogoče pridobiti.');
+      return;
+    }
+    _mapController.move(location, _mapController.camera.zoom);
   }
 
   Color _markerColor(Disturbance record) {
     final now = DateTime.now();
     final age = now.difference(record.observedAt).inDays;
-    if (age <= 31) {
-      return Colors.red;
-    }
-    if (age <= 365) {
-      return Colors.orange;
-    }
+    if (age <= 31) return Colors.red;
+    if (age <= 365) return Colors.orange;
     return Colors.blue;
   }
 
-  void _openLegacyDetail(BuildContext context, LegacyDisturbance record) {
+  void _openLegacyDetail(LegacyDisturbance record) {
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => LegacyDetailScreen(record: record),
-      ),
+      MaterialPageRoute(builder: (_) => LegacyDetailScreen(record: record)),
     );
   }
 
-  void _openForm(BuildContext context, AppState state) {
+  void _openForm(AppState state) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => FormScreen(
@@ -75,81 +139,47 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _openSettingsSheet(AppState state) {
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Nastavitve', style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 12),
-                SwitchListTile(
-                  value: state.offlineOverride,
-                  onChanged: state.setOfflineOverride,
-                  title: const Text('Offline način'),
-                  subtitle: const Text('Shranjuj lokalno in čakati na sinhronizacijo.'),
-                ),
-                SwitchListTile(
-                  value: state.showLegacy,
-                  onChanged: state.setShowLegacy,
-                  title: const Text('Prikaži zgodovinske zapise'),
-                  subtitle: Text(
-                    'Notranjski regijski park, 2025 (${state.legacyRecords.length} zapisov).',
-                  ),
-                ),
-                const Divider(),
-                ListTile(
-                  leading: const Icon(Icons.logout),
-                  title: const Text('Odjava'),
-                  subtitle: Text(state.currentUser ?? ''),
-                  onTap: () async {
-                    Navigator.of(context).pop();
-                    await state.logout();
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+  Future<void> _openSearch() async {
+    final result = await Navigator.of(context).push<PlaceResult>(
+      MaterialPageRoute(builder: (_) => const PlaceSearchScreen()),
     );
+    if (result == null || !mounted) return;
+    setState(() => _center = result.location);
+    _mapController.move(result.location, 14);
   }
 
-  Widget _buildSyncIcon(AppState state) {
-    if (state.pendingCount == 0) {
-      return const Icon(Icons.sync);
+  void _onModeTap(AppMode mode) {
+    final def = _modeDefs[mode]!;
+    if (!def.enabled) {
+      _showSnack('${def.label}: kmalu.');
+      return;
     }
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        const Icon(Icons.sync),
-        Positioned(
-          right: -6,
-          top: -6,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-            decoration: BoxDecoration(
-              color: Colors.redAccent,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            constraints: const BoxConstraints(minWidth: 16),
-            child: Text(
-              state.pendingCount.toString(),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
-      ],
+    if (_activeMode != mode) {
+      setState(() => _activeMode = mode);
+    }
+  }
+
+  void _onPlusTap(AppState state) {
+    final def = _modeDefs[_activeMode]!;
+    if (!def.enabled) {
+      _showSnack('${def.label}: kmalu.');
+      return;
+    }
+    switch (_activeMode) {
+      case AppMode.motnje:
+        _openForm(state);
+        break;
+      case AppMode.sprehod:
+      case AppMode.mode3:
+      case AppMode.mode4:
+        _showSnack('${def.label}: kmalu.');
+        break;
+    }
+  }
+
+  void _showSnack(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
     );
   }
 
@@ -157,134 +187,686 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Consumer<AppState>(
       builder: (context, state, _) {
-        final markers = <Marker>[
-          if (state.showLegacy)
-            ...state.legacyRecords.map(
-              (record) => Marker(
-                point: LatLng(record.latitude, record.longitude),
-                width: 30,
-                height: 30,
-                child: GestureDetector(
-                  onTap: () => _openLegacyDetail(context, record),
-                  child: const Icon(
-                    Icons.circle,
-                    color: Colors.deepPurple,
-                    size: 14,
-                  ),
-                ),
-              ),
-            ),
-          ...state.records.map(
-            (record) => Marker(
-              point: LatLng(record.latitude, record.longitude),
-              width: 44,
-              height: 44,
-              child: GestureDetector(
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => DetailScreen(record: record),
-                    ),
-                  );
-                },
-                child: Icon(
-                  Icons.location_on,
-                  color: _markerColor(record),
-                  size: 38,
-                ),
-              ),
-            ),
-          ),
-        ];
-        if (_userLocation != null) {
-          markers.add(
-            Marker(
-              point: _userLocation!,
-              width: 40,
-              height: 40,
-              child: const Icon(
-                Icons.my_location,
-                color: Colors.blueGrey,
-                size: 26,
-              ),
-            ),
-          );
-        }
-
         return Scaffold(
-          appBar: AppBar(
-            title: const Text('Motnje - teren'),
-            actions: [
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Chip(
-                  label: Text(state.isOnline ? 'ONLINE' : 'OFFLINE'),
-                  backgroundColor: state.isOnline ? Colors.green[100] : Colors.orange[100],
-                  labelStyle: TextStyle(
-                    color: state.isOnline ? Colors.green[900] : Colors.orange[900],
-                    fontWeight: FontWeight.w600,
+          extendBodyBehindAppBar: true,
+          body: Stack(
+            children: [
+              Positioned.fill(
+                child: FlutterMap(
+                  mapController: _mapController,
+                  options: MapOptions(
+                    initialCenter: _center,
+                    initialZoom: 13,
+                    maxZoom: 19,
+                    interactionOptions: const InteractionOptions(
+                      flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                    ),
+                    onTap: (tapPosition, point) {
+                      _center = point;
+                    },
+                    onPositionChanged: (position, _) {
+                      if (position.center != null) {
+                        _center = position.center!;
+                      }
+                    },
                   ),
+                  children: [
+                    ...basemapTileLayers(_basemapMode),
+                    MarkerLayer(markers: _buildMarkers(state)),
+                  ],
                 ),
               ),
-              BasemapToggleButton(
-                mode: _basemapMode,
-                onChanged: (mode) => setState(() => _basemapMode = mode),
-              ),
-              IconButton(
-                tooltip: 'Sinhroniziraj',
-                onPressed: state.isSyncing ? null : state.syncPending,
-                icon: state.isSyncing
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : _buildSyncIcon(state),
-              ),
-              IconButton(
-                tooltip: 'Seznam',
-                onPressed: () {
+              _TopChrome(
+                state: state,
+                basemapMode: _basemapMode,
+                showMotnje: _showMotnje,
+                showLegacy: state.showLegacy,
+                onAvatarTap: () {
                   Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => RecordListScreen(records: state.records),
-                    ),
+                    MaterialPageRoute(builder: (_) => const ProfileScreen()),
                   );
                 },
-                icon: const Icon(Icons.list_alt),
+                onSearchTap: _openSearch,
+                onSyncTap: state.isSyncing ? null : state.syncAll,
+                onBasemapChanged: (m) => setState(() => _basemapMode = m),
+                onMotnjeToggle: () =>
+                    setState(() => _showMotnje = !_showMotnje),
+                onLegacyToggle: () => state.setShowLegacy(!state.showLegacy),
+                onPlaceholderTap: (label) => _showSnack('$label: kmalu.'),
               ),
-              IconButton(
-                tooltip: 'Nastavitve',
-                onPressed: () => _openSettingsSheet(state),
-                icon: const Icon(Icons.settings),
+              _BottomBar(
+                activeMode: _activeMode,
+                locating: _locating,
+                onLocateTap: _locating ? null : _recenterOnUser,
+                onModeTap: _onModeTap,
+                onPlusTap: () => _onPlusTap(state),
               ),
             ],
-          ),
-          body: FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: _center,
-              initialZoom: 13,
-              onTap: (tapPosition, point) {
-                _center = point;
-              },
-              onPositionChanged: (position, _) {
-                if (position.center != null) {
-                  _center = position.center!;
-                }
-              },
-            ),
-            children: [
-              ...basemapTileLayers(_basemapMode),
-              MarkerLayer(markers: markers),
-            ],
-          ),
-          floatingActionButton: FloatingActionButton.extended(
-            onPressed: () => _openForm(context, state),
-            icon: const Icon(Icons.add),
-            label: const Text('Nov zapis'),
           ),
         );
       },
+    );
+  }
+
+  List<Marker> _buildMarkers(AppState state) {
+    final markers = <Marker>[];
+    if (state.showLegacy) {
+      for (final record in state.legacyRecords) {
+        markers.add(
+          Marker(
+            point: LatLng(record.latitude, record.longitude),
+            width: 30,
+            height: 30,
+            child: GestureDetector(
+              onTap: () => _openLegacyDetail(record),
+              child: const Icon(
+                Icons.circle,
+                color: Colors.deepPurple,
+                size: 14,
+              ),
+            ),
+          ),
+        );
+      }
+    }
+    if (_showMotnje) {
+      for (final record in state.records) {
+        markers.add(
+          Marker(
+            point: LatLng(record.latitude, record.longitude),
+            width: 44,
+            height: 44,
+            child: GestureDetector(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => DetailScreen(record: record),
+                  ),
+                );
+              },
+              child: Icon(
+                Icons.location_on,
+                color: _markerColor(record),
+                size: 38,
+              ),
+            ),
+          ),
+        );
+      }
+    }
+    if (_userLocation != null) {
+      markers.add(
+        Marker(
+          point: _userLocation!,
+          width: 24,
+          height: 24,
+          child: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.blueAccent,
+              border: Border.all(color: Colors.white, width: 3),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 4,
+                  offset: Offset(0, 1),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    return markers;
+  }
+}
+
+class _TopChrome extends StatelessWidget {
+  const _TopChrome({
+    required this.state,
+    required this.basemapMode,
+    required this.showMotnje,
+    required this.showLegacy,
+    required this.onAvatarTap,
+    required this.onSearchTap,
+    required this.onSyncTap,
+    required this.onBasemapChanged,
+    required this.onMotnjeToggle,
+    required this.onLegacyToggle,
+    required this.onPlaceholderTap,
+  });
+
+  final AppState state;
+  final BasemapMode basemapMode;
+  final bool showMotnje;
+  final bool showLegacy;
+  final VoidCallback onAvatarTap;
+  final VoidCallback onSearchTap;
+  final VoidCallback? onSyncTap;
+  final ValueChanged<BasemapMode> onBasemapChanged;
+  final VoidCallback onMotnjeToggle;
+  final VoidCallback onLegacyToggle;
+  final ValueChanged<String> onPlaceholderTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+              child: Row(
+                children: [
+                  _AvatarButton(
+                    email: state.currentUser ?? '',
+                    onTap: onAvatarTap,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(child: _SearchPill(onTap: onSearchTap)),
+                  const SizedBox(width: 8),
+                  _SyncStatusButton(state: state, onTap: onSyncTap),
+                  const SizedBox(width: 8),
+                  _ChromeIconButton(
+                    icon: basemapMode == BasemapMode.satellite
+                        ? Icons.map_rounded
+                        : Icons.satellite_alt_rounded,
+                    tooltip: basemapMode == BasemapMode.satellite
+                        ? 'Zemljevid'
+                        : 'Satelitska slika',
+                    enabled: state.isOnline,
+                    onTap: () => onBasemapChanged(
+                      basemapMode == BasemapMode.satellite
+                          ? BasemapMode.osm
+                          : BasemapMode.satellite,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(
+              height: 32,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                children: [
+                  _LayerChip(
+                    icon: Icons.report_problem,
+                    label: 'Motnje',
+                    selected: showMotnje,
+                    enabled: true,
+                    onTap: onMotnjeToggle,
+                  ),
+                  _LayerChip(
+                    icon: Icons.shield_moon_outlined,
+                    label: 'Območja',
+                    selected: false,
+                    enabled: false,
+                    onTap: () => onPlaceholderTap('Območja'),
+                  ),
+                  _LayerChip(
+                    icon: Icons.grid_on,
+                    label: 'Parcele',
+                    selected: false,
+                    enabled: false,
+                    onTap: () => onPlaceholderTap('Parcele'),
+                  ),
+                  _LayerChip(
+                    icon: Icons.history,
+                    label: 'Zgodovina',
+                    selected: showLegacy,
+                    enabled: true,
+                    onTap: onLegacyToggle,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AvatarButton extends StatelessWidget {
+  const _AvatarButton({required this.email, required this.onTap});
+
+  final String email;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = email.isNotEmpty ? email[0].toUpperCase() : '?';
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.primary,
+      shape: const CircleBorder(),
+      elevation: 2,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: SizedBox(
+          width: 40,
+          height: 40,
+          child: Center(
+            child: Text(
+              initial,
+              style: TextStyle(
+                color: scheme.onPrimary,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SearchPill extends StatelessWidget {
+  const _SearchPill({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.95),
+      shape: const StadiumBorder(),
+      elevation: 2,
+      child: InkWell(
+        customBorder: const StadiumBorder(),
+        onTap: onTap,
+        child: const SizedBox(
+          height: 40,
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 14),
+            child: Row(
+              children: [
+                Icon(Icons.search, size: 20),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Išči kraj…',
+                    style: TextStyle(color: Colors.black54),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SyncStatusButton extends StatelessWidget {
+  const _SyncStatusButton({required this.state, required this.onTap});
+
+  final AppState state;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isOnline = state.isOnline;
+    final outOfSync = state.isOutOfSync;
+    final badgeCount = state.pendingCount;
+
+    final Color bg;
+    final Color fg;
+    final IconData iconData;
+    final String tooltip;
+
+    if (!isOnline) {
+      bg = Colors.grey.shade300;
+      fg = Colors.grey.shade800;
+      iconData = Icons.cloud_off;
+      tooltip = 'Brez povezave';
+    } else if (outOfSync) {
+      // Pull-only divergence (server has records we don't) gets a download
+      // glyph; anything that needs to be sent up gets the warning glyph.
+      // Either way the badge count tells the user how many records are
+      // affected.
+      bg = Colors.orange.shade100;
+      fg = Colors.orange.shade900;
+      if (state.pendingPushCount > 0) {
+        iconData = Icons.cloud_upload;
+        tooltip = 'Sinhroniziraj ($badgeCount neusklajenih)';
+      } else {
+        iconData = Icons.cloud_download;
+        tooltip = 'Prenesi z strežnika ($badgeCount manjkajočih)';
+      }
+    } else {
+      bg = Colors.green.shade100;
+      fg = Colors.green.shade900;
+      iconData = Icons.cloud_done;
+      tooltip = 'Vse sinhronizirano';
+    }
+
+    Widget glyph;
+    if (state.isSyncing) {
+      glyph = SizedBox(
+        width: 18,
+        height: 18,
+        child: CircularProgressIndicator(strokeWidth: 2, color: fg),
+      );
+    } else {
+      glyph = Icon(iconData, color: fg, size: 22);
+    }
+
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: bg,
+        shape: const CircleBorder(),
+        elevation: 2,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: SizedBox(
+            width: 40,
+            height: 40,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Center(child: glyph),
+                if (badgeCount > 0)
+                  Positioned(
+                    top: -2,
+                    right: -2,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      constraints: const BoxConstraints(minWidth: 18),
+                      child: Text(
+                        badgeCount.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ChromeIconButton extends StatelessWidget {
+  const _ChromeIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+    this.enabled = true,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final surface = Theme.of(context).colorScheme.surface;
+    return Material(
+      color: surface.withValues(alpha: enabled ? 0.95 : 0.6),
+      shape: const CircleBorder(),
+      elevation: enabled ? 2 : 0,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: enabled ? onTap : null,
+        child: SizedBox(
+          width: 40,
+          height: 40,
+          child: Tooltip(
+            message: tooltip,
+            child: Icon(
+              icon,
+              size: 22,
+              color: enabled ? null : Colors.black38,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LayerChip extends StatelessWidget {
+  const _LayerChip({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final bg = !enabled
+        ? scheme.surface.withValues(alpha: 0.7)
+        : selected
+            ? scheme.primary
+            : scheme.surface.withValues(alpha: 0.95);
+    final fg = !enabled
+        ? Colors.black38
+        : selected
+            ? scheme.onPrimary
+            : Colors.black87;
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: Material(
+        color: bg,
+        shape: const StadiumBorder(),
+        elevation: 1.5,
+        child: InkWell(
+          customBorder: const StadiumBorder(),
+          onTap: onTap,
+          child: SizedBox(
+            height: 24,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 14, color: fg),
+                  const SizedBox(width: 4),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: fg,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 12,
+                      height: 1.0,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BottomBar extends StatelessWidget {
+  const _BottomBar({
+    required this.activeMode,
+    required this.locating,
+    required this.onLocateTap,
+    required this.onModeTap,
+    required this.onPlusTap,
+  });
+
+  final AppMode activeMode;
+  final bool locating;
+  final VoidCallback? onLocateTap;
+  final ValueChanged<AppMode> onModeTap;
+  final VoidCallback onPlusTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final activeColor = _modeDefs[activeMode]!.color;
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: SafeArea(
+        top: false,
+        minimum: const EdgeInsets.only(bottom: 8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              _LocateButton(locating: locating, onTap: onLocateTap),
+              _ModePill(activeMode: activeMode, onTap: onModeTap),
+              _PlusButton(color: activeColor, onTap: onPlusTap),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LocateButton extends StatelessWidget {
+  const _LocateButton({required this.locating, required this.onTap});
+
+  final bool locating;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.surface,
+      shape: const CircleBorder(),
+      elevation: 4,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: SizedBox(
+          width: 48,
+          height: 48,
+          child: Center(
+            child: locating
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Transform.rotate(
+                    angle: 0.785398, // 45° clockwise
+                    child: const Icon(Icons.navigation),
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ModePill extends StatelessWidget {
+  const _ModePill({required this.activeMode, required this.onTap});
+
+  final AppMode activeMode;
+  final ValueChanged<AppMode> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Theme.of(context).colorScheme.surface,
+      shape: const StadiumBorder(),
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: AppMode.values.map((mode) {
+            final def = _modeDefs[mode]!;
+            final isActive = mode == activeMode;
+            final Color iconColor;
+            if (!def.enabled) {
+              iconColor = Colors.black26;
+            } else if (isActive) {
+              iconColor = Colors.white;
+            } else {
+              iconColor = Colors.black87;
+            }
+            return InkWell(
+              customBorder: const CircleBorder(),
+              onTap: () => onTap(mode),
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 2),
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: isActive ? def.color : Colors.transparent,
+                  shape: BoxShape.circle,
+                ),
+                child: Tooltip(
+                  message: def.label,
+                  child: Icon(def.icon, color: iconColor, size: 22),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+}
+
+class _PlusButton extends StatelessWidget {
+  const _PlusButton({required this.color, required this.onTap});
+
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: color,
+      shape: const CircleBorder(),
+      elevation: 6,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: const SizedBox(
+          width: 56,
+          height: 56,
+          child: Icon(Icons.add, color: Colors.white, size: 28),
+        ),
+      ),
     );
   }
 }

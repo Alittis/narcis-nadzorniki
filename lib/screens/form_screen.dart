@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
+import 'package:narcis_nadzorniki/models/disturbance_photo.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
 import 'package:narcis_nadzorniki/screens/location_picker_screen.dart';
 import 'package:narcis_nadzorniki/screens/type_selection_screen.dart';
@@ -43,7 +44,7 @@ class _FormScreenState extends State<FormScreen> {
   DateTime _date = DateTime.now();
   TimeOfDay _time = TimeOfDay.now();
   List<SelectedDisturbanceType> _types = [];
-  List<String> _photoPaths = [];
+  List<DisturbancePhoto> _photos = [];
   List<String> _observers = [];
   String _actionTaken = 'Brez ukrepanja';
   bool _pickedOnMap = false;
@@ -60,12 +61,22 @@ class _FormScreenState extends State<FormScreen> {
     if (_location != null) {
       return;
     }
+    await _useFreshGps();
+  }
+
+  Future<void> _useFreshGps() async {
     final location = await _locationService.getCurrentLocation();
     if (!mounted) {
       return;
     }
+    if (location == null) {
+      _showSnack('GPS lokacije ni mogoče pridobiti.');
+      return;
+    }
     setState(() {
       _location = location;
+      _accuracy = 'Natančna';
+      _pickedOnMap = false;
     });
   }
 
@@ -125,7 +136,7 @@ class _FormScreenState extends State<FormScreen> {
   }
 
   Future<void> _addPhoto(ImageSource source) async {
-    if (_photoPaths.length >= 3) {
+    if (_photos.length >= 3) {
       _showSnack('Največ 3 fotografije na zapis.');
       return;
     }
@@ -135,8 +146,18 @@ class _FormScreenState extends State<FormScreen> {
       imageQuality: 85,
     );
     if (picked != null) {
+      // Stable storage happens in AppState.addRecord; here we just hold the
+      // temp path so the user can preview / remove before saving.
       setState(() {
-        _photoPaths = [..._photoPaths, picked.path];
+        _photos = [
+          ..._photos,
+          DisturbancePhoto(
+            id: _uuid.v4(),
+            mimeType: 'image/jpeg',
+            localPath: picked.path,
+            pendingUpload: true,
+          ),
+        ];
       });
     }
   }
@@ -172,9 +193,9 @@ class _FormScreenState extends State<FormScreen> {
     );
   }
 
-  void _removePhoto(String path) {
+  void _removePhoto(DisturbancePhoto photo) {
     setState(() {
-      _photoPaths = _photoPaths.where((item) => item != path).toList();
+      _photos = _photos.where((item) => item.id != photo.id).toList();
     });
   }
 
@@ -218,7 +239,7 @@ class _FormScreenState extends State<FormScreen> {
       observedAt: observedAt,
       types: _types,
       description: _descriptionController.text.trim(),
-      photoPaths: _photoPaths,
+      photos: _photos,
       observers: _observers,
       actionTaken: _actionTaken,
       pendingSync: true,
@@ -276,7 +297,7 @@ class _FormScreenState extends State<FormScreen> {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: _ensureLocation,
+                    onPressed: _useFreshGps,
                     icon: const Icon(Icons.my_location),
                     label: const Text('Uporabi GPS'),
                   ),
@@ -364,32 +385,38 @@ class _FormScreenState extends State<FormScreen> {
             const Divider(height: 32),
             Text('Fotografije (max 3)', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
-            if (_photoPaths.isNotEmpty)
+            if (_photos.isNotEmpty)
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: _photoPaths
-                    .map(
-                      (path) => Stack(
-                        alignment: Alignment.topRight,
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.file(
-                              File(path),
-                              width: 90,
-                              height: 90,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.close, color: Colors.white),
-                            onPressed: () => _removePhoto(path),
-                          ),
-                        ],
+                children: _photos.map((photo) {
+                  final path = photo.localPath;
+                  return Stack(
+                    alignment: Alignment.topRight,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: path != null
+                            ? Image.file(
+                                File(path),
+                                width: 90,
+                                height: 90,
+                                fit: BoxFit.cover,
+                              )
+                            : Container(
+                                width: 90,
+                                height: 90,
+                                color: Colors.black12,
+                                child: const Icon(Icons.image_not_supported),
+                              ),
                       ),
-                    )
-                    .toList(),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white),
+                        onPressed: () => _removePhoto(photo),
+                      ),
+                    ],
+                  );
+                }).toList(),
               )
             else
               const Text('Ni dodanih fotografij.'),

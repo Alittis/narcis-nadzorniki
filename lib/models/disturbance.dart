@@ -1,3 +1,4 @@
+import 'package:narcis_nadzorniki/models/disturbance_photo.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
 
 class Disturbance {
@@ -9,7 +10,7 @@ class Disturbance {
     required this.observedAt,
     required this.types,
     required this.description,
-    required this.photoPaths,
+    required this.photos,
     required this.observers,
     required this.actionTaken,
     required this.pendingSync,
@@ -24,12 +25,14 @@ class Disturbance {
   final DateTime observedAt;
   final List<SelectedDisturbanceType> types;
   final String description;
-  final List<String> photoPaths;
+  final List<DisturbancePhoto> photos;
   final List<String> observers;
   final String actionTaken;
   final bool pendingSync;
   final DateTime createdAt;
   final String? proposedType;
+
+  bool get hasPendingPhotoUploads => photos.any((p) => p.pendingUpload);
 
   Disturbance copyWith({
     double? latitude,
@@ -38,7 +41,7 @@ class Disturbance {
     DateTime? observedAt,
     List<SelectedDisturbanceType>? types,
     String? description,
-    List<String>? photoPaths,
+    List<DisturbancePhoto>? photos,
     List<String>? observers,
     String? actionTaken,
     bool? pendingSync,
@@ -53,7 +56,7 @@ class Disturbance {
       observedAt: observedAt ?? this.observedAt,
       types: types ?? this.types,
       description: description ?? this.description,
-      photoPaths: photoPaths ?? this.photoPaths,
+      photos: photos ?? this.photos,
       observers: observers ?? this.observers,
       actionTaken: actionTaken ?? this.actionTaken,
       pendingSync: pendingSync ?? this.pendingSync,
@@ -70,7 +73,7 @@ class Disturbance {
         'observedAt': observedAt.toIso8601String(),
         'types': types.map((type) => type.toJson()).toList(),
         'description': description,
-        'photoPaths': photoPaths,
+        'photos': photos.map((p) => p.toJson()).toList(),
         'observers': observers,
         'actionTaken': actionTaken,
         'pendingSync': pendingSync,
@@ -89,12 +92,37 @@ class Disturbance {
           .map((entry) => SelectedDisturbanceType.fromJson(entry as Map<String, dynamic>))
           .toList(),
       description: json['description'] as String,
-      photoPaths: (json['photoPaths'] as List<dynamic>).cast<String>(),
+      photos: _readPhotos(json),
       observers: (json['observers'] as List<dynamic>).cast<String>(),
       actionTaken: json['actionTaken'] as String,
       pendingSync: json['pendingSync'] as bool,
       createdAt: DateTime.parse(json['createdAt'] as String),
       proposedType: json['proposedType'] as String?,
     );
+  }
+
+  /// Backwards-compat reader: pre-photo-sync builds wrote `photoPaths` as a
+  /// flat list of strings. Anything we read in that shape is treated as
+  /// already-uploaded local files (best we can do without re-uploading them
+  /// blindly — the user can re-attach if they want them on the server).
+  static List<DisturbancePhoto> _readPhotos(Map<String, dynamic> json) {
+    final fresh = json['photos'];
+    if (fresh is List) {
+      return fresh
+          .map((entry) => DisturbancePhoto.fromJson(entry as Map<String, dynamic>))
+          .toList();
+    }
+    final legacy = json['photoPaths'];
+    if (legacy is List) {
+      return legacy.cast<String>().map((path) {
+        return DisturbancePhoto(
+          id: path,
+          mimeType: 'image/jpeg',
+          localPath: path,
+          pendingUpload: false,
+        );
+      }).toList();
+    }
+    return const [];
   }
 }

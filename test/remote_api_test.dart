@@ -6,6 +6,7 @@
 // timeout). The real ORDS endpoint is never touched.
 
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -37,7 +38,7 @@ Disturbance _sample({String id = '11111111-2222-3333-4444-555555555555'}) {
       ),
     ],
     description: 'Test',
-    photoPaths: const [],
+    photos: const [],
     observers: const ['Alexis Zrimec'],
     actionTaken: 'Brez ukrepanja',
     pendingSync: false,
@@ -88,9 +89,10 @@ void main() {
       expect(body['types'], const [
         {'groupCode': '1', 'typeCode': 'a'},
       ]);
-      // pendingSync, photoPaths, createdAt are not on the wire.
+      // pendingSync, photos, createdAt are not on the wire — photos go up via
+      // the dedicated photo endpoint, not the disturbance JSON.
       expect(body.containsKey('pendingSync'), isFalse);
-      expect(body.containsKey('photoPaths'), isFalse);
+      expect(body.containsKey('photos'), isFalse);
       expect(body.containsKey('createdAt'), isFalse);
     });
 
@@ -178,6 +180,130 @@ void main() {
       expect(
         api.deleteRecord('id-3', _creds),
         throwsA(isA<RemoteApiException>()),
+      );
+    });
+  });
+
+  group('fetchRecords', () {
+    test('GETs the base URL with auth and parses {"records":[...]}', () async {
+      late http.Request captured;
+      final api = _api((req) async {
+        captured = req;
+        // utf8 encoding required because the body contains 'č' (Natančna) -
+        // http.Response(String, ...) defaults to latin-1 and would fail to
+        // serialize.
+        return http.Response.bytes(
+          utf8.encode(jsonEncode({
+            'records': [
+              {
+                'id': 'rec-1',
+                'latitude': 45.79,
+                'longitude': 14.36,
+                'locationAccuracy': 'Natančna',
+                'observedAt': '2026-04-25T12:00:00.000Z',
+                'createdAt': '2026-04-25T12:01:00.000Z',
+                'description': 'd',
+                'actionTaken': 'Brez ukrepanja',
+                'proposedType': null,
+                'types': [
+                  {'groupCode': '1', 'typeCode': 'a'},
+                ],
+                'observers': ['Alexis'],
+                'photos': [
+                  {'id': 'p-1', 'mimeType': 'image/jpeg'},
+                ],
+              },
+            ],
+          })),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      });
+
+      final result = await api.fetchRecords(_creds);
+      expect(captured.method, 'GET');
+      expect(captured.url, _baseUrl);
+      expect(captured.headers['X-Narcis-Auth'], isNotNull);
+      expect(result, hasLength(1));
+      expect(result.first.id, 'rec-1');
+      expect(result.first.photos, hasLength(1));
+      expect(result.first.photos.first.id, 'p-1');
+      expect(result.first.photos.first.localPath, isNull);
+    });
+
+    test('also accepts a bare array body', () async {
+      final api = _api((_) async => http.Response('[]', 200));
+      final result = await api.fetchRecords(_creds);
+      expect(result, isEmpty);
+    });
+
+    test('401 surfaces as unauthorized', () async {
+      final api = _api((_) async => http.Response('{}', 401));
+      try {
+        await api.fetchRecords(_creds);
+        fail('expected throw');
+      } on RemoteApiException catch (e) {
+        expect(e.isUnauthorized, isTrue);
+      }
+    });
+  });
+
+  group('photo endpoints', () {
+    test('uploadPhoto POSTs binary to /<id>/photos/<photoId>', () async {
+      late http.Request captured;
+      final api = _api((req) async {
+        captured = req;
+        return http.Response('{"status":"created"}', 201);
+      });
+
+      await api.uploadPhoto(
+        motnjaId: 'rec-1',
+        photoId: 'p-1',
+        bytes: Uint8List.fromList([1, 2, 3, 4]),
+        mimeType: 'image/jpeg',
+        credentials: _creds,
+      );
+      expect(captured.method, 'POST');
+      expect(captured.url.toString(), '${_baseUrl}rec-1/photos/p-1');
+      expect(captured.headers['Content-Type'], 'image/jpeg');
+      expect(captured.bodyBytes, Uint8List.fromList([1, 2, 3, 4]));
+    });
+
+    test('uploadPhoto 200 (idempotent re-upload) is treated as success',
+        () async {
+      final api =
+          _api((_) async => http.Response('{"status":"exists"}', 200));
+      await api.uploadPhoto(
+        motnjaId: 'rec-1',
+        photoId: 'p-1',
+        bytes: Uint8List.fromList([1]),
+        mimeType: 'image/jpeg',
+        credentials: _creds,
+      );
+    });
+
+    test('downloadPhoto returns the response bytes', () async {
+      final api = _api(
+        (_) async => http.Response.bytes(
+          [9, 8, 7],
+          200,
+          headers: {'content-type': 'image/jpeg'},
+        ),
+      );
+      final bytes = await api.downloadPhoto(
+        motnjaId: 'rec-1',
+        photoId: 'p-1',
+        credentials: _creds,
+      );
+      expect(bytes, Uint8List.fromList([9, 8, 7]));
+    });
+
+    test('deletePhoto treats 404 as already-gone', () async {
+      final api = _api((_) async => http.Response('', 404));
+      await api.deletePhoto(
+        motnjaId: 'rec-1',
+        photoId: 'p-1',
+        credentials: _creds,
       );
     });
   });
