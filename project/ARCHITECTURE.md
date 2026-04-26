@@ -107,7 +107,7 @@ ORDS module: `narcis_disturbances`, base path `disturbances/`. Source: [tools/or
   }
   ```
 - Smoke test: `bash tools/ords/test_disturbances.sh` (failure paths only without creds; full lifecycle when `APP_AUTH_EMAIL` + `APP_AUTH_PASSWORD` are exported).
-- Status: schema designed and SQL written; **NOT YET DEPLOYED** to the production ORDS instance. STATUS: UNKNOWN – REQUIRES CONFIRMATION until `tools/ords/disturbance_schema.sql`, `disturbance_codebook_seed.sql`, `disturbance_auth_pkg.sql`, and `disturbance_endpoints.sql` are run against the live database in that order.
+- Status: deployed and smoke-tested 2026-04-26. All 9 probes passed: 3 failure-path 401s (no header / bogus creds / DELETE without header) and the full lifecycle (POST 201 → POST same UUID 200 idempotent → PUT 200 → DELETE 204 → PUT-after-delete 404 → DELETE-after-delete 404).
 
 ## 9bis. Client Authentication (Flutter)
 

@@ -29,7 +29,7 @@
           "host": "narcis.gov.si",
           "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
           "idempotency": "client UUID as PK; duplicate POST returns 200 instead of 201",
-          "status": "designed and SQL written; NOT YET DEPLOYED to ORDS"
+          "status": "deployed 2026-04-26; smoke test 9/9"
         },
         {
           "path": "disturbances/:id",
@@ -37,7 +37,7 @@
           "host": "narcis.gov.si",
           "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
           "scoping": "404 if target row's ORG_ID != caller's ORG_ID (no cross-tenant leak)",
-          "status": "designed and SQL written; NOT YET DEPLOYED to ORDS"
+          "status": "deployed 2026-04-26; smoke test 9/9"
         },
         {
           "path": "disturbances/:id",
@@ -45,7 +45,7 @@
           "host": "narcis.gov.si",
           "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
           "scoping": "404 if target row's ORG_ID != caller's ORG_ID",
-          "status": "designed and SQL written; NOT YET DEPLOYED to ORDS"
+          "status": "deployed 2026-04-26; smoke test 9/9"
         }
       ]
     },
@@ -106,7 +106,7 @@
     }
   },
   "disturbance_schema": {
-    "status": "DDL written; NOT YET DEPLOYED to Oracle",
+    "status": "deployed to Oracle 2026-04-26; smoke test 9/9 passed",
     "deploy_order": [
       "tools/ords/disturbance_schema.sql",
       "tools/ords/disturbance_codebook_seed.sql",

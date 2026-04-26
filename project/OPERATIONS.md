@@ -104,10 +104,11 @@ APP_AUTH_PASSWORD='...' \
 The full lifecycle creates and then deletes a record with a freshly
 `uuidgen`'d ID, so it leaves no residue in `TB_MOTNJE` on success.
 
-### First-time deployment to Oracle
-The disturbance endpoints are **not yet deployed**. To deploy, run these
-SQL files in this order against the same schema where `narcis_uporabniki`
-and `narcis_organizacije` live:
+### Re-deploying to Oracle
+The disturbance endpoints were deployed and smoke-tested on 2026-04-26.
+For a fresh deploy or a re-deploy, run these SQL files in this order
+against the same schema where `narcis_uporabniki` and `narcis_organizacije`
+live:
 ```
 tools/ords/disturbance_schema.sql           # tables, indexes, sequence
 tools/ords/disturbance_codebook_seed.sql    # global codebook (groups + types)
