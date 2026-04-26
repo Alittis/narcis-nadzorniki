@@ -19,7 +19,7 @@ class MotenjApp extends StatelessWidget {
       child: MaterialApp(
         title: 'Narcis Nadzorniki',
         theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2A6F97)),
+          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF388E3C)),
           useMaterial3: true,
         ),
         home: Consumer<AppState>(
