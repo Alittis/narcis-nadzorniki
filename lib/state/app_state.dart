@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:narcis_nadzorniki/data/disturbance_types.dart';
 import 'package:narcis_nadzorniki/data/legacy_records.dart';
@@ -138,7 +139,10 @@ class AppState extends ChangeNotifier {
     final result = await _connectivity.checkConnectivity();
     _connectivityResult = _normalizeConnectivity(result);
     _connectivitySub = _connectivity.onConnectivityChanged.listen((results) {
+      final previous = _connectivityResult;
       _connectivityResult = _normalizeConnectivity(results);
+      debugPrint('[sync] connectivity raw=$results normalized=$_connectivityResult '
+          '(was=$previous, isOnline=$isOnline)');
       notifyListeners();
       if (isOnline) {
         syncAll();
@@ -178,16 +182,26 @@ class AppState extends ChangeNotifier {
     // Move them into stable storage tied to motnja_id so they survive restarts
     // and so the upload queue can find them even if the temp dir was cleaned.
     final stablePhotos = await _materializePhotos(record);
-    final canPushNow = isOnline && canSync;
+    // ALWAYS enqueue as pendingSync=true. _sendAndMarkSynced flips it to false
+    // only on a confirmed 2xx from the server. Pre-marking it false here on
+    // the optimistic assumption that an inline push will succeed used to
+    // strand records permanently when the inline push failed (network blip,
+    // server 5xx, captive portal): syncAll() filters on pendingSync=true and
+    // would never retry them. The manual sync button would then do nothing
+    // visible, even though canSync was true.
     final newRecord = record.copyWith(
       photos: stablePhotos,
-      pendingSync: !canPushNow,
+      pendingSync: true,
     );
     _records = [..._records, newRecord];
     _lastObservers = newRecord.observers;
     await _localStore.save(_records);
     notifyListeners();
-    if (canPushNow) {
+    debugPrint('[sync] addRecord ${newRecord.id} '
+        'isOnline=$isOnline canSync=$canSync');
+    // Optimistic push if we can. Failure leaves the record queued for
+    // syncAll() to retry (connectivity tick, manual button, next login).
+    if (isOnline && canSync) {
       final ok = await _sendAndMarkSynced(newRecord);
       if (ok) {
         await _drainPendingPhotos();
@@ -254,16 +268,22 @@ class AppState extends ChangeNotifier {
   /// merges in any records that were missing locally. Single entry-point
   /// behind the sync icon.
   Future<void> syncAll() async {
+    debugPrint('[sync] syncAll() entry isOnline=$isOnline '
+        'canSync=$canSync isSyncing=$_isSyncing');
     if (!isOnline || _isSyncing || !canSync) {
+      debugPrint('[sync] syncAll() early-return');
       return;
     }
     _isSyncing = true;
     notifyListeners();
     try {
       final pendingRecords = _records.where((r) => r.pendingSync).toList();
+      debugPrint('[sync] pending records to push: ${pendingRecords.length}');
       for (final record in pendingRecords) {
         final ok = await _sendAndMarkSynced(record);
+        debugPrint('[sync]   push ${record.id} → $ok');
         if (!ok && !canSync) {
+          debugPrint('[sync] aborting after auth-clear');
           return;
         }
       }
@@ -276,6 +296,7 @@ class AppState extends ChangeNotifier {
     } finally {
       _isSyncing = false;
       notifyListeners();
+      debugPrint('[sync] syncAll() exit');
     }
   }
 
@@ -286,10 +307,14 @@ class AppState extends ChangeNotifier {
 
   Future<bool> _sendAndMarkSynced(Disturbance record) async {
     final creds = _credentials;
-    if (creds == null) return false;
+    if (creds == null) {
+      debugPrint('[sync] _sendAndMarkSynced ${record.id}: no creds');
+      return false;
+    }
     try {
       await _remoteApi.createRecord(record, creds);
     } on RemoteApiException catch (e) {
+      debugPrint('[sync] _sendAndMarkSynced ${record.id} FAILED: $e');
       _handleSyncException(e);
       return false;
     }
