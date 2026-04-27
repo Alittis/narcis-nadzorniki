@@ -180,32 +180,132 @@ class _FormScreenState extends State<FormScreen> {
     }
   }
 
-  void _showPhotoPicker() {
+  void _showPhotoSheet() {
     showModalBottomSheet<void>(
       context: context,
-      builder: (context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.photo_camera),
-                title: const Text('Uporabi kamero'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _addPhoto(ImageSource.camera);
-                },
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            final atMax = _photos.length >= 3;
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Fotografije',
+                          style: Theme.of(sheetContext).textTheme.titleMedium,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${_photos.length}/3',
+                          style: Theme.of(sheetContext).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (_photos.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          'Ni dodanih fotografij.',
+                          style: Theme.of(sheetContext).textTheme.bodyMedium,
+                        ),
+                      )
+                    else
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: _photos.map((photo) {
+                          final path = photo.localPath;
+                          return Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: path != null
+                                    ? Image.file(
+                                        File(path),
+                                        width: 92,
+                                        height: 92,
+                                        fit: BoxFit.cover,
+                                      )
+                                    : Container(
+                                        width: 92,
+                                        height: 92,
+                                        color: Colors.black12,
+                                        child: const Icon(Icons.image_not_supported),
+                                      ),
+                              ),
+                              Positioned(
+                                top: -6,
+                                right: -6,
+                                child: InkWell(
+                                  onTap: () {
+                                    _removePhoto(photo);
+                                    setSheetState(() {});
+                                  },
+                                  customBorder: const CircleBorder(),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.black87,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.close,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        }).toList(),
+                      ),
+                    const SizedBox(height: 16),
+                    if (atMax)
+                      Text(
+                        'Doseženih največ 3 fotografij.',
+                        style: Theme.of(sheetContext).textTheme.bodySmall,
+                      )
+                    else
+                      Row(
+                        children: [
+                          Expanded(
+                            child: FilledButton.tonalIcon(
+                              onPressed: () async {
+                                Navigator.of(sheetContext).pop();
+                                await _addPhoto(ImageSource.camera);
+                              },
+                              icon: const Icon(Icons.photo_camera),
+                              label: const Text('Posnemi'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: FilledButton.tonalIcon(
+                              onPressed: () async {
+                                Navigator.of(sheetContext).pop();
+                                await _addPhoto(ImageSource.gallery);
+                              },
+                              icon: const Icon(Icons.photo_library),
+                              label: const Text('Galerija'),
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
               ),
-              ListTile(
-                leading: const Icon(Icons.photo_library),
-                title: const Text('Izberi iz galerije'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _addPhoto(ImageSource.gallery);
-                },
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -292,6 +392,7 @@ class _FormScreenState extends State<FormScreen> {
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('dd.MM.yyyy');
     final timeText = _time.format(context);
+    final colors = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
@@ -302,209 +403,526 @@ class _FormScreenState extends State<FormScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Text('Lokacija', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            if (_location == null)
-              const Text('Lokacija še ni nastavljena.')
-            else
-              Text(
-                '${_location!.latitude.toStringAsFixed(5)}, ${_location!.longitude.toStringAsFixed(5)}',
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: _photoTile(colors)),
+                  const SizedBox(width: 12),
+                  Expanded(child: _typesTile(colors)),
+                ],
               ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _useFreshGps,
-                    icon: const Icon(Icons.my_location),
-                    label: const Text('Uporabi GPS'),
+            ),
+            const SizedBox(height: 16),
+            _section(
+              colors: colors,
+              icon: Icons.notes_rounded,
+              title: 'Opis',
+              child: TextFormField(
+                controller: _descriptionController,
+                decoration: InputDecoration(
+                  hintText: 'Neobvezno – kratek opis dogodka',
+                  alignLabelWithHint: true,
+                  filled: true,
+                  fillColor: colors.surface,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: colors.outlineVariant),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: colors.outlineVariant),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _pickLocation,
-                    icon: const Icon(Icons.map_outlined),
-                    label: const Text('Izberi na karti'),
-                  ),
-                ),
-              ],
+                minLines: 3,
+                maxLines: 6,
+              ),
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: _accuracy,
-              decoration: const InputDecoration(labelText: 'Natančnost lokacije'),
-              items: const [
-                DropdownMenuItem(value: 'Natančna', child: Text('Natančna')),
-                DropdownMenuItem(value: 'Približna', child: Text('Približna')),
-              ],
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() {
-                    _accuracy = value;
-                  });
-                }
-              },
-            ),
-            const Divider(height: 32),
-            Text('Datum in čas', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _pickDate,
-                    child: Text(dateFormat.format(_date)),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _pickTime,
-                    child: Text(timeText),
-                  ),
-                ),
-              ],
-            ),
-            const Divider(height: 32),
-            Text('Tip motnje', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            if (_types.isEmpty) const Text('Ni izbranih tipov.'),
-            if (_types.isNotEmpty)
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _types
-                    .map((type) => Chip(label: Text(type.display)))
-                    .toList(),
-              ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: _selectTypes,
-              icon: const Icon(Icons.list_alt),
-              label: const Text('Izberi tipe'),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _proposedTypeController,
-              decoration: const InputDecoration(
-                labelText: 'Predlagaj nov tip (neobvezno)',
-              ),
-            ),
-            const Divider(height: 32),
-            TextFormField(
-              controller: _descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Opis',
-                alignLabelWithHint: true,
-              ),
-              maxLines: 4,
-            ),
-            const Divider(height: 32),
-            Text('Fotografije (max 3)', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            if (_photos.isNotEmpty)
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _photos.map((photo) {
-                  final path = photo.localPath;
-                  return Stack(
-                    alignment: Alignment.topRight,
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: path != null
-                            ? Image.file(
-                                File(path),
-                                width: 90,
-                                height: 90,
-                                fit: BoxFit.cover,
-                              )
-                            : Container(
-                                width: 90,
-                                height: 90,
-                                color: Colors.black12,
-                                child: const Icon(Icons.image_not_supported),
+            _section(
+              colors: colors,
+              icon: Icons.group_outlined,
+              title: 'Dodatni opazovalci',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_observers.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _observers
+                            .map(
+                              (observer) => Chip(
+                                label: Text(observer),
+                                onDeleted: () {
+                                  setState(() {
+                                    _observers = _observers
+                                        .where((item) => item != observer)
+                                        .toList();
+                                  });
+                                },
                               ),
+                            )
+                            .toList(),
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.close, color: Colors.white),
-                        onPressed: () => _removePhoto(photo),
+                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _observerController,
+                          decoration: const InputDecoration(
+                            labelText: 'Dodaj opazovalca',
+                          ),
+                        ),
+                      ),
+                      IconButton.filledTonal(
+                        onPressed: _addObserver,
+                        icon: const Icon(Icons.person_add_alt_1),
                       ),
                     ],
-                  );
-                }).toList(),
-              )
-            else
-              const Text('Ni dodanih fotografij.'),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: _showPhotoPicker,
-              icon: const Icon(Icons.add_a_photo),
-              label: const Text('Dodaj fotografijo'),
-            ),
-            const Divider(height: 32),
-            Text('Opazovalci', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            if (_observers.isNotEmpty)
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _observers
-                    .map(
-                      (observer) => Chip(
-                        label: Text(observer),
-                        onDeleted: () {
-                          setState(() {
-                            _observers = _observers.where((item) => item != observer).toList();
-                          });
-                        },
-                      ),
-                    )
-                    .toList(),
+                  ),
+                ],
               ),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _observerController,
-                    decoration: const InputDecoration(
-                      labelText: 'Dodaj opazovalca',
-                    ),
+            ),
+            const SizedBox(height: 12),
+            _section(
+              colors: colors,
+              icon: Icons.gavel_rounded,
+              title: 'Ukrepanje',
+              child: DropdownButtonFormField<String>(
+                value: _actionTaken,
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: colors.surface,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: colors.outlineVariant),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: colors.outlineVariant),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
                   ),
                 ),
-                IconButton(
-                  onPressed: _addObserver,
-                  icon: const Icon(Icons.person_add),
-                ),
-              ],
+                items: const [
+                  DropdownMenuItem(value: 'Brez ukrepanja', child: Text('Brez ukrepanja')),
+                  DropdownMenuItem(value: 'Ustno opozorilo', child: Text('Ustno opozorilo')),
+                  DropdownMenuItem(value: 'Pisno opozorilo', child: Text('Pisno opozorilo')),
+                  DropdownMenuItem(value: 'Drugo', child: Text('Drugo')),
+                ],
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() {
+                      _actionTaken = value;
+                    });
+                  }
+                },
+              ),
             ),
-            const Divider(height: 32),
-            DropdownButtonFormField<String>(
-              value: _actionTaken,
-              decoration: const InputDecoration(labelText: 'Ukrepanje'),
-              items: const [
-                DropdownMenuItem(value: 'Brez ukrepanja', child: Text('Brez ukrepanja')),
-                DropdownMenuItem(value: 'Ustno opozorilo', child: Text('Ustno opozorilo')),
-                DropdownMenuItem(value: 'Pisno opozorilo', child: Text('Pisno opozorilo')),
-                DropdownMenuItem(value: 'Drugo', child: Text('Drugo')),
-              ],
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() {
-                    _actionTaken = value;
-                  });
-                }
-              },
+            const SizedBox(height: 12),
+            _section(
+              colors: colors,
+              icon: Icons.tune_rounded,
+              title: 'Podrobnosti zapisa',
+              subtitle: 'Samodejno izpolnjeno – preveri in po potrebi popravi.',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _subLabel('Lokacija', colors),
+                  const SizedBox(height: 6),
+                  if (_location == null)
+                    Text(
+                      'Lokacija še ni nastavljena.',
+                      style: TextStyle(color: colors.onSurfaceVariant),
+                    )
+                  else
+                    Text(
+                      '${_location!.latitude.toStringAsFixed(5)}, ${_location!.longitude.toStringAsFixed(5)}',
+                      style: const TextStyle(fontFeatures: [FontFeature.tabularFigures()]),
+                    ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _useFreshGps,
+                          icon: const Icon(Icons.my_location, size: 18),
+                          label: const Text('GPS'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _pickLocation,
+                          icon: const Icon(Icons.map_outlined, size: 18),
+                          label: const Text('Karta'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: _accuracy,
+                    decoration: InputDecoration(
+                      labelText: 'Natančnost lokacije',
+                      filled: true,
+                      fillColor: colors.surface,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: colors.outlineVariant),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: colors.outlineVariant),
+                      ),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'Natančna', child: Text('Natančna')),
+                      DropdownMenuItem(value: 'Približna', child: Text('Približna')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() {
+                          _accuracy = value;
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  _subLabel('Datum in čas', colors),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _pickDate,
+                          icon: const Icon(Icons.calendar_today, size: 16),
+                          label: Text(dateFormat.format(_date)),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _pickTime,
+                          icon: const Icon(Icons.access_time, size: 16),
+                          label: Text(timeText),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _proposedTypeController,
+                    decoration: InputDecoration(
+                      labelText: 'Predlagaj nov tip (neobvezno)',
+                      filled: true,
+                      fillColor: colors.surface,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: colors.outlineVariant),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: colors.outlineVariant),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 24),
-            ElevatedButton.icon(
+            FilledButton.icon(
               onPressed: _save,
               icon: const Icon(Icons.save),
               label: const Text('Shrani zapis'),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
             ),
+            const SizedBox(height: 12),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _section({
+    required ColorScheme colors,
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    required Widget child,
+  }) {
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      color: colors.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 20, color: colors.primary),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: colors.primary,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.2,
+                      ),
+                ),
+              ],
+            ),
+            if (subtitle != null) ...[
+              const SizedBox(height: 4),
+              Padding(
+                padding: const EdgeInsets.only(left: 28),
+                child: Text(
+                  subtitle,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _subLabel(String text, ColorScheme colors) {
+    return Text(
+      text,
+      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: colors.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
+    );
+  }
+
+  Widget _photoTile(ColorScheme colors) {
+    final photo = _photos.isNotEmpty ? _photos.first : null;
+    final hasPhoto = photo != null;
+    final bg = hasPhoto ? colors.surfaceContainerHigh : colors.primaryContainer;
+    final fg = colors.onPrimaryContainer;
+
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      color: bg,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: InkWell(
+        onTap: _showPhotoSheet,
+        child: AspectRatio(
+          aspectRatio: 1,
+          child: hasPhoto
+              ? Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (photo.localPath != null)
+                      Image.file(
+                        File(photo.localPath!),
+                        fit: BoxFit.cover,
+                      )
+                    else
+                      Container(
+                        color: Colors.black12,
+                        child: const Icon(Icons.image_not_supported, size: 40),
+                      ),
+                    if (_photos.length > 1)
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.6),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '${_photos.length}/3',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    Positioned(
+                      bottom: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.6),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.edit_rounded,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              : Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.add_a_photo_outlined,
+                        size: 44,
+                        color: fg,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Dodaj foto',
+                        style: TextStyle(
+                          color: fg,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _typesTile(ColorScheme colors) {
+    final hasTypes = _types.isNotEmpty;
+    const amberBg = Color(0xFFFFF4E0);
+    const amberBorder = Color(0xFFFFB74D);
+    const amberFg = Color(0xFFB85B00);
+
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      color: hasTypes ? colors.surfaceContainerHigh : amberBg,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: hasTypes
+              ? colors.outlineVariant.withValues(alpha: 0.5)
+              : amberBorder,
+          width: hasTypes ? 1 : 1.5,
+        ),
+      ),
+      child: InkWell(
+        onTap: _selectTypes,
+        child: AspectRatio(
+          aspectRatio: 1,
+          child: hasTypes
+              ? Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.list_alt_rounded, size: 16, color: colors.primary),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Tipi motnje',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: colors.primary,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                          const Spacer(),
+                          Icon(
+                            Icons.edit_rounded,
+                            size: 14,
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          child: Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: _types
+                                .map(
+                                  (type) => Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: colors.primaryContainer,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      type.display,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: colors.onPrimaryContainer,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.menu_book_rounded,
+                        size: 44,
+                        color: amberFg,
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Izberi tipe motnje',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: amberFg,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
         ),
       ),
     );
