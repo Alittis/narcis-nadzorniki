@@ -95,7 +95,7 @@ ORDS module: `narcis_disturbances`, base path `disturbances/`. Source: [tools/or
 - Auth: same `X-Narcis-Auth: Basic <base64(email:password)>` header as §9.1, on every call. `pkg_tb_auth.authenticate` raises `e_unauthorized` on any failure — handler returns 401 with `{"error":"unauthorized"}`. Same TERENSKA-BELEZNICA gate as login.
 - `ORG_ID` is stamped server-side from `narcis_uporabniki.organizacija`; the client never sends it. PUT/DELETE/photo-* silently 404 when the target row's org doesn't match the caller's — "not yours" is indistinguishable from "not found".
 - Idempotency: POST with an already-known `motnja_id` is a no-op and returns 200 instead of 201. Same goes for photo upload on a known `photoId`. Lets the Flutter sync queue retry safely after a lost response.
-- GET `/` response shape: `{"records":[{...record fields...,"createdBy":"<email>","photos":[{"id":"<uuid>","mimeType":"image/jpeg"},...]}]}`. Includes every record from the caller's organization (org-scoped, not author-scoped); `createdBy` carries `TB_MOTNJE.USTVARJEN_OD` so the client can distinguish own vs. teammates' records (used by `RecordListScreen` to show only the user's own; the home-map Motnje layer renders the full org set). Photo BLOBs are NOT inlined — the client lazy-fetches each one via the per-photo GET when the user opens the detail view.
+- GET `/` response shape: `{"records":[{...record fields...,"createdBy":"<email>","obhodId":"<uuid>"|null,"photos":[{"id":"<uuid>","mimeType":"image/jpeg"},...]}]}`. Includes every record from the caller's organization (org-scoped, not author-scoped); `createdBy` carries `TB_MOTNJE.USTVARJEN_OD` so the client can distinguish own vs. teammates' records (used by `RecordListScreen` to show only the user's own; the home-map Motnje layer renders the full org set). `obhodId` is the walk-around link (§9.4); NULL for stand-alone records. Photo BLOBs are NOT inlined — the client lazy-fetches each one via the per-photo GET when the user opens the detail view.
 - Photo upload limits: `Content-Type` must be `image/jpeg`, `image/png`, `image/webp`, or `image/heic` (415 otherwise). Body cap is 10 MB (413 otherwise) — the client compresses to ~200–500 KB via `image_picker` `maxWidth=1600, imageQuality=85` so the cap is a defense against accidental original-resolution uploads.
 - Wire payload for record CRUD (matches `Disturbance.toJson()` minus `pendingSync`/`photos`/`createdAt`). Note: `locationAccuracy` and `actionTaken` carry the **Slovenian display labels** verbatim from the Flutter dropdowns (`form_screen.dart`), not normalized codes - the `CK_TB_MOTNJE_LOC` constraint and the column values match those labels.
   ```json
@@ -108,15 +108,54 @@ ORDS module: `narcis_disturbances`, base path `disturbances/`. Source: [tools/or
     "description": "...",
     "observers": ["..."],
     "actionTaken": "Brez ukrepanja",
-    "proposedType": null
+    "proposedType": null,
+    "obhodId": null
   }
   ```
   Allowed `locationAccuracy` values: `Natančna`, `Približna`.
   Allowed `actionTaken` values: `Brez ukrepanja`, `Ustno opozorilo`, `Pisno opozorilo`, `Drugo` (currently no CHECK constraint, just a free `VARCHAR2(50)`).
+  `obhodId` is the optional walk-around link (FK to `TB_OBHODI.OBHOD_ID`, see §9.4). NULL when the record was created outside a walk. Server raises an FK error if the walk doesn't yet exist; clients must POST the walk before any of its disturbances.
 - Each handler has a top-level `WHEN OTHERS` guard that ROLLBACKs and returns HTTP 500 with `{"error":"server_error","sqlcode":...,"sqlerrm":"..."}`. Without it, an unhandled PL/SQL exception in this ORDS instance returns 200 with no body - which the Flutter client would mistake for a successful sync (a real silent-failure bug bit us on 2026-04-26 with a `CK_TB_MOTNJE_LOC` violation).
 - Smoke test: `bash tools/ords/test_disturbances.sh` (failure paths only without creds; full lifecycle including photo upload/download/delete when `APP_AUTH_EMAIL` + `APP_AUTH_PASSWORD` are exported).
 - Status: deployed and smoke-tested 2026-04-26. GET-list, photo CRUD, and `TB_MOTNJE_FOTO` all landed and verified — full 17-probe lifecycle (incl. photo upload/duplicate-idempotency/download/delete/404-after-delete) passes against production.
 - Known cosmetic quirk on the photo GET: response `Content-Type` comes back as `image/jpeg` regardless of what was stored in `MIME_TYPE`, because `WPG_DOCLOAD.download_file` overrides the `:content_type` HEADER OUT bind (similar pattern to the §9.1 quirk on the auth endpoint). The actual bytes are correct, and the client identifies the format from the on-disk file extension when rendering, so this is non-blocking. Investigate by switching to `OWA_UTIL.mime_header` before `WPG_DOCLOAD.download_file` if/when we start ingesting non-JPEG photos and need accurate MIME on the wire.
+
+### 9.4 Walk-around CRUD — `https://narcis.gov.si/ords/narcis/walks/`
+ORDS module: `narcis_walks`, base path `walks/`. Source: [tools/ords/walks_endpoints.sql](../tools/ords/walks_endpoints.sql). Auth helper: same `pkg_tb_auth` package as §9.3. Schema: [tools/ords/walks_schema.sql](../tools/ords/walks_schema.sql).
+
+A walk-around (Slovene "obhod") is a continuous GPS-tracked field session. Disturbances captured during a walk carry the walk's `obhodId` (§9.3 wire payload) so the path and its observations can be reviewed together later. Photos still hang off the disturbance record; walks themselves don't carry photos.
+
+| Method | Pattern | Purpose | Success | Failure |
+|---|---|---|---|---|
+| GET | `/` | List caller's walks (metadata only — point geometry not inlined) | 200 `{walks:[...]}` | 401, 500 |
+| POST | `/` | Create with inline track points (idempotent on `id`) | 201 created, 200 if same UUID already exists | 400 bad body, 401 |
+| PUT | `:id` | Update `name` + `notes` only (times and points are write-once) | 200 | 400 bad body, 401, 404 (incl. cross-org) |
+| DELETE | `:id` | Delete walk (points cascade; linked `TB_MOTNJE.OBHOD_ID` set NULL) | 204 | 401, 404 |
+| GET | `:id/points` | Fetch the track polyline (`{obhodId, points:[{seq,lat,lon,t,accuracy},...]}`) | 200 | 401, 404 |
+
+- Auth, org-scoping, and 404-on-cross-tenant semantics are identical to §9.3 (single `pkg_tb_auth.authenticate` call per request, raises `e_unauthorized` → 401).
+- Idempotency: POST with an already-known `obhod_id` is a no-op and returns 200 instead of 201. **The first POST is the source of truth for the points array** — duplicate POSTs do NOT replace points (lets the offline upload queue retry safely without truncating data).
+- POST body shape:
+  ```json
+  {
+    "id": "<uuid>",
+    "startedAt": "2026-04-27T10:00:00.000Z",
+    "endedAt":   "2026-04-27T11:30:00.000Z",
+    "name":  "Optional walk name" ,
+    "notes": "Optional notes",
+    "points": [
+      { "seq": 0, "lat": 45.79, "lon": 14.36, "t": "2026-04-27T10:00:01.000Z", "accuracy": 8.4 }
+    ]
+  }
+  ```
+  `seq` is a 0-based monotonic integer assigned by the client. The PK `(OBHOD_ID, SEQ)` reproduces the path in capture order. `accuracy` is in meters and may be NULL.
+- PUT body shape: `{"name":"...","notes":"..."}`. Only those two fields are mutable — the times and points captured during the walk are immutable on the server. Edits offline are not queued, same caveat as §9.3 record edits (decision deferred until we figure out clash semantics; revisit when the client lands).
+- GET `/` response shape: `{"walks":[{"id":"...","startedAt":"...","endedAt":"...","name":"...","notes":"...","createdAt":"...","createdBy":"<email>","pointCount":N,"disturbanceCount":N},...]}`. Includes every walk from the caller's organization, ordered by `startedAt DESC`. Point geometry is not inlined — the client lazy-fetches it via `GET :id/points` when the user opens the walk's detail view.
+- Bulk insert: POST uses `FORALL` to insert track points. A 2-hour walk at the existing 5 m position-stream filter is roughly 1.5–2k points, which is enough that per-row INSERTs would noticeably slow the handler.
+- Each handler has the same top-level `WHEN OTHERS` guard as §9.3 (rolls back, returns 500, surfaces SQLCODE/SQLERRM) so an unhandled exception never returns 200 with an empty body.
+- Smoke test: `bash tools/ords/test_walks.sh` (failure paths only without creds; full lifecycle including 3-point POST, idempotent re-POST, points GET, name+notes PUT, DELETE when `APP_AUTH_EMAIL` + `APP_AUTH_PASSWORD` are exported).
+- Status: deployed and smoke-tested 2026-04-27. Full 14-probe lifecycle (failure paths + POST 3-point walk + idempotent re-POST + GET list with point/disturbance counts + GET points sorted by seq + PUT name+notes + DELETE + 404 follow-ups) passes against production. The `disturbance_endpoints.sql` re-deploy on the same day was also smoke-tested clean (17/17).
+- Implementation note for clients: `APEX_JSON.write(<key>, <null>)` elides the key entirely from the response (visible in the GET-list output — `obhodId` is absent rather than `null` on records with no walk link). The Flutter side must treat a missing key as `null`.
 
 ## 9bis. Client Authentication (Flutter)
 
@@ -197,7 +236,7 @@ Defined in [tools/ords/disturbance_schema.sql](../tools/ords/disturbance_schema.
 **Tables:**
 - `TB_SIF_MOTNJE_SKUPINE` — group codebook. PK `SKUPINA_KODA VARCHAR2(2)`. Universal (no per-org variation by design — confirmed 2026-04-25).
 - `TB_SIF_MOTNJE_TIPI` — type codebook. Synthetic PK `TIP_ID NUMBER`. Unique on `(SKUPINA_KODA, TIP_KODA, NVL(ORG_ID, 0))` — same `(group, type)` pair can exist once globally (`ORG_ID NULL`) and once per organization. Per-org additions live alongside the global codebook.
-- `TB_MOTNJE` — main records. **PK is `MOTNJA_ID VARCHAR2(36)` — the client-generated UUID, NOT a server sequence**. Off Oracle convention but lets POST be naturally idempotent on retry without a separate dedupe column. `ORG_ID` is stamped server-side from the authenticated user's `narcis_uporabniki.organizacija`. `OPIS CLOB` for the long description; lat/lon as `NUMBER(10,7)`; `CAS_OPAZOVANJA TIMESTAMP`. `NATANCNOST_LOK VARCHAR2(20)` constrained to `'Natančna'` / `'Približna'` (verbatim Slovenian labels from the Flutter form). `UKREPANJE VARCHAR2(50)` is unconstrained free text; expected values are the four dropdown labels (`Brez ukrepanja`, `Ustno opozorilo`, `Pisno opozorilo`, `Drugo`). Audit columns: `USTVARJEN_OD/USTVARJEN`, `SPREMENJEN_OD/SPREMENJEN`. Indexes on `(ORG_ID, CAS_OPAZOVANJA DESC)` and `USTVARJEN_OD`.
+- `TB_MOTNJE` — main records. **PK is `MOTNJA_ID VARCHAR2(36)` — the client-generated UUID, NOT a server sequence**. Off Oracle convention but lets POST be naturally idempotent on retry without a separate dedupe column. `ORG_ID` is stamped server-side from the authenticated user's `narcis_uporabniki.organizacija`. `OPIS CLOB` for the long description; lat/lon as `NUMBER(10,7)`; `CAS_OPAZOVANJA TIMESTAMP`. `NATANCNOST_LOK VARCHAR2(20)` constrained to `'Natančna'` / `'Približna'` (verbatim Slovenian labels from the Flutter form). `UKREPANJE VARCHAR2(50)` is unconstrained free text; expected values are the four dropdown labels (`Brez ukrepanja`, `Ustno opozorilo`, `Pisno opozorilo`, `Drugo`). `OBHOD_ID VARCHAR2(36)` is a nullable FK to `TB_OBHODI(OBHOD_ID)` with `ON DELETE SET NULL`, linking the disturbance to the walk it was captured during (see §16); records created outside a walk leave it NULL. Audit columns: `USTVARJEN_OD/USTVARJEN`, `SPREMENJEN_OD/SPREMENJEN`. Indexes on `(ORG_ID, CAS_OPAZOVANJA DESC)`, `USTVARJEN_OD`, and `(OBHOD_ID)`.
 - `TB_MOTNJE_TIPI_DOGODKA` — junction (record × selected types). Composite PK `(MOTNJA_ID, SKUPINA_KODA, TIP_KODA)`. **Intentionally NOT a FK to `TB_SIF_MOTNJE_TIPI`** so historical records keep their type codes even if a codebook row is later renamed or deactivated.
 - `TB_MOTNJE_OPAZOVALCI` — junction (record × observers). Composite PK `(MOTNJA_ID, IME_OPAZOVALCA)`. `IME_OPAZOVALCA` is the free-text name as the user typed it on the phone; `UPORABNIK_ID` is a nullable FK to `narcis_uporabniki.id` for resolution to a system user (resolution logic is a follow-up — currently always NULL).
 - `TB_MOTNJE_FOTO` — photos. **PK `FOTO_ID VARCHAR2(36)` is a client-generated UUID**, same pattern as `TB_MOTNJE.MOTNJA_ID` — lets the photo upload endpoint be naturally idempotent on retry. `VSEBINA BLOB` stored as SECUREFILE with `ENABLE STORAGE IN ROW` (small photos inline; large ones offline). `MIME_TYPE` constrained to `image/jpeg|png|webp|heic`. `VELIKOST` is the byte length, used by clients/operators to budget storage; CHECK ensures it's positive. `USTVARJEN_OD` is the uploader's email. **Note:** SECUREFILE `COMPRESS LOW` + `DEDUPLICATE` would be ideal but require the Advanced Compression option license (raises ORA-00439 on this instance); JPEGs are already compressed so plain SECUREFILE is the right default until/unless that license is added.
@@ -285,6 +324,17 @@ Many target devices (e.g. Samsung A56) reserve a strip at the bottom of the scre
 - Pattern 2 (`SafeArea` wrap): `login_screen.dart`, `type_selection_screen.dart`.
 - N/A (full-bleed map + Scaffold-managed FAB whose default location respects view padding): `home_screen.dart`, `location_picker_screen.dart`.
 
+## 16. Walk-around Schema (Oracle, prefix `TB_OBHOD*`)
+Defined in [tools/ords/walks_schema.sql](../tools/ords/walks_schema.sql). Same `TB_` prefix family as the disturbance schema (§12).
+
+**Tables:**
+- `TB_OBHODI` — main walk row. **PK is `OBHOD_ID VARCHAR2(36)` — client-generated UUID** (same idempotent-POST pattern as `TB_MOTNJE`). `ZACETEK`/`KONEC` `TIMESTAMP` (start/end of the walk; client-supplied, immutable on the server, with `CK_TB_OBHODI_KON CHECK (KONEC >= ZACETEK)`). `NAZIV VARCHAR2(200)` and `OPIS CLOB` are optional and the only fields a PUT can change. `ORG_ID` is stamped server-side from `narcis_uporabniki.organizacija`. Audit columns: `USTVARJEN_OD/USTVARJEN`, `SPREMENJEN_OD/SPREMENJEN`. Indexes on `(ORG_ID, ZACETEK DESC)` and `USTVARJEN_OD`.
+- `TB_OBHODI_TOCKE` — track points. Composite PK `(OBHOD_ID, SEQ)` where `SEQ NUMBER` is a 0-based monotonic integer assigned by the client (no server sequence). `GEO_SIRINA`/`GEO_DOLZINA NUMBER(10,7)` with the same `BETWEEN -90/-180 AND 90/180` checks as `TB_MOTNJE`. `CAS TIMESTAMP` is the GPS fix time. `NATANCNOST NUMBER(10,2)` is accuracy in meters (nullable; `geolocator` may return null). `ON DELETE CASCADE` from `TB_OBHODI` so deleting a walk drops its points in one go.
+
+`TB_MOTNJE` carries `OBHOD_ID VARCHAR2(36)` with FK `ON DELETE SET NULL` (§12) — deleting a walk preserves the disturbances captured during it, just unlinked. The reverse choice (`ON DELETE CASCADE`) was rejected: a walk delete is not the same as wanting the captured field data gone.
+
+Order of operations on the wire: clients must POST the walk row before any disturbance referencing it, otherwise the FK on the disturbance INSERT raises ORA-02291 → 500. The client's `syncAll` drains pending walks before pending disturbances for this reason.
+
 ## Documentation Authority
 The /project directory is the single source of truth for:
 - Architecture
@@ -292,3 +342,4 @@ The /project directory is the single source of truth for:
 - Operational procedures
 
 All structural changes must update these documents.
+

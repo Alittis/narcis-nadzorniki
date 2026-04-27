@@ -29,8 +29,8 @@
           "host": "narcis.gov.si",
           "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
           "scoping": "ORG_ID stamped from caller's narcis_uporabniki.organizacija; cross-org rows never returned. Returns the full org set; client filters to author-only views (e.g. RecordListScreen) using the createdBy field.",
-          "response_shape": "{ records: [ { id, latitude, longitude, locationAccuracy, observedAt, createdAt, createdBy, description, actionTaken, proposedType, types[], observers[], photos[{id,mimeType}] } ] }",
-          "status": "deployed 2026-04-26; createdBy field added 2026-04-27 (re-run tools/ords/disturbance_endpoints.sql to apply); smoke test 17/17 (full record + photo lifecycle)"
+          "response_shape": "{ records: [ { id, latitude, longitude, locationAccuracy, observedAt, createdAt, createdBy, description, actionTaken, proposedType, obhodId, types[], observers[], photos[{id,mimeType}] } ] }",
+          "status": "deployed 2026-04-26; createdBy field added 2026-04-27; obhodId field added and deployed 2026-04-27; smoke test 17/17 (full record + photo lifecycle)"
         },
         {
           "path": "disturbances/",
@@ -38,7 +38,8 @@
           "host": "narcis.gov.si",
           "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
           "idempotency": "client UUID as PK; duplicate POST returns 200 instead of 201",
-          "status": "deployed 2026-04-26; smoke test 9/9"
+          "request_extras": "accepts optional obhodId linking the record to a TB_OBHODI walk; FK validated server-side (walk must already exist, otherwise 500 with ORA-02291)",
+          "status": "deployed 2026-04-26; obhodId field added and deployed 2026-04-27; smoke test 9/9"
         },
         {
           "path": "disturbances/:id",
@@ -46,7 +47,8 @@
           "host": "narcis.gov.si",
           "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
           "scoping": "404 if target row's ORG_ID != caller's ORG_ID (no cross-tenant leak)",
-          "status": "deployed 2026-04-26; smoke test 9/9"
+          "request_extras": "accepts optional obhodId; passing null clears any existing link",
+          "status": "deployed 2026-04-26; obhodId field added and deployed 2026-04-27; smoke test 9/9"
         },
         {
           "path": "disturbances/:id",
@@ -82,6 +84,50 @@
           "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
           "scoping": "404 if record or photo not in caller's ORG_ID",
           "status": "deployed 2026-04-26; smoke test 17/17 (full record + photo lifecycle)"
+        },
+        {
+          "path": "walks/",
+          "method": "GET",
+          "host": "narcis.gov.si",
+          "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
+          "scoping": "ORG_ID stamped from caller's narcis_uporabniki.organizacija; cross-org rows never returned",
+          "response_shape": "{ walks: [ { id, startedAt, endedAt, name, notes, createdAt, createdBy, pointCount, disturbanceCount } ] } - point geometry not inlined; fetch via /:id/points",
+          "status": "deployed and smoke-tested 2026-04-27; 14/14 walks lifecycle probes passed"
+        },
+        {
+          "path": "walks/",
+          "method": "POST",
+          "host": "narcis.gov.si",
+          "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
+          "idempotency": "client UUID as PK; duplicate POST returns 200 instead of 201; first POST is the source of truth for points (duplicates do NOT replace points)",
+          "request_shape": "{ id, startedAt, endedAt, name, notes, points: [{seq, lat, lon, t, accuracy}, ...] }",
+          "status": "deployed and smoke-tested 2026-04-27; 14/14 walks lifecycle probes passed"
+        },
+        {
+          "path": "walks/:id",
+          "method": "PUT",
+          "host": "narcis.gov.si",
+          "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
+          "scoping": "404 if target walk's ORG_ID != caller's ORG_ID",
+          "request_shape": "{ name, notes } - times and points are write-once",
+          "status": "deployed and smoke-tested 2026-04-27; 14/14 walks lifecycle probes passed"
+        },
+        {
+          "path": "walks/:id",
+          "method": "DELETE",
+          "host": "narcis.gov.si",
+          "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
+          "scoping": "404 if target walk's ORG_ID != caller's ORG_ID; track points cascade; linked TB_MOTNJE.OBHOD_ID set NULL by FK rule",
+          "status": "deployed and smoke-tested 2026-04-27; 14/14 walks lifecycle probes passed"
+        },
+        {
+          "path": "walks/:id/points",
+          "method": "GET",
+          "host": "narcis.gov.si",
+          "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
+          "scoping": "404 if target walk's ORG_ID != caller's ORG_ID",
+          "response_shape": "{ obhodId, points: [{seq, lat, lon, t, accuracy}, ...] } sorted by seq",
+          "status": "deployed and smoke-tested 2026-04-27; 14/14 walks lifecycle probes passed"
         }
       ]
     },
@@ -142,12 +188,14 @@
     }
   },
   "disturbance_schema": {
-    "status": "deployed to Oracle 2026-04-26; smoke test 9/9 passed",
+    "status": "deployed to Oracle 2026-04-26; smoke test 9/9 passed; OBHOD_ID column applied 2026-04-27 via walks_schema.sql ALTER and re-deployed disturbance_endpoints.sql (17/17 lifecycle probes passed)",
     "deploy_order": [
       "tools/ords/disturbance_schema.sql",
       "tools/ords/disturbance_codebook_seed.sql",
       "tools/ords/disturbance_auth_pkg.sql",
-      "tools/ords/disturbance_endpoints.sql"
+      "tools/ords/walks_schema.sql",
+      "tools/ords/disturbance_endpoints.sql",
+      "tools/ords/walks_endpoints.sql"
     ],
     "table_prefix": "TB_",
     "tables": [
@@ -161,7 +209,7 @@
       },
       {
         "name": "TB_MOTNJE",
-        "purpose": "main records; PK = client-generated UUID for idempotent POST retries; ORG_ID stamped from narcis_uporabniki.organizacija"
+        "purpose": "main records; PK = client-generated UUID for idempotent POST retries; ORG_ID stamped from narcis_uporabniki.organizacija; OBHOD_ID nullable FK to TB_OBHODI (ON DELETE SET NULL) added 2026-04-27"
       },
       {
         "name": "TB_MOTNJE_TIPI_DOGODKA",
@@ -180,5 +228,27 @@
     "photos_in_scope": true,
     "photos_status": "deployed and smoke-tested 2026-04-26; 17/17 lifecycle probes passed (upload/duplicate/download/delete/404). Known cosmetic: response Content-Type on photo GET always reports image/jpeg regardless of stored MIME (WPG_DOCLOAD overrides the :content_type bind) — non-blocking until non-JPEG photos enter the pipeline",
     "codebook_fetch_endpoint_in_scope": false
+  },
+  "walks_schema": {
+    "status": "deployed and smoke-tested 2026-04-27; tables and ALTER applied; 14/14 walks lifecycle probes passed against production",
+    "purpose": "Tracks walk-around (obhod) sessions: a continuous GPS path with linked disturbances. Walks themselves do not carry photos; photos still hang off TB_MOTNJE.",
+    "deploy_files": [
+      "tools/ords/walks_schema.sql",
+      "tools/ords/walks_endpoints.sql"
+    ],
+    "deploy_dependency": "walks_schema.sql must run after disturbance_schema.sql (ALTER TB_MOTNJE ADD OBHOD_ID); walks_endpoints.sql can deploy independently of disturbance_endpoints.sql",
+    "table_prefix": "TB_OBHOD",
+    "tables": [
+      {
+        "name": "TB_OBHODI",
+        "purpose": "main walk row; PK = client-generated UUID for idempotent POST retries; ZACETEK/KONEC are immutable on the server (PUT only allows NAZIV + OPIS); ORG_ID stamped from narcis_uporabniki.organizacija"
+      },
+      {
+        "name": "TB_OBHODI_TOCKE",
+        "purpose": "track points; composite PK (OBHOD_ID, SEQ) where SEQ is a 0-based monotonic integer assigned by the client; ON DELETE CASCADE from TB_OBHODI; bulk-inserted via FORALL"
+      }
+    ],
+    "fk_to_disturbances": "TB_MOTNJE.OBHOD_ID is a nullable FK to TB_OBHODI(OBHOD_ID) with ON DELETE SET NULL — deleting a walk preserves its captured disturbances, just unlinks them",
+    "wire_ordering_constraint": "client must POST a walk before any disturbance referencing it (FK on disturbance INSERT raises ORA-02291 → 500 if walk is missing); syncAll drains pending walks before pending disturbances"
   }
 }

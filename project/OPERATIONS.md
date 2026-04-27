@@ -208,19 +208,44 @@ APP_AUTH_PASSWORD='...' \
 The full lifecycle creates and then deletes a record with a freshly
 `uuidgen`'d ID, so it leaves no residue in `TB_MOTNJE` on success.
 
+### Probing the walk-around endpoints
+Same shape as the disturbance probes, against `narcis_walks`:
+```bash
+bash tools/ords/test_walks.sh
+```
+Full lifecycle (POST 3-point walk → idempotent re-POST → GET list →
+GET points → PUT name+notes → DELETE → 404 checks):
+```bash
+APP_AUTH_EMAIL=alexis.zrimec@gov.si \
+APP_AUTH_PASSWORD='...' \
+    bash tools/ords/test_walks.sh
+```
+The full lifecycle creates and then deletes a walk (and its 3 points
+via cascade) with a freshly `uuidgen`'d ID, so it leaves no residue in
+`TB_OBHODI`/`TB_OBHODI_TOCKE` on success.
+
 ### Re-deploying to Oracle
 The disturbance record endpoints (POST/PUT/DELETE) were deployed and
 smoke-tested on 2026-04-26. The GET-list endpoint and photo CRUD endpoints
 landed in source on 2026-04-26 and require a re-deploy of the schema and
-endpoints scripts before the new sync-icon UX functions end-to-end.
+endpoints scripts before the new sync-icon UX functions end-to-end. The
+walk-around (obhod) schema and endpoints landed in source on 2026-04-27 and
+require their own deploy plus a re-deploy of `disturbance_endpoints.sql`
+(which now reads/writes the `obhodId` link).
 
 For a fresh deploy or a re-deploy, run these SQL files in this order
 against the same schema where `narcis_uporabniki` and `narcis_organizacije`
 live:
 ```
-tools/ords/disturbance_schema.sql           # tables, indexes, sequence (now includes TB_MOTNJE_FOTO)
+tools/ords/disturbance_schema.sql           # disturbance tables (TB_MOTNJE, TB_MOTNJE_FOTO, ...)
 tools/ords/disturbance_codebook_seed.sql    # global codebook (groups + types)
 tools/ords/disturbance_auth_pkg.sql         # pkg_tb_auth helper package
-tools/ords/disturbance_endpoints.sql        # ORDS module narcis_disturbances (now includes GET list + photo endpoints)
+tools/ords/walks_schema.sql                 # walk tables + ALTER TB_MOTNJE ADD OBHOD_ID
+tools/ords/disturbance_endpoints.sql        # ORDS module narcis_disturbances (now includes obhodId)
+tools/ords/walks_endpoints.sql              # ORDS module narcis_walks
 ```
-All four are idempotent. After deploying, run `bash tools/ords/test_disturbances.sh` (with creds) for the lifecycle smoke test — the script now exercises GET list, photo upload (incl. duplicate-idempotency), photo download, and photo delete in addition to the original record CRUD probes.
+All six are idempotent. `walks_schema.sql` must run AFTER `disturbance_schema.sql` because its ALTER adds the `OBHOD_ID` column + FK on `TB_MOTNJE`. Endpoint scripts can be deployed in either order relative to each other; both expect the schema files to be in place.
+
+After deploying:
+- `bash tools/ords/test_disturbances.sh` (with creds) for the disturbance lifecycle.
+- `bash tools/ords/test_walks.sh` (with creds) for the walk lifecycle (POST 3-point walk → idempotent re-POST → GET list → GET points → PUT name+notes → DELETE → 404 checks).

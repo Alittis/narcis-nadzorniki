@@ -34,9 +34,13 @@
 --     "description": "...",
 --     "observers": ["...", ...],
 --     "actionTaken": "...",
---     "proposedType": "..." | null
+--     "proposedType": "..." | null,
+--     "obhodId": "<uuid>" | null
 --   }
 --   (createdAt, groupName/typeName, photos, pendingSync are ignored.)
+--   `obhodId` links the record to a walk-around (TB_OBHODI). May be NULL
+--   for records created outside a walk. The walk row must already exist
+--   (FK is validated server-side) - the client should POST the walk first.
 --
 -- GET /  response shape (caller's org only; photos returned as IDs+MIME, BLOBs
 -- are fetched lazily via the photo endpoint):
@@ -52,6 +56,7 @@
 --         "observers":  ["...", ...],
 --         "actionTaken": "...",
 --         "proposedType": "..." | null,
+--         "obhodId":    "..." | null,
 --         "photos":     [{ "id": "...", "mimeType": "image/jpeg" }, ...]
 --       },
 --       ...
@@ -111,7 +116,7 @@ BEGIN
   FOR rec IN (
     SELECT motnja_id, geo_sirina, geo_dolzina, natancnost_lok,
            cas_opazovanja, opis, ukrepanje, predlog_tipa, ustvarjen,
-           ustvarjen_od
+           ustvarjen_od, obhod_id
       FROM tb_motnje
      WHERE org_id = l_ctx.org_id
      ORDER BY cas_opazovanja DESC, ustvarjen DESC
@@ -131,6 +136,7 @@ BEGIN
     APEX_JSON.write('description',  rec.opis);
     APEX_JSON.write('actionTaken',  rec.ukrepanje);
     APEX_JSON.write('proposedType', rec.predlog_tipa);
+    APEX_JSON.write('obhodId',      rec.obhod_id);
 
     APEX_JSON.open_array('types');
     FOR t IN (
@@ -222,6 +228,7 @@ DECLARE
   l_description  CLOB;
   l_action       VARCHAR2(50);
   l_proposed     VARCHAR2(500);
+  l_obhod_id     VARCHAR2(36);
   l_types_n      PLS_INTEGER;
   l_obs_n        PLS_INTEGER;
   l_skup         VARCHAR2(2);
@@ -267,6 +274,7 @@ BEGIN
   l_description  := APEX_JSON.get_clob    (p_path => 'description');
   l_action       := APEX_JSON.get_varchar2(p_path => 'actionTaken');
   l_proposed     := APEX_JSON.get_varchar2(p_path => 'proposedType');
+  l_obhod_id     := APEX_JSON.get_varchar2(p_path => 'obhodId');
 
   IF l_motnja_id IS NULL
      OR l_lat IS NULL OR l_lon IS NULL
@@ -306,13 +314,16 @@ BEGIN
     GOTO respond;
   END IF;
 
-  -- 4. Insert main record
+  -- 4. Insert main record. obhod_id is the optional walk-around link;
+  --    the FK on tb_motnje.obhod_id will surface ORA-02291 if the walk
+  --    doesn't exist (caught by WHEN OTHERS -> 500). Clients should POST
+  --    the walk before any of its disturbances.
   INSERT INTO tb_motnje (
     motnja_id, org_id, geo_sirina, geo_dolzina, natancnost_lok,
-    cas_opazovanja, opis, ukrepanje, predlog_tipa, ustvarjen_od
+    cas_opazovanja, opis, ukrepanje, predlog_tipa, obhod_id, ustvarjen_od
   ) VALUES (
     l_motnja_id, l_ctx.org_id, l_lat, l_lon, l_loc_acc,
-    l_observed_at, l_description, l_action, l_proposed, l_ctx.email
+    l_observed_at, l_description, l_action, l_proposed, l_obhod_id, l_ctx.email
   );
 
   -- 5. Insert type junction rows
@@ -413,6 +424,7 @@ DECLARE
   l_description  CLOB;
   l_action       VARCHAR2(50);
   l_proposed     VARCHAR2(500);
+  l_obhod_id     VARCHAR2(36);
   l_types_n      PLS_INTEGER;
   l_obs_n        PLS_INTEGER;
   l_skup         VARCHAR2(2);
@@ -454,6 +466,7 @@ BEGIN
   l_description  := APEX_JSON.get_clob    (p_path => 'description');
   l_action       := APEX_JSON.get_varchar2(p_path => 'actionTaken');
   l_proposed     := APEX_JSON.get_varchar2(p_path => 'proposedType');
+  l_obhod_id     := APEX_JSON.get_varchar2(p_path => 'obhodId');
 
   IF l_lat IS NULL OR l_lon IS NULL OR l_loc_acc IS NULL
      OR l_observed_str IS NULL OR l_action IS NULL
@@ -509,6 +522,7 @@ BEGIN
          opis           = l_description,
          ukrepanje      = l_action,
          predlog_tipa   = l_proposed,
+         obhod_id       = l_obhod_id,
          spremenjen_od  = l_ctx.email,
          spremenjen     = SYSTIMESTAMP
    WHERE motnja_id = l_motnja_id;
