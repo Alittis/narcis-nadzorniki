@@ -111,6 +111,42 @@ automatic:
   if the server has historical type codes that aren't in the codebook
   (e.g. an org-specific addition) the UI falls back to the raw code.
 
+### Sync diagnostics (`[sync] …`)
+The disturbance sync pipeline emits debug-print lines prefixed with `[sync]`
+from four sites in [lib/state/app_state.dart](../lib/state/app_state.dart):
+
+- `addRecord` — new record id, plus `isOnline` and `canSync` at save time.
+- The `Connectivity.onConnectivityChanged` listener — raw result list, normalized
+  result, and the resulting `isOnline` after the change.
+- `syncAll` — entry/exit, count of `pendingSync==true` records to push, and the
+  per-record push outcome.
+- `_sendAndMarkSynced` — failures with the wrapped `RemoteApiException` (HTTP
+  status code or underlying network cause).
+
+To follow them on a connected device:
+```bash
+flutter run -d <device_id>
+```
+or, with the app already installed, tail logcat directly:
+```bash
+adb -s <device_id> logcat -v time '*:S' flutter:I | grep '\[sync\]'
+```
+
+Use these when investigating "I created a record offline and it never synced."
+A representative healthy trace from a connectivity flip:
+```
+[sync] connectivity raw=[ConnectivityResult.none] normalized=ConnectivityResult.none (was=ConnectivityResult.mobile, isOnline=false)
+[sync] addRecord <uuid> isOnline=false canSync=true
+[sync] connectivity raw=[ConnectivityResult.mobile] normalized=ConnectivityResult.mobile (was=ConnectivityResult.none, isOnline=true)
+[sync] syncAll() entry isOnline=true canSync=true isSyncing=false
+[sync] pending records to push: 1
+[sync]   push <uuid> → true
+[sync] syncAll() exit
+```
+A 401 manifests as a `_sendAndMarkSynced ... FAILED: RemoteApiException(401): …`
+line followed by `aborting after auth-clear` — at that point the in-memory
+password is gone and the user must re-login online (see §10 caveats).
+
 ### Photo storage operational notes
 - Photos live in `TB_MOTNJE_FOTO.VSEBINA` as SECUREFILE BLOBs with
   `ENABLE STORAGE IN ROW` (small photos inline, large ones out-of-line).
