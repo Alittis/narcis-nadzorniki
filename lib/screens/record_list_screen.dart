@@ -15,6 +15,7 @@ class RecordListScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('dd.MM.yyyy HH:mm');
     final sorted = [...records]..sort((a, b) => b.observedAt.compareTo(a.observedAt));
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
 
     return Scaffold(
       appBar: AppBar(
@@ -23,7 +24,7 @@ class RecordListScreen extends StatelessWidget {
       body: sorted.isEmpty
           ? const Center(child: Text('Ni vnosov.'))
           : ListView.separated(
-              padding: const EdgeInsets.all(12),
+              padding: EdgeInsets.fromLTRB(12, 12, 12, 12 + bottomInset),
               itemBuilder: (context, index) {
                 final record = sorted[index];
                 final typePreview = record.types.isEmpty

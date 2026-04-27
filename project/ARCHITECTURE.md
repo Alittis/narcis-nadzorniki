@@ -251,6 +251,38 @@ Open optimizations (not in scope yet):
 - Quick-save bottom sheet for the trivial case (photo + 1 type + auto-location), skipping the full form.
 - Photo flow could chain into the type-picker before landing on the form, so the form lands prefilled in both paths.
 
+## 15. UI Conventions — System Gesture / Navigation Inset
+
+Many target devices (e.g. Samsung A56) reserve a strip at the bottom of the screen for the OS gesture bar / navigation pill. Flutter exposes that strip as `MediaQuery.viewPaddingOf(context).bottom` — `0` on devices without it, ~24–48 logical px on devices that have it.
+
+**Rule:** any screen whose bottom-most interactive element (Save / primary CTA, FAB row, sticky action bar, scrolling list's last item) can be reached by the user must add the bottom inset to its layout. The default Scaffold body does NOT do this for you when the inner widget overrides padding (e.g. `ListView(padding: EdgeInsets.all(16))` strips the implicit MediaQuery padding).
+
+**Approved patterns** (pick whichever fits the screen — be consistent within a screen):
+1. Scrolling content with a button at the end of the list — extend the list's bottom padding:
+   ```dart
+   final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
+   ListView(
+     padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomInset),
+     ...
+   )
+   ```
+2. Static body with content that should never run under the gesture region — wrap the body:
+   ```dart
+   body: SafeArea(top: false, child: ...)
+   ```
+   (`top: false` because the AppBar already handles the status-bar inset.)
+3. Bottom sheets / modals — wrap the sheet body in `SafeArea(...)`. Already done in `form_screen.dart`'s photo sheet.
+4. Floating elements positioned with `Positioned` — add `bottomInset` to the `bottom:` value, don't rely on a parent SafeArea.
+
+**Reference fix:** [lib/screens/form_screen.dart:396](../lib/screens/form_screen.dart) — Save button used to be partially covered by the A56 gesture bar; resolved by reading `viewPaddingOf(context).bottom` and adding it to the ListView's bottom padding.
+
+**When adding a new screen:** verify on a device with a gesture nav bar (or in the emulator with `Android Studio → AVD → Display → Gesture navigation` enabled) before declaring the screen done. Type-checking and `flutter test` won't catch this — only a real bottom-of-screen visual check will.
+
+**Audit status (2026-04-27):** all current screens are A56-safe.
+- Pattern 1 (list bottom padding): `form_screen.dart`, `detail_screen.dart`, `record_list_screen.dart`, `profile_screen.dart`, `legacy_detail_screen.dart`, `place_search_screen.dart`.
+- Pattern 2 (`SafeArea` wrap): `login_screen.dart`, `type_selection_screen.dart`.
+- N/A (full-bleed map + Scaffold-managed FAB whose default location respects view padding): `home_screen.dart`, `location_picker_screen.dart`.
+
 ## Documentation Authority
 The /project directory is the single source of truth for:
 - Architecture

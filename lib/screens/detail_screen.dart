@@ -46,6 +46,7 @@ class _DetailScreenState extends State<DetailScreen> {
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('dd.MM.yyyy HH:mm');
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Podrobnosti zapisa'),
@@ -59,7 +60,7 @@ class _DetailScreenState extends State<DetailScreen> {
                   .firstOrNull ??
               widget.record;
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomInset),
             children: [
               _InfoRow(
                 label: 'Status sinhronizacije',

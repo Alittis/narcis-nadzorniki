@@ -393,6 +393,7 @@ class _FormScreenState extends State<FormScreen> {
     final dateFormat = DateFormat('dd.MM.yyyy');
     final timeText = _time.format(context);
     final colors = Theme.of(context).colorScheme;
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
 
     return Scaffold(
       appBar: AppBar(
@@ -401,7 +402,7 @@ class _FormScreenState extends State<FormScreen> {
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomInset),
           children: [
             IntrinsicHeight(
               child: Row(

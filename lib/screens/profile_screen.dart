@@ -19,6 +19,9 @@ class ProfileScreen extends StatelessWidget {
           final missingLocal = state.missingLocalCount;
 
           return ListView(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewPaddingOf(context).bottom,
+            ),
             children: [
               const SizedBox(height: 16),
               Center(

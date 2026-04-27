@@ -110,6 +110,9 @@ class _PlaceSearchScreenState extends State<PlaceSearchScreen> {
       );
     }
     return ListView.separated(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.viewPaddingOf(context).bottom,
+      ),
       itemCount: _results.length,
       separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, index) {

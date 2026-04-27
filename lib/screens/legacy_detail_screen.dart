@@ -13,13 +13,14 @@ class LegacyDetailScreen extends StatelessWidget {
     final observed = record.observedAt == null
         ? '-'
         : dateFormat.format(record.observedAt!.toLocal());
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Zgodovinski zapis'),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomInset),
         children: [
           Container(
             padding: const EdgeInsets.all(12),
