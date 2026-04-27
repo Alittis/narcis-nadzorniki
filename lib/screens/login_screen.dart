@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:narcis_nadzorniki/state/app_state.dart';
 import 'package:provider/provider.dart';
 
@@ -32,9 +33,12 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
     final result = await context.read<AppState>().login(
-          _emailController.text,
-          _passwordController.text,
-        );
+      _emailController.text,
+      _passwordController.text,
+    );
+    if (result.success) {
+      TextInput.finishAutofillContext();
+    }
     if (!mounted) return;
     setState(() {
       _submitting = false;
@@ -54,70 +58,80 @@ class _LoginScreenState extends State<LoginScreen> {
               constraints: const BoxConstraints(maxWidth: 420),
               child: Form(
                 key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'Narcis Nadzorniki',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 24),
-                    TextFormField(
-                      controller: _emailController,
-                      autofillHints: const [AutofillHints.username, AutofillHints.email],
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(
-                        labelText: 'E-pošta',
-                        prefixIcon: Icon(Icons.person_outline),
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        final v = value?.trim() ?? '';
-                        if (v.isEmpty) return 'Vnesite e-pošto.';
-                        if (!v.contains('@')) return 'Neveljaven e-poštni naslov.';
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _passwordController,
-                      autofillHints: const [AutofillHints.password],
-                      obscureText: true,
-                      textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) => _submit(),
-                      decoration: const InputDecoration(
-                        labelText: 'Geslo',
-                        prefixIcon: Icon(Icons.lock_outline),
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) {
-                        if ((value ?? '').isEmpty) return 'Vnesite geslo.';
-                        return null;
-                      },
-                    ),
-                    if (_error != null) ...[
-                      const SizedBox(height: 16),
+                child: AutofillGroup(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
                       Text(
-                        _error!,
-                        style: TextStyle(color: Theme.of(context).colorScheme.error),
+                        'Terenska beležnica',
+                        style: Theme.of(context).textTheme.headlineSmall,
                         textAlign: TextAlign.center,
                       ),
+                      const SizedBox(height: 24),
+                      TextFormField(
+                        controller: _emailController,
+                        autofillHints: const [
+                          AutofillHints.username,
+                          AutofillHints.email,
+                        ],
+                        keyboardType: TextInputType.emailAddress,
+                        textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(
+                          labelText: 'E-pošta',
+                          prefixIcon: Icon(Icons.person_outline),
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) {
+                          final v = value?.trim() ?? '';
+                          if (v.isEmpty) return 'Vnesite e-pošto.';
+                          if (!v.contains('@'))
+                            return 'Neveljaven e-poštni naslov.';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _passwordController,
+                        autofillHints: const [AutofillHints.password],
+                        obscureText: true,
+                        textInputAction: TextInputAction.done,
+                        onFieldSubmitted: (_) => _submit(),
+                        decoration: const InputDecoration(
+                          labelText: 'Geslo',
+                          prefixIcon: Icon(Icons.lock_outline),
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) {
+                          if ((value ?? '').isEmpty) return 'Vnesite geslo.';
+                          return null;
+                        },
+                      ),
+                      if (_error != null) ...[
+                        const SizedBox(height: 16),
+                        Text(
+                          _error!,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                      const SizedBox(height: 24),
+                      FilledButton(
+                        onPressed: _submitting ? null : _submit,
+                        child: _submitting
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text('Prijava'),
+                      ),
                     ],
-                    const SizedBox(height: 24),
-                    FilledButton(
-                      onPressed: _submitting ? null : _submit,
-                      child: _submitting
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text('Prijava'),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),

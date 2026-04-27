@@ -153,6 +153,8 @@ The email is written **last** so that a partial-write crash leaves the cache eff
 
 **First-time login is always online**: cache is empty until the first online success, so an unauthorized user can never establish an offline-capable cache. See OPERATIONS.md §9 for the operator-facing implications of the offline window.
 
+**OS password-manager autofill**: the login form ([lib/screens/login_screen.dart](../lib/screens/login_screen.dart)) wraps both fields in an `AutofillGroup` with `AutofillHints.username/email` and `AutofillHints.password`, and calls `TextInput.finishAutofillContext()` on a successful login. That commits the autofill context and triggers the OS-level "save password?" prompt (iCloud Keychain on iOS, Google Password Manager on Android) on first entry. This is independent of the offline cache above — the OS prompt is a user-visible convenience, the PBKDF2 cache is an app-internal offline-login mechanism.
+
 ## 10. Basemap Tile Providers
 Online basemap tiles are requested directly from public tile servers via `flutter_map` `TileLayer`s. Two modes, switchable at runtime by the user:
 
