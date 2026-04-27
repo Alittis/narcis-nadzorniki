@@ -38,25 +38,28 @@ class _TypeSelectionScreenState extends State<TypeSelectionScreen> {
           ),
         ],
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(12),
-        itemCount: disturbanceTypeGroups.length,
-        itemBuilder: (context, index) {
-          final group = disturbanceTypeGroups[index];
-          return _TypeGroupTile(
-            group: group,
-            selected: _selected,
-            onChanged: (key, selection) {
-              setState(() {
-                if (selection == null) {
-                  _selected.remove(key);
-                } else {
-                  _selected[key] = selection;
-                }
-              });
-            },
-          );
-        },
+      body: SafeArea(
+        top: false,
+        child: ListView.builder(
+          padding: const EdgeInsets.all(12),
+          itemCount: disturbanceTypeGroups.length,
+          itemBuilder: (context, index) {
+            final group = disturbanceTypeGroups[index];
+            return _TypeGroupTile(
+              group: group,
+              selected: _selected,
+              onChanged: (key, selection) {
+                setState(() {
+                  if (selection == null) {
+                    _selected.remove(key);
+                  } else {
+                    _selected[key] = selection;
+                  }
+                });
+              },
+            );
+          },
+        ),
       ),
     );
   }

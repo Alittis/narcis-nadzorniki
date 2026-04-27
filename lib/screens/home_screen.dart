@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:narcis_nadzorniki/data/map_view_store.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
 import 'package:narcis_nadzorniki/models/legacy_disturbance.dart';
@@ -71,10 +72,17 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  static const _sloveniaCenter = LatLng(46.15, 14.99);
+  static const _sloveniaZoom = 8.0;
+  static const _userZoom = 14.0;
+
   final _mapController = MapController();
   final _locationService = LocationService();
   final _imagePicker = ImagePicker();
-  LatLng _center = const LatLng(45.75, 14.39);
+  final _mapViewStore = MapViewStore();
+  LatLng _center = _sloveniaCenter;
+  double _initialZoom = _sloveniaZoom;
+  bool _viewLoaded = false;
   LatLng? _userLocation;
   BasemapMode _basemapMode = BasemapMode.osm;
   bool _locating = false;
@@ -90,7 +98,22 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _loadUserLocation();
+    _bootstrapView();
+  }
+
+  Future<void> _bootstrapView() async {
+    final cached = await _mapViewStore.load();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      if (cached != null) {
+        _center = cached.center;
+        _initialZoom = cached.zoom;
+      }
+      _viewLoaded = true;
+    });
+    await _loadUserLocation();
   }
 
   Future<void> _loadUserLocation() async {
@@ -102,7 +125,12 @@ class _HomeScreenState extends State<HomeScreen> {
       _userLocation = location;
       _center = location;
     });
-    _mapController.move(location, _mapController.camera.zoom);
+    final currentZoom = _mapController.camera.zoom;
+    final targetZoom = currentZoom < _userZoom ? _userZoom : currentZoom;
+    _mapController.move(location, targetZoom);
+    unawaited(
+      _mapViewStore.save(MapViewport(center: location, zoom: targetZoom)),
+    );
   }
 
   Future<void> _recenterOnUser() async {
@@ -122,7 +150,9 @@ class _HomeScreenState extends State<HomeScreen> {
       _showSnack('GPS lokacije ni mogoče pridobiti.');
       return;
     }
-    _mapController.move(location, _mapController.camera.zoom);
+    final zoom = _mapController.camera.zoom;
+    _mapController.move(location, zoom);
+    unawaited(_mapViewStore.save(MapViewport(center: location, zoom: zoom)));
   }
 
   Color _markerColor(Disturbance record) {
@@ -266,6 +296,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_viewLoaded) {
+      // Suppress the first frame until the cached viewport is restored,
+      // otherwise cached-location opens flash the Slovenia bounding view.
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
     return Consumer<AppState>(
       builder: (context, state, _) {
         return Scaffold(
@@ -277,7 +314,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   mapController: _mapController,
                   options: MapOptions(
                     initialCenter: _center,
-                    initialZoom: 13,
+                    initialZoom: _initialZoom,
                     maxZoom: 19,
                     interactionOptions: const InteractionOptions(
                       flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
@@ -329,9 +366,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 onModeTap: _onModeTap,
                 onPlusTap: () => _onPlusTap(state),
                 plusExpanded: _plusExpanded,
-                onPhotoTap: () => _startPhotoFlow(state),
-                onCodebookTap: () => _startCodebookFlow(state),
               ),
+              if (_plusExpanded)
+                _SpeedDialMiniFabs(
+                  color: _modeDefs[_activeMode]!.color,
+                  onPhotoTap: () => _startPhotoFlow(state),
+                  onCodebookTap: () => _startCodebookFlow(state),
+                ),
             ],
           ),
         );
@@ -815,8 +856,6 @@ class _BottomBar extends StatelessWidget {
     required this.onModeTap,
     required this.onPlusTap,
     required this.plusExpanded,
-    required this.onPhotoTap,
-    required this.onCodebookTap,
   });
 
   final AppMode activeMode;
@@ -825,8 +864,6 @@ class _BottomBar extends StatelessWidget {
   final ValueChanged<AppMode> onModeTap;
   final VoidCallback onPlusTap;
   final bool plusExpanded;
-  final VoidCallback onPhotoTap;
-  final VoidCallback onCodebookTap;
 
   @override
   Widget build(BuildContext context) {
@@ -846,12 +883,10 @@ class _BottomBar extends StatelessWidget {
             children: [
               _LocateButton(locating: locating, onTap: onLocateTap),
               _ModePill(activeMode: activeMode, onTap: onModeTap),
-              _PlusSpeedDial(
+              _PlusButton(
                 color: activeColor,
                 expanded: plusExpanded,
-                onPlusTap: onPlusTap,
-                onPhotoTap: onPhotoTap,
-                onCodebookTap: onCodebookTap,
+                onTap: onPlusTap,
               ),
             ],
           ),
@@ -949,58 +984,48 @@ class _ModePill extends StatelessWidget {
   }
 }
 
-class _PlusSpeedDial extends StatelessWidget {
-  const _PlusSpeedDial({
+class _SpeedDialMiniFabs extends StatelessWidget {
+  const _SpeedDialMiniFabs({
     required this.color,
-    required this.expanded,
-    required this.onPlusTap,
     required this.onPhotoTap,
     required this.onCodebookTap,
   });
 
   final Color color;
-  final bool expanded;
-  final VoidCallback onPlusTap;
   final VoidCallback onPhotoTap;
   final VoidCallback onCodebookTap;
 
-  static const double _plusSize = 56;
-  static const double _miniSize = 48;
-  static const double _gap = 12;
-
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: _plusSize,
-      height: _plusSize,
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.bottomRight,
-        children: [
-          if (expanded) ...[
-            Positioned(
-              right: 0,
-              bottom: _plusSize + _gap + _miniSize + _gap,
-              child: _MiniSpeedDialButton(
+    return Positioned(
+      right: 16,
+      bottom: 0,
+      child: SafeArea(
+        top: false,
+        minimum: const EdgeInsets.only(bottom: 8),
+        // Bar inner vertical pad (12) + plus button (56) + gap (12) above the +.
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 80),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              _MiniSpeedDialButton(
                 label: 'Foto',
                 icon: Icons.photo_camera,
                 color: color,
                 onTap: onPhotoTap,
               ),
-            ),
-            Positioned(
-              right: 0,
-              bottom: _plusSize + _gap,
-              child: _MiniSpeedDialButton(
+              const SizedBox(height: 12),
+              _MiniSpeedDialButton(
                 label: 'Šifrant',
                 icon: Icons.list_alt,
                 color: color,
                 onTap: onCodebookTap,
               ),
-            ),
-          ],
-          _PlusButton(color: color, expanded: expanded, onTap: onPlusTap),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }

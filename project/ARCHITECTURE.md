@@ -221,14 +221,23 @@ Three visual states: green `cloud_done` when in sync, orange `cloud_upload` when
 **Photo lifecycle.**
 1. Form picks a photo via `image_picker` (`maxWidth=1600`, `quality=85`) → temp path.
 2. `addRecord` calls `PhotoStorage.savePicked` to copy the file to `<docs>/disturbance_photos/<motnja_id>/<foto_id>.<ext>` so it survives across app restarts. The new `DisturbancePhoto` lands with `pendingUpload=true`.
-3. Next `syncAll` reads the file and POSTs the bytes. Success flips `pendingUpload=false`.
-4. `ensurePhotoCached` (called from `DetailScreen.initState`) downloads any photo with no `localPath` and writes it under the same canonical layout.
+3. If the create was online, `addRecord` chains `_drainPendingPhotos` after the record POST so the photo uploads in the same call (otherwise the badge would sit at "1 to push" until the next `syncAll` trigger). Offline creates skip this step and wait for the next online sync.
+4. Otherwise (or for any leftover from a network blip) the next `syncAll` reads the file and POSTs the bytes. Success flips `pendingUpload=false`.
+5. `ensurePhotoCached` (called from `DetailScreen.initState`) downloads any photo with no `localPath` and writes it under the same canonical layout.
 
 **Implications.**
 - Records created during an *offline* login session stay queued until the next *online* login. Records created during an online session are pushed immediately (or queued briefly across a connectivity blip).
 - After a fresh install + online login, `init()` runs `syncAll`, which pulls all of the user's records from Oracle. Photos download lazily on first detail view.
 - Update / delete are NOT queued: they only fire when online + `canSync`. Edits made offline persist locally but don't reach Oracle. (Tracked as a follow-up; the create queue is the priority since it's the field-data path.)
 - Photo deletes also fire only online; offline removal in the form doesn't queue. Photos that exist on the server but not locally still render in the detail view as a placeholder + lazy-fetch.
+
+## 13bis. Initial Map Viewport
+On home boot, the map opens at the user's last-known location instead of a hardcoded park area. Persisted in `<docs>/map_view.json` (lat/lon/zoom) by [lib/data/map_view_store.dart](../lib/data/map_view_store.dart). Saved on every successful GPS resolve in `_loadUserLocation` and `_recenterOnUser`.
+
+- **Cache hit:** map opens at the cached center+zoom. Any subsequent GPS resolve only zooms in if the current zoom is below `_userZoom` (14), so the user's manual zoom is preserved.
+- **Cache miss (fresh install / cleared cache):** map opens at a Slovenia bounding view (`(46.15, 14.99)`, zoom 8). When GPS resolves, the camera animates to the user location at zoom 14.
+- The first frame is gated on the cache load (a brief `CircularProgressIndicator`) to avoid a Slovenia-then-cached-location flash on cache-hit opens.
+- Cache is global (single device, single user). If multi-user-per-device becomes a thing, this needs to key by `currentUser`.
 
 ## 14. New-Record Entry Flow (Client UI)
 The red "+" FAB on `HomeScreen` (lib/screens/home_screen.dart) is a speed dial. Tapping it expands two mini-FABs above it: **Foto** (camera) and **Šifrant** (codebook). The single-tap-to-form path is intentionally gone — observers in the field have one of two intents and the entry point reflects that.

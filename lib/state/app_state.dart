@@ -188,7 +188,10 @@ class AppState extends ChangeNotifier {
     await _localStore.save(_records);
     notifyListeners();
     if (canPushNow) {
-      await _sendAndMarkSynced(newRecord);
+      final ok = await _sendAndMarkSynced(newRecord);
+      if (ok) {
+        await _drainPendingPhotos();
+      }
     }
   }
 
