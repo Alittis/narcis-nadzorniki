@@ -20,11 +20,15 @@ class FormScreen extends StatefulWidget {
     required this.initialLocation,
     required this.initialObservers,
     required this.mapCenter,
+    this.initialPhotoPath,
+    this.initialTypes,
   });
 
   final LatLng? initialLocation;
   final List<String> initialObservers;
   final LatLng mapCenter;
+  final String? initialPhotoPath;
+  final List<SelectedDisturbanceType>? initialTypes;
 
   @override
   State<FormScreen> createState() => _FormScreenState();
@@ -54,6 +58,20 @@ class _FormScreenState extends State<FormScreen> {
     super.initState();
     _location = widget.initialLocation;
     _observers = [...widget.initialObservers];
+    if (widget.initialTypes != null) {
+      _types = [...widget.initialTypes!];
+    }
+    final photoPath = widget.initialPhotoPath;
+    if (photoPath != null) {
+      _photos = [
+        DisturbancePhoto(
+          id: _uuid.v4(),
+          mimeType: 'image/jpeg',
+          localPath: photoPath,
+          pendingUpload: true,
+        ),
+      ];
+    }
     _ensureLocation();
   }
 

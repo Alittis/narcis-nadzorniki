@@ -1,13 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
+import 'package:narcis_nadzorniki/models/disturbance_type.dart';
 import 'package:narcis_nadzorniki/models/legacy_disturbance.dart';
 import 'package:narcis_nadzorniki/screens/detail_screen.dart';
 import 'package:narcis_nadzorniki/screens/form_screen.dart';
 import 'package:narcis_nadzorniki/screens/legacy_detail_screen.dart';
 import 'package:narcis_nadzorniki/screens/place_search_screen.dart';
 import 'package:narcis_nadzorniki/screens/profile_screen.dart';
+import 'package:narcis_nadzorniki/screens/type_selection_screen.dart';
 import 'package:narcis_nadzorniki/services/location_service.dart';
 import 'package:narcis_nadzorniki/services/place_search_service.dart';
 import 'package:narcis_nadzorniki/state/app_state.dart';
@@ -67,6 +73,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _mapController = MapController();
   final _locationService = LocationService();
+  final _imagePicker = ImagePicker();
   LatLng _center = const LatLng(45.75, 14.39);
   LatLng? _userLocation;
   BasemapMode _basemapMode = BasemapMode.osm;
@@ -74,6 +81,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   AppMode _activeMode = AppMode.motnje;
   bool _showMotnje = true;
+
+  bool _plusExpanded = false;
+  // Location stamped at the moment the user declared intent (tapped "+"),
+  // so a downstream camera or type-selection step can't drift the GPS.
+  LatLng? _capturedLocation;
 
   @override
   void initState() {
@@ -127,13 +139,20 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _openForm(AppState state) {
+  void _openForm(
+    AppState state, {
+    LatLng? location,
+    String? initialPhotoPath,
+    List<SelectedDisturbanceType>? initialTypes,
+  }) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => FormScreen(
-          initialLocation: _userLocation,
+          initialLocation: location ?? _userLocation,
           initialObservers: state.lastObservers,
           mapCenter: _center,
+          initialPhotoPath: initialPhotoPath,
+          initialTypes: initialTypes,
         ),
       ),
     );
@@ -165,16 +184,78 @@ class _HomeScreenState extends State<HomeScreen> {
       _showSnack('${def.label}: kmalu.');
       return;
     }
-    switch (_activeMode) {
-      case AppMode.motnje:
-        _openForm(state);
-        break;
-      case AppMode.sprehod:
-      case AppMode.mode3:
-      case AppMode.mode4:
-        _showSnack('${def.label}: kmalu.');
-        break;
+    if (_activeMode != AppMode.motnje) {
+      _showSnack('${def.label}: kmalu.');
+      return;
     }
+    if (_plusExpanded) {
+      _collapseSpeedDial();
+      return;
+    }
+    setState(() {
+      _plusExpanded = true;
+      _capturedLocation = _userLocation;
+    });
+    // Kick off a fresh GPS read so it's ready by the time the user picks a
+    // sub-action; falls back to the last known _userLocation otherwise.
+    unawaited(_refreshCapturedLocation());
+  }
+
+  void _collapseSpeedDial() {
+    if (!_plusExpanded) return;
+    setState(() {
+      _plusExpanded = false;
+      _capturedLocation = null;
+    });
+  }
+
+  Future<void> _refreshCapturedLocation() async {
+    final fresh = await _locationService.getCurrentLocation();
+    if (!mounted || !_plusExpanded || fresh == null) return;
+    setState(() => _capturedLocation = fresh);
+  }
+
+  Future<void> _startPhotoFlow(AppState state) async {
+    final location = _capturedLocation ?? _userLocation;
+    setState(() {
+      _plusExpanded = false;
+      _capturedLocation = null;
+    });
+    XFile? picked;
+    try {
+      picked = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1600,
+        imageQuality: 85,
+      );
+    } on PlatformException catch (e) {
+      if (!mounted) return;
+      if (e.code == 'camera_access_denied') {
+        _showSnack('Kamera ni dovoljena.');
+      } else {
+        _showSnack('Napaka pri odpiranju kamere.');
+      }
+      return;
+    }
+    if (picked == null || !mounted) return;
+    _openForm(state, location: location, initialPhotoPath: picked.path);
+  }
+
+  Future<void> _startCodebookFlow(AppState state) async {
+    final location = _capturedLocation ?? _userLocation;
+    setState(() {
+      _plusExpanded = false;
+      _capturedLocation = null;
+    });
+    final selections =
+        await Navigator.of(context).push<List<SelectedDisturbanceType>>(
+      MaterialPageRoute(
+        builder: (_) => const TypeSelectionScreen(initialSelections: []),
+      ),
+    );
+    if (!mounted) return;
+    if (selections == null || selections.isEmpty) return;
+    _openForm(state, location: location, initialTypes: selections);
   }
 
   void _showSnack(String message) {
@@ -234,12 +315,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 onLegacyToggle: () => state.setShowLegacy(!state.showLegacy),
                 onPlaceholderTap: (label) => _showSnack('$label: kmalu.'),
               ),
+              if (_plusExpanded)
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _collapseSpeedDial,
+                  ),
+                ),
               _BottomBar(
                 activeMode: _activeMode,
                 locating: _locating,
                 onLocateTap: _locating ? null : _recenterOnUser,
                 onModeTap: _onModeTap,
                 onPlusTap: () => _onPlusTap(state),
+                plusExpanded: _plusExpanded,
+                onPhotoTap: () => _startPhotoFlow(state),
+                onCodebookTap: () => _startCodebookFlow(state),
               ),
             ],
           ),
@@ -723,6 +814,9 @@ class _BottomBar extends StatelessWidget {
     required this.onLocateTap,
     required this.onModeTap,
     required this.onPlusTap,
+    required this.plusExpanded,
+    required this.onPhotoTap,
+    required this.onCodebookTap,
   });
 
   final AppMode activeMode;
@@ -730,6 +824,9 @@ class _BottomBar extends StatelessWidget {
   final VoidCallback? onLocateTap;
   final ValueChanged<AppMode> onModeTap;
   final VoidCallback onPlusTap;
+  final bool plusExpanded;
+  final VoidCallback onPhotoTap;
+  final VoidCallback onCodebookTap;
 
   @override
   Widget build(BuildContext context) {
@@ -749,7 +846,13 @@ class _BottomBar extends StatelessWidget {
             children: [
               _LocateButton(locating: locating, onTap: onLocateTap),
               _ModePill(activeMode: activeMode, onTap: onModeTap),
-              _PlusButton(color: activeColor, onTap: onPlusTap),
+              _PlusSpeedDial(
+                color: activeColor,
+                expanded: plusExpanded,
+                onPlusTap: onPlusTap,
+                onPhotoTap: onPhotoTap,
+                onCodebookTap: onCodebookTap,
+              ),
             ],
           ),
         ),
@@ -846,10 +949,72 @@ class _ModePill extends StatelessWidget {
   }
 }
 
-class _PlusButton extends StatelessWidget {
-  const _PlusButton({required this.color, required this.onTap});
+class _PlusSpeedDial extends StatelessWidget {
+  const _PlusSpeedDial({
+    required this.color,
+    required this.expanded,
+    required this.onPlusTap,
+    required this.onPhotoTap,
+    required this.onCodebookTap,
+  });
 
   final Color color;
+  final bool expanded;
+  final VoidCallback onPlusTap;
+  final VoidCallback onPhotoTap;
+  final VoidCallback onCodebookTap;
+
+  static const double _plusSize = 56;
+  static const double _miniSize = 48;
+  static const double _gap = 12;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: _plusSize,
+      height: _plusSize,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.bottomRight,
+        children: [
+          if (expanded) ...[
+            Positioned(
+              right: 0,
+              bottom: _plusSize + _gap + _miniSize + _gap,
+              child: _MiniSpeedDialButton(
+                label: 'Foto',
+                icon: Icons.photo_camera,
+                color: color,
+                onTap: onPhotoTap,
+              ),
+            ),
+            Positioned(
+              right: 0,
+              bottom: _plusSize + _gap,
+              child: _MiniSpeedDialButton(
+                label: 'Šifrant',
+                icon: Icons.list_alt,
+                color: color,
+                onTap: onCodebookTap,
+              ),
+            ),
+          ],
+          _PlusButton(color: color, expanded: expanded, onTap: onPlusTap),
+        ],
+      ),
+    );
+  }
+}
+
+class _PlusButton extends StatelessWidget {
+  const _PlusButton({
+    required this.color,
+    required this.expanded,
+    required this.onTap,
+  });
+
+  final Color color;
+  final bool expanded;
   final VoidCallback onTap;
 
   @override
@@ -861,12 +1026,68 @@ class _PlusButton extends StatelessWidget {
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: onTap,
-        child: const SizedBox(
+        child: SizedBox(
           width: 56,
           height: 56,
-          child: Icon(Icons.add, color: Colors.white, size: 28),
+          child: Center(
+            child: AnimatedRotation(
+              turns: expanded ? 0.125 : 0,
+              duration: const Duration(milliseconds: 150),
+              child: const Icon(Icons.add, color: Colors.white, size: 28),
+            ),
+          ),
         ),
       ),
+    );
+  }
+}
+
+class _MiniSpeedDialButton extends StatelessWidget {
+  const _MiniSpeedDialButton({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Material(
+          color: Theme.of(context).colorScheme.surface,
+          shape: const StadiumBorder(),
+          elevation: 4,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Material(
+          color: color,
+          shape: const CircleBorder(),
+          elevation: 4,
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onTap,
+            child: SizedBox(
+              width: 48,
+              height: 48,
+              child: Icon(icon, color: Colors.white, size: 24),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

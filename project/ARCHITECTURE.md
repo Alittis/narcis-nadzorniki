@@ -230,6 +230,18 @@ Three visual states: green `cloud_done` when in sync, orange `cloud_upload` when
 - Update / delete are NOT queued: they only fire when online + `canSync`. Edits made offline persist locally but don't reach Oracle. (Tracked as a follow-up; the create queue is the priority since it's the field-data path.)
 - Photo deletes also fire only online; offline removal in the form doesn't queue. Photos that exist on the server but not locally still render in the detail view as a placeholder + lazy-fetch.
 
+## 14. New-Record Entry Flow (Client UI)
+The red "+" FAB on `HomeScreen` (lib/screens/home_screen.dart) is a speed dial. Tapping it expands two mini-FABs above it: **Foto** (camera) and **Šifrant** (codebook). The single-tap-to-form path is intentionally gone — observers in the field have one of two intents and the entry point reflects that.
+
+- **GPS lock at intent time.** Tapping "+" snapshots `_userLocation` into `_capturedLocation` immediately and kicks off a fresh `LocationService.getCurrentLocation()` in the background. Whichever arrives first becomes the location passed to `FormScreen`. This prevents drift if the camera or type-selection step takes a while; the location stamped on the record is where the user *was* when they declared intent, not where they happened to be when they finally hit Shrani.
+- **Photo flow.** `_startPhotoFlow` launches `image_picker` with `ImageSource.camera`. On `PlatformException(camera_access_denied)` the user gets a snackbar and stays on home (no gallery fallback — fresh GPS exif matters). On success, `FormScreen` opens with `initialPhotoPath` and the locked location prefilled.
+- **Codebook flow.** `_startCodebookFlow` pushes the existing `TypeSelectionScreen` with empty initial selections. An empty / cancelled return drops the user back on home with no record. Non-empty selections open `FormScreen` with `initialTypes` and the locked location prefilled.
+- **Form validation unchanged.** The form still requires location + at least one type before Shrani, so the photo flow still forces a type pick (just inside the form). A future "quick save" sheet that bypasses the form when both photo and types are set is deferred — see "Open optimizations" below.
+
+Open optimizations (not in scope yet):
+- Quick-save bottom sheet for the trivial case (photo + 1 type + auto-location), skipping the full form.
+- Photo flow could chain into the type-picker before landing on the form, so the form lands prefilled in both paths.
+
 ## Documentation Authority
 The /project directory is the single source of truth for:
 - Architecture
