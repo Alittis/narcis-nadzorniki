@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
 import 'package:narcis_nadzorniki/models/disturbance_photo.dart';
+import 'package:narcis_nadzorniki/screens/photo_viewer_screen.dart';
 import 'package:narcis_nadzorniki/state/app_state.dart';
 import 'package:provider/provider.dart';
 
@@ -102,9 +103,22 @@ class _DetailScreenState extends State<DetailScreen> {
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: live.photos
-                      .map((photo) => _PhotoTile(photo: photo))
-                      .toList(),
+                  children: [
+                    for (var i = 0; i < live.photos.length; i++)
+                      _PhotoTile(
+                        photo: live.photos[i],
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => PhotoViewerScreen(
+                                motnjaId: live.id,
+                                initialIndex: i,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                  ],
                 ),
             ],
           );
@@ -115,9 +129,10 @@ class _DetailScreenState extends State<DetailScreen> {
 }
 
 class _PhotoTile extends StatelessWidget {
-  const _PhotoTile({required this.photo});
+  const _PhotoTile({required this.photo, required this.onTap});
 
   final DisturbancePhoto photo;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -126,43 +141,53 @@ class _PhotoTile extends StatelessWidget {
       // No local file yet — either we haven't fetched it or the fetch
       // failed (offline / 401). Render a placeholder so the user knows the
       // photo exists on the server.
-      return Container(
-        width: 90,
-        height: 90,
-        decoration: BoxDecoration(
-          color: Colors.black12,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: const Center(
-          child: Icon(Icons.cloud_download, color: Colors.black45),
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          width: 90,
+          height: 90,
+          decoration: BoxDecoration(
+            color: Colors.black12,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Center(
+            child: Icon(Icons.cloud_download, color: Colors.black45),
+          ),
         ),
       );
     }
-    return Stack(
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.file(
-            File(path),
-            width: 90,
-            height: 90,
-            fit: BoxFit.cover,
-          ),
-        ),
-        if (photo.pendingUpload)
-          Positioned(
-            right: 4,
-            bottom: 4,
-            child: Container(
-              padding: const EdgeInsets.all(2),
-              decoration: const BoxDecoration(
-                color: Colors.black54,
-                shape: BoxShape.circle,
+    return GestureDetector(
+      onTap: onTap,
+      child: Stack(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Hero(
+              tag: photo.id,
+              child: Image.file(
+                File(path),
+                width: 90,
+                height: 90,
+                fit: BoxFit.cover,
               ),
-              child: const Icon(Icons.cloud_upload, size: 14, color: Colors.white),
             ),
           ),
-      ],
+          if (photo.pendingUpload)
+            Positioned(
+              right: 4,
+              bottom: 4,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: const BoxDecoration(
+                  color: Colors.black54,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.cloud_upload, size: 14, color: Colors.white),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
