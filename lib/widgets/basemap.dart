@@ -46,6 +46,24 @@ List<Widget> basemapTileLayers(BasemapMode mode) {
   }
 }
 
+/// Translucent halo whose radius equals the OS-reported horizontal
+/// accuracy in metres. Sized in metres (not pixels) so it grows/shrinks
+/// with zoom — same behaviour as Google Maps' blue accuracy circle.
+CircleLayer userAccuracyCircleLayer(LatLng point, double accuracyMeters) {
+  return CircleLayer(
+    circles: [
+      CircleMarker(
+        point: point,
+        radius: accuracyMeters,
+        useRadiusInMeter: true,
+        color: Colors.blueAccent.withValues(alpha: 0.15),
+        borderColor: Colors.blueAccent.withValues(alpha: 0.4),
+        borderStrokeWidth: 1,
+      ),
+    ],
+  );
+}
+
 /// User's current GPS dot. Used by HomeScreen and LocationPickerScreen so
 /// they render the same way.
 Marker userLocationMarker(LatLng point) {

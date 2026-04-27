@@ -83,6 +83,10 @@ class _HomeScreenState extends State<HomeScreen> {
   double _initialZoom = _sloveniaZoom;
   bool _viewLoaded = false;
   LatLng? _userLocation;
+  // Horizontal accuracy in metres. Drives the size of the translucent
+  // halo around the user dot. Null until the first fix arrives.
+  double? _userAccuracy;
+  StreamSubscription<UserPosition>? _positionSub;
   BasemapMode _basemapMode = BasemapMode.osm;
   bool _locating = false;
 
@@ -100,6 +104,12 @@ class _HomeScreenState extends State<HomeScreen> {
     _bootstrapView();
   }
 
+  @override
+  void dispose() {
+    _positionSub?.cancel();
+    super.dispose();
+  }
+
   Future<void> _bootstrapView() async {
     final cached = await _mapViewStore.load();
     if (!mounted) {
@@ -112,46 +122,85 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       _viewLoaded = true;
     });
+    // Order matters: the one-shot fix may pop the permission dialog. Only
+    // start the continuous stream after that resolves so two concurrent
+    // permission requests can't race.
     await _loadUserLocation();
+    if (mounted) _startPositionStream();
+  }
+
+  /// Subscribes to the OS position stream so the dot + halo follow the user
+  /// continuously while the app is foreground. Does NOT move the camera —
+  /// that only happens on the explicit Locate button or the first cache-miss
+  /// fix in `_loadUserLocation`. Saving to MapViewStore is also deliberately
+  /// skipped here so we don't churn disk on every metre of movement.
+  void _startPositionStream() {
+    debugPrint('[gps] starting position stream');
+    _positionSub = _locationService.watchPosition().listen(
+      (pos) {
+        debugPrint('[gps] tick lat=${pos.location.latitude.toStringAsFixed(5)} '
+            'lon=${pos.location.longitude.toStringAsFixed(5)} '
+            'acc=${pos.accuracy.toStringAsFixed(1)}m');
+        if (!mounted) return;
+        setState(() {
+          _userLocation = pos.location;
+          _userAccuracy = pos.accuracy;
+        });
+      },
+      onError: (Object e, StackTrace s) {
+        debugPrint('[gps] stream error: $e');
+      },
+      onDone: () {
+        debugPrint('[gps] stream closed');
+      },
+    );
   }
 
   Future<void> _loadUserLocation() async {
-    final location = await _locationService.getCurrentLocation();
-    if (!mounted || location == null) {
+    final position = await _locationService.getCurrentPosition();
+    debugPrint('[gps] one-shot fix: '
+        '${position == null ? "null (no permission / no service)" : "ok"}');
+    if (!mounted || position == null) {
       return;
     }
     setState(() {
-      _userLocation = location;
-      _center = location;
+      _userLocation = position.location;
+      _userAccuracy = position.accuracy;
+      _center = position.location;
     });
     final currentZoom = _mapController.camera.zoom;
     final targetZoom = currentZoom < kUserZoom ? kUserZoom : currentZoom;
-    _mapController.move(location, targetZoom);
+    _mapController.move(position.location, targetZoom);
     unawaited(
-      _mapViewStore.save(MapViewport(center: location, zoom: targetZoom)),
+      _mapViewStore.save(
+        MapViewport(center: position.location, zoom: targetZoom),
+      ),
     );
   }
 
   Future<void> _recenterOnUser() async {
     setState(() => _locating = true);
-    final location = await _locationService.getCurrentLocation();
+    final position = await _locationService.getCurrentPosition();
     if (!mounted) {
       return;
     }
     setState(() {
       _locating = false;
-      if (location != null) {
-        _userLocation = location;
-        _center = location;
+      if (position != null) {
+        _userLocation = position.location;
+        _userAccuracy = position.accuracy;
+        _center = position.location;
       }
     });
-    if (location == null) {
+    if (position == null) {
       _showSnack('GPS lokacije ni mogoče pridobiti.');
       return;
     }
     final zoom = _mapController.camera.zoom;
-    _mapController.move(location, zoom);
-    unawaited(_mapViewStore.save(MapViewport(center: location, zoom: zoom)));
+    _mapController.move(position.location, zoom);
+    unawaited(
+      _mapViewStore.save(MapViewport(center: position.location, zoom: zoom)),
+    );
   }
 
   Color _markerColor(Disturbance record) {
@@ -330,6 +379,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   children: [
                     ...basemapTileLayers(_basemapMode),
+                    if (_userLocation != null && _userAccuracy != null)
+                      userAccuracyCircleLayer(
+                        _userLocation!,
+                        _userAccuracy!,
+                      ),
                     MarkerLayer(markers: _buildMarkers(state)),
                   ],
                 ),

@@ -202,9 +202,15 @@ class AppState extends ChangeNotifier {
     // server 5xx, captive portal): syncAll() filters on pendingSync=true and
     // would never retry them. The manual sync button would then do nothing
     // visible, even though canSync was true.
+    // Stamp the author locally so the record reads as "mine" immediately,
+    // before the next pull merges in the server-side `ustvarjen_od`. Without
+    // this, freshly-created records render as outlined (teammate) markers
+    // and hide the Avtor row from the moment the optimistic POST returns
+    // until the next `_pullRemote` overwrites the local row.
     final newRecord = record.copyWith(
       photos: stablePhotos,
       pendingSync: true,
+      createdBy: _currentUser,
     );
     _records = [..._records, newRecord];
     _lastObservers = newRecord.observers;

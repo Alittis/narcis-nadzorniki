@@ -147,6 +147,28 @@ A 401 manifests as a `_sendAndMarkSynced ... FAILED: RemoteApiException(401): �
 line followed by `aborting after auth-clear` — at that point the in-memory
 password is gone and the user must re-login online (see §10 caveats).
 
+### Location diagnostics (`[gps] …`)
+Same convention as `[sync]`, emitted from [lib/screens/home_screen.dart](../lib/screens/home_screen.dart):
+
+- `[gps] one-shot fix: ok | null (no permission / no service)` — result of the
+  startup `getCurrentPosition` call.
+- `[gps] starting position stream` — confirms the continuous-update subscription
+  was attached after the one-shot fix resolved (serialised so the two permission
+  flows can't race).
+- `[gps] tick lat=… lon=… acc=…m` — every position event from
+  `Geolocator.getPositionStream` (5 m distance filter).
+- `[gps] stream error: …` / `[gps] stream closed` — surfaces stream-side
+  failures or unexpected termination.
+
+Tail with:
+```bash
+adb -s <device_id> logcat -v time '*:S' flutter:I | grep '\[gps\]'
+```
+
+Use these to investigate "the dot doesn't move" reports — the typical
+non-bug cause is the user being zoomed too far out for the per-tick metres
+of movement to be visible (≈6.6 m/px at zoom 14).
+
 ### Photo storage operational notes
 - Photos live in `TB_MOTNJE_FOTO.VSEBINA` as SECUREFILE BLOBs with
   `ENABLE STORAGE IN ROW` (small photos inline, large ones out-of-line).
