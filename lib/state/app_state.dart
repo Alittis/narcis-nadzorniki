@@ -105,6 +105,19 @@ class AppState extends ChangeNotifier {
 
   bool get isOnline => !_offlineOverride && _connectivityResult != ConnectivityResult.none;
 
+  /// True if the record was authored by the currently logged-in user.
+  /// Local-only (`pendingSync`) records are owned by the caller by definition
+  /// — `createdBy` is null until the server stamps `ustvarjen_od` on the
+  /// next pull. Email comparison is case-insensitive to match the server's
+  /// `LOWER(TRIM(email))` lookup in `pkg_tb_auth.authenticate`.
+  bool isAuthoredByCurrentUser(Disturbance record) {
+    if (record.pendingSync) return true;
+    final me = _currentUser?.toLowerCase();
+    if (me == null) return false;
+    final author = record.createdBy?.toLowerCase();
+    return author != null && author == me;
+  }
+
   /// Records local-only that haven't been pushed yet (created offline or while
   /// the session password is missing) plus records whose photos still need to
   /// be uploaded.

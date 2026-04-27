@@ -61,6 +61,7 @@ class RemoteDisturbance {
     required this.actionTaken,
     required this.proposedType,
     required this.createdAt,
+    required this.createdBy,
     required this.photos,
   });
 
@@ -75,6 +76,7 @@ class RemoteDisturbance {
   final String actionTaken;
   final String? proposedType;
   final DateTime createdAt;
+  final String? createdBy;
   final List<DisturbancePhoto> photos;
 
   /// Convert into a local-store-shaped record. Photos are returned without a
@@ -94,6 +96,7 @@ class RemoteDisturbance {
       pendingSync: false,
       createdAt: createdAt,
       proposedType: proposedType,
+      createdBy: createdBy,
     );
   }
 
@@ -114,6 +117,7 @@ class RemoteDisturbance {
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'] as String)
           : DateTime.parse(json['observedAt'] as String),
+      createdBy: json['createdBy'] as String?,
       photos: (json['photos'] as List<dynamic>? ?? const [])
           .map((e) => _readPhoto(e as Map<String, dynamic>))
           .toList(),

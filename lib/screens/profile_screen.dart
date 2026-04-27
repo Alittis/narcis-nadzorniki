@@ -14,7 +14,8 @@ class ProfileScreen extends StatelessWidget {
         builder: (context, state, _) {
           final email = state.currentUser ?? '';
           final initial = email.isNotEmpty ? email[0].toUpperCase() : '?';
-          final total = state.records.length;
+          final total =
+              state.records.where(state.isAuthoredByCurrentUser).length;
           final pendingPush = state.pendingPushCount;
           final missingLocal = state.missingLocalCount;
 
@@ -109,7 +110,7 @@ class ProfileScreen extends StatelessWidget {
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => RecordListScreen(records: state.records),
+                      builder: (_) => const RecordListScreen(),
                     ),
                   );
                 },

@@ -28,9 +28,9 @@
           "method": "GET",
           "host": "narcis.gov.si",
           "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
-          "scoping": "ORG_ID stamped from caller's narcis_uporabniki.organizacija; cross-org rows never returned",
-          "response_shape": "{ records: [ { id, latitude, longitude, locationAccuracy, observedAt, createdAt, description, actionTaken, proposedType, types[], observers[], photos[{id,mimeType}] } ] }",
-          "status": "deployed 2026-04-26; smoke test 17/17 (full record + photo lifecycle)"
+          "scoping": "ORG_ID stamped from caller's narcis_uporabniki.organizacija; cross-org rows never returned. Returns the full org set; client filters to author-only views (e.g. RecordListScreen) using the createdBy field.",
+          "response_shape": "{ records: [ { id, latitude, longitude, locationAccuracy, observedAt, createdAt, createdBy, description, actionTaken, proposedType, types[], observers[], photos[{id,mimeType}] } ] }",
+          "status": "deployed 2026-04-26; createdBy field added 2026-04-27 (re-run tools/ords/disturbance_endpoints.sql to apply); smoke test 17/17 (full record + photo lifecycle)"
         },
         {
           "path": "disturbances/",

@@ -11,6 +11,7 @@ import 'package:narcis_nadzorniki/screens/location_picker_screen.dart';
 import 'package:narcis_nadzorniki/screens/type_selection_screen.dart';
 import 'package:narcis_nadzorniki/services/location_service.dart';
 import 'package:narcis_nadzorniki/state/app_state.dart';
+import 'package:narcis_nadzorniki/widgets/basemap.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
@@ -20,6 +21,7 @@ class FormScreen extends StatefulWidget {
     required this.initialLocation,
     required this.initialObservers,
     required this.mapCenter,
+    required this.initialBasemap,
     this.initialPhotoPath,
     this.initialTypes,
   });
@@ -27,6 +29,7 @@ class FormScreen extends StatefulWidget {
   final LatLng? initialLocation;
   final List<String> initialObservers;
   final LatLng mapCenter;
+  final BasemapMode initialBasemap;
   final String? initialPhotoPath;
   final List<SelectedDisturbanceType>? initialTypes;
 
@@ -128,7 +131,10 @@ class _FormScreenState extends State<FormScreen> {
     final initial = _pickedOnMap && _location != null ? _location! : widget.mapCenter;
     final selected = await Navigator.of(context).push<LatLng>(
       MaterialPageRoute(
-        builder: (_) => LocationPickerScreen(initialLocation: initial),
+        builder: (_) => LocationPickerScreen(
+          initialLocation: initial,
+          initialBasemap: widget.initialBasemap,
+        ),
       ),
     );
     if (selected != null) {

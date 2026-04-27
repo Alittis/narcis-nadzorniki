@@ -45,6 +45,8 @@
 --         "latitude": <num>, "longitude": <num>,
 --         "locationAccuracy": "...",
 --         "observedAt": "<ISO-8601 UTC>",
+--         "createdAt":  "<ISO-8601 UTC>",
+--         "createdBy":  "<email>",
 --         "types":      [{ "groupCode": "...", "typeCode": "..." }, ...],
 --         "description": "...",
 --         "observers":  ["...", ...],
@@ -108,7 +110,8 @@ BEGIN
   APEX_JSON.open_array('records');
   FOR rec IN (
     SELECT motnja_id, geo_sirina, geo_dolzina, natancnost_lok,
-           cas_opazovanja, opis, ukrepanje, predlog_tipa, ustvarjen
+           cas_opazovanja, opis, ukrepanje, predlog_tipa, ustvarjen,
+           ustvarjen_od
       FROM tb_motnje
      WHERE org_id = l_ctx.org_id
      ORDER BY cas_opazovanja DESC, ustvarjen DESC
@@ -124,6 +127,7 @@ BEGIN
     APEX_JSON.write('createdAt',
       TO_CHAR(SYS_EXTRACT_UTC(CAST(rec.ustvarjen AS TIMESTAMP WITH TIME ZONE)),
               'YYYY-MM-DD"T"HH24:MI:SS.FF3"Z"'));
+    APEX_JSON.write('createdBy',    rec.ustvarjen_od);
     APEX_JSON.write('description',  rec.opis);
     APEX_JSON.write('actionTaken',  rec.ukrepanje);
     APEX_JSON.write('proposedType', rec.predlog_tipa);

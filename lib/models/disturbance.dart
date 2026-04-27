@@ -16,6 +16,7 @@ class Disturbance {
     required this.pendingSync,
     required this.createdAt,
     this.proposedType,
+    this.createdBy,
   });
 
   final String id;
@@ -31,6 +32,10 @@ class Disturbance {
   final bool pendingSync;
   final DateTime createdAt;
   final String? proposedType;
+  // Email of the user who created the record. Null for local-only records
+  // that haven't been pushed yet (the caller is the author by definition);
+  // populated from `ustvarjen_od` when pulled from the server.
+  final String? createdBy;
 
   bool get hasPendingPhotoUploads => photos.any((p) => p.pendingUpload);
 
@@ -47,6 +52,7 @@ class Disturbance {
     bool? pendingSync,
     DateTime? createdAt,
     String? proposedType,
+    String? createdBy,
   }) {
     return Disturbance(
       id: id,
@@ -62,6 +68,7 @@ class Disturbance {
       pendingSync: pendingSync ?? this.pendingSync,
       createdAt: createdAt ?? this.createdAt,
       proposedType: proposedType ?? this.proposedType,
+      createdBy: createdBy ?? this.createdBy,
     );
   }
 
@@ -79,6 +86,7 @@ class Disturbance {
         'pendingSync': pendingSync,
         'createdAt': createdAt.toIso8601String(),
         'proposedType': proposedType,
+        'createdBy': createdBy,
       };
 
   factory Disturbance.fromJson(Map<String, dynamic> json) {
@@ -98,6 +106,7 @@ class Disturbance {
       pendingSync: json['pendingSync'] as bool,
       createdAt: DateTime.parse(json['createdAt'] as String),
       proposedType: json['proposedType'] as String?,
+      createdBy: json['createdBy'] as String?,
     );
   }
 

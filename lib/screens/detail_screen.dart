@@ -60,6 +60,10 @@ class _DetailScreenState extends State<DetailScreen> {
                   .where((r) => r.id == widget.record.id)
                   .firstOrNull ??
               widget.record;
+          final author = live.createdBy;
+          final showAuthor = author != null &&
+              author.isNotEmpty &&
+              !state.isAuthoredByCurrentUser(live);
           return ListView(
             padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomInset),
             children: [
@@ -71,6 +75,7 @@ class _DetailScreenState extends State<DetailScreen> {
                         ? 'Fotografije v čakanju'
                         : 'Sinhronizirano'),
               ),
+              if (showAuthor) _InfoRow(label: 'Avtor', value: author),
               _InfoRow(label: 'Datum/čas', value: dateFormat.format(live.observedAt)),
               _InfoRow(
                 label: 'Lokacija',

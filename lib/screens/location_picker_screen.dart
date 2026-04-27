@@ -8,9 +8,11 @@ class LocationPickerScreen extends StatefulWidget {
   const LocationPickerScreen({
     super.key,
     required this.initialLocation,
+    required this.initialBasemap,
   });
 
   final LatLng initialLocation;
+  final BasemapMode initialBasemap;
 
   @override
   State<LocationPickerScreen> createState() => _LocationPickerScreenState();
@@ -20,14 +22,15 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   final _mapController = MapController();
   final _locationService = LocationService();
   late LatLng _selected;
+  late BasemapMode _basemapMode;
   LatLng? _userLocation;
-  BasemapMode _basemapMode = BasemapMode.osm;
   bool _locating = false;
 
   @override
   void initState() {
     super.initState();
     _selected = widget.initialLocation;
+    _basemapMode = widget.initialBasemap;
     _refreshUserLocation(recenter: false);
   }
 
@@ -50,7 +53,11 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       return;
     }
     if (recenter) {
-      _mapController.move(location, _mapController.camera.zoom);
+      // Match the home screen: keep the user's manual zoom but lift to
+      // kUserZoom only if they're zoomed out below it.
+      final currentZoom = _mapController.camera.zoom;
+      final targetZoom = currentZoom < kUserZoom ? kUserZoom : currentZoom;
+      _mapController.move(location, targetZoom);
     }
   }
 
@@ -74,7 +81,8 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         mapController: _mapController,
         options: MapOptions(
           initialCenter: _selected,
-          initialZoom: 14,
+          initialZoom: kUserZoom,
+          maxZoom: kMapMaxZoom,
           interactionOptions: const InteractionOptions(
             flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
           ),
@@ -88,17 +96,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
           ...basemapTileLayers(_basemapMode),
           MarkerLayer(
             markers: [
-              if (_userLocation != null)
-                Marker(
-                  point: _userLocation!,
-                  width: 40,
-                  height: 40,
-                  child: const Icon(
-                    Icons.my_location,
-                    color: Colors.blueAccent,
-                    size: 26,
-                  ),
-                ),
+              if (_userLocation != null) userLocationMarker(_userLocation!),
               Marker(
                 point: _selected,
                 width: 44,
@@ -113,17 +111,11 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _locating ? null : () => _refreshUserLocation(recenter: true),
-        tooltip: 'Moja lokacija',
-        child: _locating
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(Icons.my_location),
+      floatingActionButton: LocateButton(
+        locating: _locating,
+        onTap: _locating ? null : () => _refreshUserLocation(recenter: true),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
     );
   }
 }

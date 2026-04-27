@@ -74,7 +74,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   static const _sloveniaCenter = LatLng(46.15, 14.99);
   static const _sloveniaZoom = 8.0;
-  static const _userZoom = 14.0;
 
   final _mapController = MapController();
   final _locationService = LocationService();
@@ -126,7 +125,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _center = location;
     });
     final currentZoom = _mapController.camera.zoom;
-    final targetZoom = currentZoom < _userZoom ? _userZoom : currentZoom;
+    final targetZoom = currentZoom < kUserZoom ? kUserZoom : currentZoom;
     _mapController.move(location, targetZoom);
     unawaited(
       _mapViewStore.save(MapViewport(center: location, zoom: targetZoom)),
@@ -181,6 +180,7 @@ class _HomeScreenState extends State<HomeScreen> {
           initialLocation: location ?? _userLocation,
           initialObservers: state.lastObservers,
           mapCenter: _center,
+          initialBasemap: _basemapMode,
           initialPhotoPath: initialPhotoPath,
           initialTypes: initialTypes,
         ),
@@ -315,7 +315,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   options: MapOptions(
                     initialCenter: _center,
                     initialZoom: _initialZoom,
-                    maxZoom: 19,
+                    maxZoom: kMapMaxZoom,
                     interactionOptions: const InteractionOptions(
                       flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
                     ),
@@ -402,52 +402,47 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
     if (_showMotnje) {
+      // Two passes so the user's own markers always sit on top of teammates'
+      // when they overlap. flutter_map draws markers in list order.
+      final mine = <Disturbance>[];
+      final others = <Disturbance>[];
       for (final record in state.records) {
-        markers.add(
-          Marker(
-            point: LatLng(record.latitude, record.longitude),
-            width: 44,
-            height: 44,
-            child: GestureDetector(
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => DetailScreen(record: record),
-                  ),
-                );
-              },
-              child: Icon(
-                Icons.location_on,
-                color: _markerColor(record),
-                size: 38,
-              ),
+        (state.isAuthoredByCurrentUser(record) ? mine : others).add(record);
+      }
+      Marker buildMarker(Disturbance record, {required bool isMine}) {
+        // Color encodes age (red ≤31d, orange ≤365d, blue older) for both
+        // own and teammate records; shape encodes authorship (own = filled
+        // pin, teammate = outlined pin). Keeps the age signal meaningful
+        // for the full org set without color-aliasing.
+        return Marker(
+          point: LatLng(record.latitude, record.longitude),
+          width: 44,
+          height: 44,
+          child: GestureDetector(
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => DetailScreen(record: record),
+                ),
+              );
+            },
+            child: Icon(
+              isMine ? Icons.location_on : Icons.location_on_outlined,
+              color: _markerColor(record),
+              size: 38,
             ),
           ),
         );
       }
+      for (final r in others) {
+        markers.add(buildMarker(r, isMine: false));
+      }
+      for (final r in mine) {
+        markers.add(buildMarker(r, isMine: true));
+      }
     }
     if (_userLocation != null) {
-      markers.add(
-        Marker(
-          point: _userLocation!,
-          width: 24,
-          height: 24,
-          child: Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.blueAccent,
-              border: Border.all(color: Colors.white, width: 3),
-              boxShadow: const [
-                BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 4,
-                  offset: Offset(0, 1),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
+      markers.add(userLocationMarker(_userLocation!));
     }
     return markers;
   }
@@ -881,7 +876,7 @@ class _BottomBar extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              _LocateButton(locating: locating, onTap: onLocateTap),
+              LocateButton(locating: locating, onTap: onLocateTap),
               _ModePill(activeMode: activeMode, onTap: onModeTap),
               _PlusButton(
                 color: activeColor,
@@ -889,43 +884,6 @@ class _BottomBar extends StatelessWidget {
                 onTap: onPlusTap,
               ),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _LocateButton extends StatelessWidget {
-  const _LocateButton({required this.locating, required this.onTap});
-
-  final bool locating;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Material(
-      color: scheme.surface,
-      shape: const CircleBorder(),
-      elevation: 4,
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: SizedBox(
-          width: 48,
-          height: 48,
-          child: Center(
-            child: locating
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Transform.rotate(
-                    angle: 0.785398, // 45° clockwise
-                    child: const Icon(Icons.navigation),
-                  ),
           ),
         ),
       ),
