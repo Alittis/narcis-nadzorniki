@@ -249,3 +249,24 @@ All six are idempotent. `walks_schema.sql` must run AFTER `disturbance_schema.sq
 After deploying:
 - `bash tools/ords/test_disturbances.sh` (with creds) for the disturbance lifecycle.
 - `bash tools/ords/test_walks.sh` (with creds) for the walk lifecycle (POST 3-point walk → idempotent re-POST → GET list → GET points → PUT name+notes → DELETE → 404 checks).
+
+## 11. Regenerating the App Icon
+The launcher icon is a stylized white six-petal narcissus (yellow cup, red rim) on a forest-green rounded square — drawn from the app's brand cue (narcis = narcissus / *Narcissus poeticus*) and the theme seed `#388E3C`. Source PNGs live under `assets/icon/` and are not hand-drawn — they're generated from [tools/icon/build_icon.py](../tools/icon/build_icon.py) so any tweak (color, petal count, cup proportions) is a code edit, not a graphics-editor round-trip.
+
+To regenerate after editing `build_icon.py`:
+```bash
+python3 tools/icon/build_icon.py            # rebuild assets/icon/*.png
+dart run flutter_launcher_icons             # fan out to android/res/* + ios/Runner/Assets.xcassets/AppIcon.appiconset/*
+```
+
+`flutter_launcher_icons` config lives at the bottom of `pubspec.yaml` (adaptive icon: foreground PNG + `#2E7D32` background; iOS alpha stripped per Apple guidance). Pillow is the only Python dependency for the source-PNG step; no Dart packages need re-resolving unless the launcher-icons version is bumped.
+
+## 12. Login Background Photo
+The login screen renders `assets/images/login_bg.jpg` full-bleed. The full-resolution camera original is checked in at `tools/icon/sources/login_bg.jpg`; the bundled asset is a downsampled JPEG produced by [tools/icon/build_login_bg.py](../tools/icon/build_login_bg.py) (1800 px longest edge, quality 78, ~400 KB — ~6× smaller than the original, no visible difference behind the gradient + translucent fields).
+
+To replace the photo: drop a new full-resolution JPEG at `tools/icon/sources/login_bg.jpg`, then:
+```bash
+python3 tools/icon/build_login_bg.py
+```
+
+The login screen's `Image.asset` falls back to a solid `#2E7D32` panel via `errorBuilder` if the file is missing, so the app still launches on a fresh clone before the asset is added — useful for CI / fresh-machine bootstrap, not as a long-term default.

@@ -163,6 +163,21 @@
       "purpose": "Read-only historical disturbance records (703 entries, Mar-Aug 2025) from Notranjski regijski park Formidable form",
       "size_kb": 409,
       "regenerated_by": "tools/import_notranjski_csv.py"
+    },
+    {
+      "path": "assets/icon/app_icon.png",
+      "purpose": "1024x1024 launcher-icon source (white six-petal narcissus + yellow/red cup on forest-green rounded square); fanned out to android/app/src/main/res/mipmap-* and ios/Runner/Assets.xcassets/AppIcon.appiconset/* by flutter_launcher_icons",
+      "regenerated_by": "python3 tools/icon/build_icon.py && dart run flutter_launcher_icons"
+    },
+    {
+      "path": "assets/icon/app_icon_foreground.png",
+      "purpose": "1024x1024 adaptive-icon foreground (flower only, transparent background, scaled to ~66% so Android's circular/squircle launcher mask doesn't clip it); pairs with adaptive_icon_background #2E7D32 in pubspec.yaml",
+      "regenerated_by": "python3 tools/icon/build_icon.py && dart run flutter_launcher_icons"
+    },
+    {
+      "path": "assets/images/login_bg.jpg",
+      "purpose": "Full-bleed background photograph for the login screen (Marsh Fritillary on a hawkbit in a meadow). Downsampled from tools/icon/sources/login_bg.jpg to 1800px longest edge at quality 78 (~375 KB) to keep APK/IPA weight low; full-res camera original is preserved in sources/.",
+      "regenerated_by": "python3 tools/icon/build_login_bg.py (re-run after replacing tools/icon/sources/login_bg.jpg)"
     }
   ],
   "env_required": [],
