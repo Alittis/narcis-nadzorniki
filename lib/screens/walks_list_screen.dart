@@ -19,7 +19,9 @@ class WalksListScreen extends StatelessWidget {
       ),
       body: Consumer<AppState>(
         builder: (context, state, _) {
-          final sorted = [...state.walks]
+          final sorted = state.walks
+              .where(state.isWalkAuthoredByCurrentUser)
+              .toList()
             ..sort((a, b) => b.startedAt.compareTo(a.startedAt));
 
           if (sorted.isEmpty) {

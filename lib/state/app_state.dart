@@ -160,6 +160,15 @@ class AppState extends ChangeNotifier {
     return author != null && author == me;
   }
 
+  /// Same logic as [isAuthoredByCurrentUser] but for walks.
+  bool isWalkAuthoredByCurrentUser(Walk walk) {
+    if (walk.pendingSync) return true;
+    final me = _currentUser?.toLowerCase();
+    if (me == null) return false;
+    final author = walk.createdBy?.toLowerCase();
+    return author != null && author == me;
+  }
+
   /// Records local-only that haven't been pushed yet (created offline or while
   /// the session password is missing) plus records whose photos still need to
   /// be uploaded, plus walks waiting to be pushed.
@@ -463,7 +472,7 @@ class AppState extends ChangeNotifier {
       await _drainPendingPhotos();
       // Pull remote list to surface any IDs the device doesn't have locally.
       await _pullRemoteWalks();
-      await _prefetchOwnWalkPoints();
+      await _prefetchAllWalkPoints();
       await _pullRemote();
     } finally {
       _isSyncing = false;
@@ -949,20 +958,16 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  /// Eagerly download track points for the caller's own walks that don't
+  /// Eagerly download track points for every walk in the org that doesn't
   /// yet have geometry locally, so the home-map "Obhodi" layer renders all
-  /// of them without requiring a per-walk detail-screen open. Teammate
-  /// walks stay lazy — bandwidth then tracks the user's own activity, not
-  /// the org's. Failures on one walk don't block the rest.
-  Future<void> _prefetchOwnWalkPoints() async {
+  /// of them (own + teammate) without requiring a per-walk detail-screen
+  /// open. Mirrors the disturbance pull, which is org-wide. Failures on one
+  /// walk don't block the rest.
+  Future<void> _prefetchAllWalkPoints() async {
     final creds = _credentials;
-    final me = _currentUser?.toLowerCase();
-    if (creds == null || me == null) return;
+    if (creds == null) return;
     final targetIds = _walks
-        .where((w) =>
-            w.points.isEmpty &&
-            !w.pendingSync &&
-            w.createdBy?.toLowerCase() == me)
+        .where((w) => w.points.isEmpty && !w.pendingSync)
         .map((w) => w.id)
         .toList();
     if (targetIds.isEmpty) return;

@@ -488,8 +488,8 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Polyline> _buildPolylines(AppState state) {
     final out = <Polyline>[];
     // Historical walks under the Obhodi layer toggle. Sync prefetches
-    // points for the caller's own walks, so those always render here.
-    // Teammate walks lazy-load on detail open and only show up after that.
+    // points for every walk in the org (own + teammate), mirroring the
+    // disturbance pull, so all walks render here.
     if (_showObhodi) {
       for (final walk in state.walks) {
         if (walk.points.isEmpty) continue;
