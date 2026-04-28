@@ -2,7 +2,14 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <!-- ACCESS_BACKGROUND_LOCATION is intentionally NOT declared. Walk
+         tracking uses a foreground service typed `location` (started while
+         the app is in the foreground via startWalk), which Android grants
+         continuous location to without the background-location permission.
+         No code path requests location while no FGS is running. Re-add this
+         permission only when a feature genuinely needs background location
+         outside an FGS (e.g. geofencing while app is closed) — and prepare
+         a Play Console "prominent disclosure" form when you do. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission

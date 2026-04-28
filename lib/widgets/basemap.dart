@@ -15,7 +15,7 @@ const String _esriImageryUrl =
     'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 const String _esriLabelsUrl =
     'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}';
-const String _userAgent = 'si.narcis.nadzorniki';
+const String _userAgent = 'si.terenska.beleznica';
 
 List<Widget> basemapTileLayers(BasemapMode mode) {
   switch (mode) {

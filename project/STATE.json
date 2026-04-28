@@ -5,6 +5,28 @@
   "containerized": false,
   "primary_port": "",
   "requires_build_step": true,
+  "android_release": {
+    "applicationId": "si.terenska.beleznica",
+    "namespace": "si.terenska.beleznica",
+    "publisher": "Alittis",
+    "publisher_contact": "admin@alittis.com",
+    "data_controller": "Agencija Republike Slovenije za okolje (ARSO)",
+    "data_controller_contact": "narcis.arso@gov.si",
+    "data_controller_url": "https://narcis.arso.gov.si",
+    "privacy_policy_url": "https://alittis.github.io/terenska-beleznica/privacy/",
+    "privacy_policy_source": "~/Documents/PROJEKTI/alittis.github.io/terenska-beleznica/privacy/index.html (Alittis/alittis.github.io)",
+    "upload_keystore_path": "/Users/Alexis/keystores/narcis_nadzorniki_upload.jks",
+    "upload_keystore_alias": "upload",
+    "upload_keystore_algo": "RSA 2048",
+    "upload_keystore_validity_until": "2051-04-22",
+    "upload_cert_sha1": "66:06:D2:3D:09:96:28:4B:10:05:29:F1:07:99:CA:C1:FC:D7:CA:19",
+    "upload_cert_sha256": "25:F1:C4:C6:20:C5:33:39:D3:8A:53:11:6C:7A:44:70:53:BD:FC:99:E8:1E:9F:AE:CA:D3:4D:BB:38:B5:E6:A2",
+    "play_app_signing_cert_sha1": "STATUS: UNKNOWN — REQUIRES CONFIRMATION (visible in Play Console after first AAB upload)",
+    "play_app_signing_cert_sha256": "STATUS: UNKNOWN — REQUIRES CONFIRMATION (visible in Play Console after first AAB upload)",
+    "manifest_permissions_truthful": "ACCESS_BACKGROUND_LOCATION intentionally NOT declared — walk tracking is foreground-service-only (FGS type 'location'); permission would be required only for a future feature that needs location while no FGS is running",
+    "first_aab_built": "2026-04-28 (45.5 MB, signed with upload key, manifest verified clean of com.example and BACKGROUND_LOCATION)",
+    "play_console_status": "STATUS: UNKNOWN — REQUIRES CONFIRMATION (Play Console internal testing track not yet created at time of writing)"
+  },
   "external_services": [
     {
       "name": "ORDS / Oracle APEX",

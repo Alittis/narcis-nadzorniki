@@ -43,3 +43,10 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Release signing — never commit. The actual keystore lives outside the repo
+# (see /project/DEPLOYMENT.md). key.properties holds plain-text passwords
+# that point at it.
+/android/key.properties
+*.jks
+*.keystore

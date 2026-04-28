@@ -1,4 +1,4 @@
-package com.example.narcis_nadzorniki
+package si.terenska.beleznica
 
 import io.flutter.embedding.android.FlutterActivity
 
