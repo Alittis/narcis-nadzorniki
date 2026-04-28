@@ -133,20 +133,24 @@ class _MapSection extends StatelessWidget {
                   ],
                 ),
               if (linked.isNotEmpty)
-                MarkerLayer(
-                  markers: [
-                    for (final r in linked)
-                      Marker(
-                        point: LatLng(r.latitude, r.longitude),
-                        width: 36,
-                        height: 36,
-                        child: const Icon(
-                          Icons.location_on,
-                          color: Colors.red,
-                          size: 32,
-                        ),
-                      ),
-                  ],
+                Builder(
+                  builder: (mapContext) {
+                    final state = mapContext.read<AppState>();
+                    return MarkerLayer(
+                      markers: [
+                        for (final r in linked)
+                          Marker(
+                            point: LatLng(r.latitude, r.longitude),
+                            width: 44,
+                            height: 44,
+                            child: RecordMarker(
+                              color: recordMarkerColorForAge(r.observedAt),
+                              isMine: state.isAuthoredByCurrentUser(r),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
                 ),
             ],
           ),

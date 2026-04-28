@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:narcis_nadzorniki/data/disturbance_group_colors.dart';
 import 'package:narcis_nadzorniki/data/disturbance_types.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
 
@@ -78,39 +79,72 @@ class _TypeGroupTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hue = disturbanceGroupColor(group.code);
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      child: ExpansionTile(
-        title: Text('${group.code}. ${group.name}'),
-        children: group.types.map((type) {
-          final key = '${group.code}_${type.code}';
-          final isSelected = selected.containsKey(key);
-          return CheckboxListTile(
-            value: isSelected,
-            onChanged: (value) {
-              if (value == true) {
-                onChanged(
-                  key,
-                  SelectedDisturbanceType(
-                    groupCode: group.code,
-                    groupName: group.name,
-                    typeCode: type.code,
-                    typeName: type.name,
-                  ),
-                );
-              } else {
-                onChanged(key, null);
-              }
-            },
-            title: Text('${type.code}. ${type.name}'),
-            subtitle: type.note == null
-                ? null
-                : Text(
-                    type.note!,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-          );
-        }).toList(),
+      clipBehavior: Clip.antiAlias,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(
+            left: BorderSide(color: hue, width: 4),
+          ),
+        ),
+        child: ExpansionTile(
+          shape: const Border(),
+          collapsedShape: const Border(),
+          tilePadding: const EdgeInsets.fromLTRB(12, 4, 16, 4),
+          leading: Container(
+            width: 32,
+            height: 32,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: disturbanceGroupTint(group.code),
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              group.code,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: hue,
+              ),
+            ),
+          ),
+          title: Text(
+            group.name,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          children: group.types.map((type) {
+            final key = '${group.code}_${type.code}';
+            final isSelected = selected.containsKey(key);
+            return CheckboxListTile(
+              value: isSelected,
+              activeColor: hue,
+              onChanged: (value) {
+                if (value == true) {
+                  onChanged(
+                    key,
+                    SelectedDisturbanceType(
+                      groupCode: group.code,
+                      groupName: group.name,
+                      typeCode: type.code,
+                      typeName: type.name,
+                    ),
+                  );
+                } else {
+                  onChanged(key, null);
+                }
+              },
+              title: Text('${type.code}. ${type.name}'),
+              subtitle: type.note == null
+                  ? null
+                  : Text(
+                      type.note!,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+            );
+          }).toList(),
+        ),
       ),
     );
   }

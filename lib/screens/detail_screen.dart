@@ -2,8 +2,10 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:narcis_nadzorniki/data/disturbance_group_colors.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
 import 'package:narcis_nadzorniki/models/disturbance_photo.dart';
+import 'package:narcis_nadzorniki/models/disturbance_type.dart';
 import 'package:narcis_nadzorniki/screens/photo_viewer_screen.dart';
 import 'package:narcis_nadzorniki/state/app_state.dart';
 import 'package:provider/provider.dart';
@@ -21,15 +23,21 @@ class DetailScreen extends StatefulWidget {
 }
 
 class _DetailScreenState extends State<DetailScreen> {
+  final _photoPageController = PageController();
+  int _photoIndex = 0;
+
   @override
   void initState() {
     super.initState();
-    // Lazy-fetch any photos that exist on the server but haven't been
-    // downloaded yet. Runs async; the build pulls fresh state from AppState
-    // when files arrive.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _ensurePhotos();
     });
+  }
+
+  @override
+  void dispose() {
+    _photoPageController.dispose();
+    super.dispose();
   }
 
   Future<void> _ensurePhotos() async {
@@ -44,87 +52,81 @@ class _DetailScreenState extends State<DetailScreen> {
     }
   }
 
+  Disturbance _liveRecord(AppState state) {
+    return state.records
+            .where((r) => r.id == widget.record.id)
+            .firstOrNull ??
+        widget.record;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final dateFormat = DateFormat('dd.MM.yyyy HH:mm');
+    final colors = Theme.of(context).colorScheme;
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
+
     return Scaffold(
+      backgroundColor: colors.surface,
       appBar: AppBar(
         title: const Text('Podrobnosti zapisa'),
+        actions: [
+          Consumer<AppState>(
+            builder: (context, state, _) {
+              final live = _liveRecord(state);
+              return _SyncBadge(record: live);
+            },
+          ),
+        ],
       ),
       body: Consumer<AppState>(
         builder: (context, state, _) {
-          // Re-resolve the record from state so photo localPaths populated
-          // by ensurePhotoCached show up without rebuilding from props.
-          final live = state.records
-                  .where((r) => r.id == widget.record.id)
-                  .firstOrNull ??
-              widget.record;
+          final live = _liveRecord(state);
           final author = live.createdBy;
           final showAuthor = author != null &&
               author.isNotEmpty &&
               !state.isAuthoredByCurrentUser(live);
+
           return ListView(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomInset),
+            padding: EdgeInsets.only(bottom: 16 + bottomInset),
             children: [
-              _InfoRow(
-                label: 'Status sinhronizacije',
-                value: live.pendingSync
-                    ? 'V čakanju'
-                    : (live.hasPendingPhotoUploads
-                        ? 'Fotografije v čakanju'
-                        : 'Sinhronizirano'),
+              _PhotoHero(
+                photos: live.photos,
+                motnjaId: live.id,
+                pageController: _photoPageController,
+                currentIndex: _photoIndex,
+                onPageChanged: (i) => setState(() => _photoIndex = i),
               ),
-              if (showAuthor) _InfoRow(label: 'Avtor', value: author),
-              _InfoRow(label: 'Datum/čas', value: dateFormat.format(live.observedAt)),
-              _InfoRow(
-                label: 'Lokacija',
-                value: '${live.latitude.toStringAsFixed(5)}, ${live.longitude.toStringAsFixed(5)}',
+              Transform.translate(
+                offset: const Offset(0, -22),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: _TypesCard(
+                    types: live.types,
+                    proposedType: live.proposedType,
+                  ),
+                ),
               ),
-              _InfoRow(label: 'Natančnost', value: live.locationAccuracy),
-              _InfoRow(label: 'Ukrepanje', value: live.actionTaken),
-              _InfoRow(
-                label: 'Opazovalci',
-                value: live.observers.isEmpty ? '—' : live.observers.join(', '),
-              ),
-              const SizedBox(height: 12),
-              Text('Tipi motenj', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 8),
-              ...live.types.map((type) => Text('• ${type.display}')),
-              if (live.proposedType != null && live.proposedType!.trim().isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text('Predlagan tip: ${live.proposedType}'),
-              ],
-              const SizedBox(height: 16),
-              Text('Opis', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 6),
-              Text(live.description.isEmpty ? '—' : live.description),
-              const SizedBox(height: 16),
-              Text('Fotografije', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 8),
-              if (live.photos.isEmpty)
-                const Text('Ni pripetih fotografij.')
-              else
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    for (var i = 0; i < live.photos.length; i++)
-                      _PhotoTile(
-                        photo: live.photos[i],
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => PhotoViewerScreen(
-                                motnjaId: live.id,
-                                initialIndex: i,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+                    _Description(text: live.description),
+                    const SizedBox(height: 14),
+                    _MetaStrip(
+                      observedAt: live.observedAt,
+                      latitude: live.latitude,
+                      longitude: live.longitude,
+                      accuracy: live.locationAccuracy,
+                      author: showAuthor ? author : null,
+                    ),
+                    const SizedBox(height: 10),
+                    _FooterRow(
+                      actionTaken: live.actionTaken,
+                      observers: live.observers,
+                    ),
                   ],
                 ),
+              ),
             ],
           );
         },
@@ -133,62 +135,91 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 }
 
-class _PhotoTile extends StatelessWidget {
-  const _PhotoTile({required this.photo, required this.onTap});
+class _PhotoHero extends StatelessWidget {
+  const _PhotoHero({
+    required this.photos,
+    required this.motnjaId,
+    required this.pageController,
+    required this.currentIndex,
+    required this.onPageChanged,
+  });
 
-  final DisturbancePhoto photo;
-  final VoidCallback onTap;
+  final List<DisturbancePhoto> photos;
+  final String motnjaId;
+  final PageController pageController;
+  final int currentIndex;
+  final ValueChanged<int> onPageChanged;
 
   @override
   Widget build(BuildContext context) {
-    final path = photo.localPath;
-    if (path == null) {
-      // No local file yet — either we haven't fetched it or the fetch
-      // failed (offline / 401). Render a placeholder so the user knows the
-      // photo exists on the server.
-      return InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          width: 90,
-          height: 90,
-          decoration: BoxDecoration(
-            color: Colors.black12,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Center(
-            child: Icon(Icons.cloud_download, color: Colors.black45),
-          ),
+    final colors = Theme.of(context).colorScheme;
+    final height = MediaQuery.sizeOf(context).height * 0.36;
+
+    if (photos.isEmpty) {
+      return Container(
+        height: 120,
+        color: colors.surfaceContainerLow,
+        alignment: Alignment.center,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.image_not_supported_outlined,
+                color: colors.onSurfaceVariant, size: 18),
+            const SizedBox(width: 8),
+            Text(
+              'Ni fotografij',
+              style: TextStyle(color: colors.onSurfaceVariant),
+            ),
+          ],
         ),
       );
     }
-    return GestureDetector(
-      onTap: onTap,
+
+    return SizedBox(
+      height: height,
       child: Stack(
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Hero(
-              tag: photo.id,
-              child: Image.file(
-                File(path),
-                width: 90,
-                height: 90,
-                fit: BoxFit.cover,
-              ),
-            ),
+          PageView.builder(
+            controller: pageController,
+            itemCount: photos.length,
+            onPageChanged: onPageChanged,
+            itemBuilder: (context, i) {
+              final photo = photos[i];
+              return GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => PhotoViewerScreen(
+                        motnjaId: motnjaId,
+                        initialIndex: i,
+                      ),
+                    ),
+                  );
+                },
+                child: _PhotoSlide(photo: photo),
+              );
+            },
           ),
-          if (photo.pendingUpload)
+          if (photos.length > 1)
             Positioned(
-              right: 4,
-              bottom: 4,
+              bottom: 32,
+              right: 12,
               child: Container(
-                padding: const EdgeInsets.all(2),
-                decoration: const BoxDecoration(
-                  color: Colors.black54,
-                  shape: BoxShape.circle,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.cloud_upload, size: 14, color: Colors.white),
+                child: Text(
+                  '${currentIndex + 1} / ${photos.length}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                ),
               ),
             ),
         ],
@@ -197,33 +228,313 @@ class _PhotoTile extends StatelessWidget {
   }
 }
 
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({
-    required this.label,
-    required this.value,
-  });
+class _PhotoSlide extends StatelessWidget {
+  const _PhotoSlide({required this.photo});
 
-  final String label;
-  final String value;
+  final DisturbancePhoto photo;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+    final colors = Theme.of(context).colorScheme;
+    final path = photo.localPath;
+    if (path == null) {
+      return Container(
+        color: colors.surfaceContainerLow,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.cloud_download_outlined,
+                  size: 36, color: colors.onSurfaceVariant),
+              const SizedBox(height: 6),
+              Text(
+                'Prenos fotografije ...',
+                style: TextStyle(color: colors.onSurfaceVariant),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return Hero(
+      tag: photo.id,
+      child: Image.file(
+        File(path),
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+      ),
+    );
+  }
+}
+
+class _TypesCard extends StatelessWidget {
+  const _TypesCard({required this.types, required this.proposedType});
+
+  final List<SelectedDisturbanceType> types;
+  final String? proposedType;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final hasProposed =
+        proposedType != null && proposedType!.trim().isNotEmpty;
+
+    return Card(
+      elevation: 3,
+      margin: EdgeInsets.zero,
+      color: colors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: types.isEmpty && !hasProposed
+            ? Text(
+                'Brez izbranih tipov',
+                style: TextStyle(color: colors.onSurfaceVariant),
+              )
+            : Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final type in types) _TypeChip(type: type),
+                  if (hasProposed) _ProposedChip(text: proposedType!.trim()),
+                ],
+              ),
+      ),
+    );
+  }
+}
+
+class _TypeChip extends StatelessWidget {
+  const _TypeChip({required this.type});
+
+  final SelectedDisturbanceType type;
+
+  @override
+  Widget build(BuildContext context) {
+    final hue = disturbanceGroupColor(type.groupCode);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: disturbanceGroupTint(type.groupCode),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: disturbanceGroupBorder(type.groupCode),
+          width: 1,
+        ),
+      ),
+      child: Text(
+        type.display,
+        style: TextStyle(
+          fontSize: 12,
+          color: hue,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+class _ProposedChip extends StatelessWidget {
+  const _ProposedChip({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: colors.outline.withValues(alpha: 0.6),
+          width: 1,
+        ),
+      ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(
-            width: 140,
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+          Icon(Icons.lightbulb_outline,
+              size: 12, color: colors.onSurfaceVariant),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 12,
+              color: colors.onSurfaceVariant,
+              fontStyle: FontStyle.italic,
+              fontWeight: FontWeight.w500,
             ),
           ),
-          Expanded(child: Text(value)),
         ],
+      ),
+    );
+  }
+}
+
+class _Description extends StatelessWidget {
+  const _Description({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    if (text.trim().isEmpty) {
+      return Text(
+        'Brez opisa.',
+        style: TextStyle(
+          color: colors.onSurfaceVariant,
+          fontStyle: FontStyle.italic,
+        ),
+      );
+    }
+    return Text(
+      text,
+      style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.35),
+    );
+  }
+}
+
+class _MetaStrip extends StatelessWidget {
+  const _MetaStrip({
+    required this.observedAt,
+    required this.latitude,
+    required this.longitude,
+    required this.accuracy,
+    required this.author,
+  });
+
+  final DateTime observedAt;
+  final double latitude;
+  final double longitude;
+  final String accuracy;
+  final String? author;
+
+  @override
+  Widget build(BuildContext context) {
+    final dateFmt = DateFormat('dd.MM.yyyy HH:mm');
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        _Pill(
+          icon: Icons.calendar_today,
+          text: dateFmt.format(observedAt),
+          tabular: true,
+        ),
+        _Pill(
+          icon: Icons.location_on_outlined,
+          text:
+              '${latitude.toStringAsFixed(4)}, ${longitude.toStringAsFixed(4)}',
+          tabular: true,
+        ),
+        _Pill(icon: Icons.gps_fixed, text: accuracy),
+        if (author != null) _Pill(icon: Icons.person_outline, text: author!),
+      ],
+    );
+  }
+}
+
+class _FooterRow extends StatelessWidget {
+  const _FooterRow({
+    required this.actionTaken,
+    required this.observers,
+  });
+
+  final String actionTaken;
+  final List<String> observers;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        _Pill(icon: Icons.gavel_rounded, text: actionTaken),
+        if (observers.isNotEmpty)
+          _Pill(icon: Icons.group_outlined, text: observers.join(', ')),
+      ],
+    );
+  }
+}
+
+class _Pill extends StatelessWidget {
+  const _Pill({
+    required this.icon,
+    required this.text,
+    this.tabular = false,
+  });
+
+  final IconData icon;
+  final String text;
+  final bool tabular;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: colors.outlineVariant.withValues(alpha: 0.6),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: colors.onSurfaceVariant),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 12,
+              color: colors.onSurface,
+              fontWeight: FontWeight.w500,
+              fontFeatures:
+                  tabular ? const [FontFeature.tabularFigures()] : null,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SyncBadge extends StatelessWidget {
+  const _SyncBadge({required this.record});
+
+  final Disturbance record;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final IconData icon;
+    final Color color;
+    final String tooltip;
+    if (record.pendingSync) {
+      icon = Icons.cloud_upload_outlined;
+      color = colors.tertiary;
+      tooltip = 'V čakanju na sinhronizacijo';
+    } else if (record.hasPendingPhotoUploads) {
+      icon = Icons.cloud_sync_outlined;
+      color = colors.tertiary;
+      tooltip = 'Fotografije v čakanju';
+    } else {
+      icon = Icons.cloud_done_outlined;
+      color = colors.primary;
+      tooltip = 'Sinhronizirano';
+    }
+    return Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: Tooltip(
+        message: tooltip,
+        child: Icon(icon, color: color),
       ),
     );
   }

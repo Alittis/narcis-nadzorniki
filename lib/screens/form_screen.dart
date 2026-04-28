@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:narcis_nadzorniki/data/disturbance_group_colors.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
 import 'package:narcis_nadzorniki/models/disturbance_photo.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
@@ -623,23 +624,26 @@ class _FormScreenState extends State<FormScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _proposedTypeController,
-                    decoration: InputDecoration(
-                      labelText: 'Predlagaj nov tip (neobvezno)',
-                      filled: true,
-                      fillColor: colors.surface,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: colors.outlineVariant),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: colors.outlineVariant),
-                      ),
-                    ),
-                  ),
+                  // Hidden for now — may bring back later. Controller and
+                  // save-path wiring left intact so re-enabling is just
+                  // un-commenting this block.
+                  // const SizedBox(height: 16),
+                  // TextFormField(
+                  //   controller: _proposedTypeController,
+                  //   decoration: InputDecoration(
+                  //     labelText: 'Predlagaj nov tip (neobvezno)',
+                  //     filled: true,
+                  //     fillColor: colors.surface,
+                  //     border: OutlineInputBorder(
+                  //       borderRadius: BorderRadius.circular(12),
+                  //       borderSide: BorderSide(color: colors.outlineVariant),
+                  //     ),
+                  //     enabledBorder: OutlineInputBorder(
+                  //       borderRadius: BorderRadius.circular(12),
+                  //       borderSide: BorderSide(color: colors.outlineVariant),
+                  //     ),
+                  //   ),
+                  // ),
                 ],
               ),
             ),
@@ -879,28 +883,31 @@ class _FormScreenState extends State<FormScreen> {
                           child: Wrap(
                             spacing: 6,
                             runSpacing: 6,
-                            children: _types
-                                .map(
-                                  (type) => Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: colors.primaryContainer,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      type.display,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: colors.onPrimaryContainer,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
+                            children: _types.map((type) {
+                              final hue = disturbanceGroupColor(type.groupCode);
+                              return Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: disturbanceGroupTint(type.groupCode),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: disturbanceGroupBorder(type.groupCode),
+                                    width: 1,
                                   ),
-                                )
-                                .toList(),
+                                ),
+                                child: Text(
+                                  type.display,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: hue,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              );
+                            }).toList(),
                           ),
                         ),
                       ),

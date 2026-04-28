@@ -29,12 +29,14 @@ class _ModeDef {
     required this.color,
     required this.label,
     required this.enabled,
+    this.comingSoon,
   });
 
   final IconData icon;
   final Color color;
   final String label;
   final bool enabled;
+  final String? comingSoon;
 }
 
 const Map<AppMode, _ModeDef> _modeDefs = {
@@ -55,12 +57,14 @@ const Map<AppMode, _ModeDef> _modeDefs = {
     color: Colors.grey,
     label: 'Način 3',
     enabled: false,
+    comingSoon: 'Kmalu: najdbe vrst, vključno z ITV',
   ),
   AppMode.mode4: _ModeDef(
     icon: Icons.deck,
     color: Colors.grey,
     label: 'Način 4',
     enabled: false,
+    comingSoon: 'Kmalu: status inventarja',
   ),
 };
 
@@ -204,14 +208,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Color _markerColor(Disturbance record) {
-    final now = DateTime.now();
-    final age = now.difference(record.observedAt).inDays;
-    if (age <= 31) return Colors.red;
-    if (age <= 365) return Colors.orange;
-    return Colors.blue;
-  }
-
   void _openLegacyDetail(LegacyDisturbance record) {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => LegacyDetailScreen(record: record)),
@@ -250,7 +246,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _onModeTap(AppMode mode) {
     final def = _modeDefs[mode]!;
     if (!def.enabled) {
-      _showSnack('${def.label}: kmalu.');
+      _showSnack(def.comingSoon ?? '${def.label}: kmalu.');
       return;
     }
     if (_activeMode != mode) {
@@ -261,7 +257,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _onPlusTap(AppState state) {
     final def = _modeDefs[_activeMode]!;
     if (!def.enabled) {
-      _showSnack('${def.label}: kmalu.');
+      _showSnack(def.comingSoon ?? '${def.label}: kmalu.');
       return;
     }
     if (_activeMode == AppMode.obhodi) {
@@ -277,7 +273,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
     if (_activeMode != AppMode.motnje) {
-      _showSnack('${def.label}: kmalu.');
+      _showSnack(def.comingSoon ?? '${def.label}: kmalu.');
       return;
     }
     if (_plusExpanded) {
@@ -531,11 +527,7 @@ class _HomeScreenState extends State<HomeScreen> {
             height: 30,
             child: GestureDetector(
               onTap: () => _openLegacyDetail(record),
-              child: const Icon(
-                Icons.circle,
-                color: Colors.deepPurple,
-                size: 14,
-              ),
+              child: const LegacyRecordMarker(),
             ),
           ),
         );
@@ -552,8 +544,8 @@ class _HomeScreenState extends State<HomeScreen> {
       Marker buildMarker(Disturbance record, {required bool isMine}) {
         // Color encodes age (red ≤31d, orange ≤365d, blue older) for both
         // own and teammate records; shape encodes authorship (own = filled
-        // pin, teammate = outlined pin). Keeps the age signal meaningful
-        // for the full org set without color-aliasing.
+        // disc, teammate = ring). White halo keeps both legible against
+        // any basemap.
         return Marker(
           point: LatLng(record.latitude, record.longitude),
           width: 44,
@@ -566,10 +558,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               );
             },
-            child: Icon(
-              isMine ? Icons.location_on : Icons.location_on_outlined,
-              color: _markerColor(record),
-              size: 38,
+            child: RecordMarker(
+              color: recordMarkerColorForAge(record.observedAt),
+              isMine: isMine,
             ),
           ),
         );

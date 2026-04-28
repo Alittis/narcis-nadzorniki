@@ -88,6 +88,101 @@ Marker userLocationMarker(LatLng point) {
   );
 }
 
+/// Age-based fill colour for a disturbance marker.
+/// red ≤ 31 days · orange ≤ 365 days · blue older.
+Color recordMarkerColorForAge(DateTime observedAt) {
+  final age = DateTime.now().difference(observedAt).inDays;
+  if (age <= 31) return Colors.red;
+  if (age <= 365) return Colors.orange;
+  return Colors.blue;
+}
+
+/// Disturbance-record marker. Filled disc = own record, ring = teammate's.
+/// White halo + drop-shadow keep it legible on any basemap.
+class RecordMarker extends StatelessWidget {
+  const RecordMarker({super.key, required this.color, required this.isMine});
+
+  final Color color;
+  final bool isMine;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        width: 26,
+        height: 26,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Color(0x40000000),
+              blurRadius: 2,
+              offset: Offset(0, 1),
+            ),
+          ],
+        ),
+        alignment: Alignment.center,
+        child: Container(
+          width: 20,
+          height: 20,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: color,
+          ),
+          alignment: Alignment.center,
+          child: isMine
+              ? null
+              : Container(
+                  width: 10,
+                  height: 10,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Smaller, deep-purple variant for legacy pre-app records. Same halo /
+/// shadow treatment as [RecordMarker] for visual consistency.
+class LegacyRecordMarker extends StatelessWidget {
+  const LegacyRecordMarker({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        width: 16,
+        height: 16,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Color(0x40000000),
+              blurRadius: 2,
+              offset: Offset(0, 1),
+            ),
+          ],
+        ),
+        alignment: Alignment.center,
+        child: Container(
+          width: 12,
+          height: 12,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.deepPurple,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// "Recenter on me" button. Same look on every map screen — 48px circle,
 /// elevated, navigation arrow rotated 45° clockwise; spinner while a GPS
 /// resolve is in flight.
