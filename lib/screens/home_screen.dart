@@ -51,13 +51,13 @@ const Map<AppMode, _ModeDef> _modeDefs = {
     enabled: true,
   ),
   AppMode.mode3: _ModeDef(
-    icon: Icons.help_outline,
+    icon: Icons.local_florist,
     color: Colors.grey,
     label: 'Način 3',
     enabled: false,
   ),
   AppMode.mode4: _ModeDef(
-    icon: Icons.help_outline,
+    icon: Icons.deck,
     color: Colors.grey,
     label: 'Način 4',
     enabled: false,
