@@ -50,7 +50,7 @@ class MotenjApp extends StatelessWidget {
     return ChangeNotifierProvider(
       create: (_) => AppState()..init(),
       child: MaterialApp(
-        title: 'Narcis Nadzorniki',
+        title: 'Terenska beležnica',
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF388E3C)),
           useMaterial3: true,

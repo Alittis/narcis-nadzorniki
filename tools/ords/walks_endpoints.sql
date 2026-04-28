@@ -146,7 +146,19 @@ BEGIN
 
   :status_code  := 200;
   :content_type := 'application/json';
-  HTP.prn(l_out);
+  -- Chunk-emit so HTP.prn never gets a CLOB it has to implicitly convert
+  -- to VARCHAR2 (ORA-06502 above ~32 KB). Triggers on orgs with many walks.
+  DECLARE
+    l_pos INTEGER := 1;
+    l_amt INTEGER;
+    l_len INTEGER := DBMS_LOB.getlength(l_out);
+  BEGIN
+    WHILE l_pos <= l_len LOOP
+      l_amt := LEAST(8000, l_len - l_pos + 1);
+      HTP.prn(DBMS_LOB.substr(l_out, l_amt, l_pos));
+      l_pos := l_pos + l_amt;
+    END LOOP;
+  END;
 EXCEPTION
   WHEN OTHERS THEN
     :status_code  := 500;
@@ -537,6 +549,9 @@ DECLARE
   l_obhod_id     VARCHAR2(36) := :id;
   l_existing_org NUMBER;
   l_out          CLOB;
+  -- Last seq we attempted to write to JSON; surfaces in the WHEN OTHERS
+  -- response so a row-specific data fault names the offending point.
+  l_diag_seq     NUMBER;
 BEGIN
   BEGIN
     l_ctx := pkg_tb_auth.authenticate;
@@ -577,6 +592,7 @@ BEGIN
      WHERE obhod_id = l_obhod_id
      ORDER BY seq
   ) LOOP
+    l_diag_seq := p.seq;
     APEX_JSON.open_object;
     APEX_JSON.write('seq',      p.seq);
     APEX_JSON.write('lat',      p.geo_sirina);
@@ -594,13 +610,33 @@ BEGIN
 
   :status_code  := 200;
   :content_type := 'application/json';
-  HTP.prn(l_out);
+  -- Chunk-emit so HTP.prn never gets a CLOB it has to implicitly convert
+  -- to VARCHAR2 (ORA-06502 once the body exceeds ~32 KB; a long walk's
+  -- points payload trips this around 340+ rows).
+  DECLARE
+    l_pos INTEGER := 1;
+    l_amt INTEGER;
+    l_len INTEGER := DBMS_LOB.getlength(l_out);
+  BEGIN
+    WHILE l_pos <= l_len LOOP
+      l_amt := LEAST(8000, l_len - l_pos + 1);
+      HTP.prn(DBMS_LOB.substr(l_out, l_amt, l_pos));
+      l_pos := l_pos + l_amt;
+    END LOOP;
+  END;
 EXCEPTION
   WHEN OTHERS THEN
     :status_code  := 500;
     :content_type := 'application/json';
-    HTP.prn('{"error":"server_error","sqlcode":' || SQLCODE
-            || ',"sqlerrm":"' || REPLACE(SUBSTR(SQLERRM, 1, 400), '"', '\"') || '"}');
+    HTP.prn('{"error":"server_error"'
+            || ',"sqlcode":' || SQLCODE
+            || ',"sqlerrm":"' || REPLACE(SUBSTR(SQLERRM, 1, 400), '"', '\"') || '"'
+            || ',"diag_seq":' || NVL(TO_CHAR(l_diag_seq), 'null')
+            || ',"backtrace":"'
+            || REPLACE(REPLACE(REPLACE(
+                 SUBSTR(dbms_utility.format_error_backtrace, 1, 800),
+                 '\', '\\'), '"', '\"'), CHR(10), '\n')
+            || '"}');
 END;
 ~'
   );

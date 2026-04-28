@@ -463,6 +463,7 @@ class AppState extends ChangeNotifier {
       await _drainPendingPhotos();
       // Pull remote list to surface any IDs the device doesn't have locally.
       await _pullRemoteWalks();
+      await _prefetchOwnWalkPoints();
       await _pullRemote();
     } finally {
       _isSyncing = false;
@@ -946,6 +947,41 @@ class AppState extends ChangeNotifier {
     } on RemoteApiException catch (e) {
       _handleSyncException(e);
     }
+  }
+
+  /// Eagerly download track points for the caller's own walks that don't
+  /// yet have geometry locally, so the home-map "Obhodi" layer renders all
+  /// of them without requiring a per-walk detail-screen open. Teammate
+  /// walks stay lazy — bandwidth then tracks the user's own activity, not
+  /// the org's. Failures on one walk don't block the rest.
+  Future<void> _prefetchOwnWalkPoints() async {
+    final creds = _credentials;
+    final me = _currentUser?.toLowerCase();
+    if (creds == null || me == null) return;
+    final targetIds = _walks
+        .where((w) =>
+            w.points.isEmpty &&
+            !w.pendingSync &&
+            w.createdBy?.toLowerCase() == me)
+        .map((w) => w.id)
+        .toList();
+    if (targetIds.isEmpty) return;
+    final fetched = <String, List<WalkPoint>>{};
+    for (final id in targetIds) {
+      try {
+        fetched[id] = await _remoteApi.fetchWalkPoints(id, creds);
+      } on RemoteApiException catch (e) {
+        _handleSyncException(e);
+        if (_credentials == null) break;
+      }
+    }
+    if (fetched.isEmpty) return;
+    _walks = _walks
+        .map((w) =>
+            fetched.containsKey(w.id) ? w.copyWith(points: fetched[w.id]!) : w)
+        .toList(growable: false);
+    await _walksStore.save(_walks);
+    notifyListeners();
   }
 
   List<Walk> _mergeRemoteWalksIntoLocal(List<RemoteWalk> remote) {

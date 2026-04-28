@@ -186,7 +186,19 @@ BEGIN
 
   :status_code  := 200;
   :content_type := 'application/json';
-  HTP.prn(l_out);
+  -- Chunk-emit so HTP.prn never gets a CLOB it has to implicitly convert
+  -- to VARCHAR2 (ORA-06502 above ~32 KB). Triggers on orgs with many records.
+  DECLARE
+    l_pos INTEGER := 1;
+    l_amt INTEGER;
+    l_len INTEGER := DBMS_LOB.getlength(l_out);
+  BEGIN
+    WHILE l_pos <= l_len LOOP
+      l_amt := LEAST(8000, l_len - l_pos + 1);
+      HTP.prn(DBMS_LOB.substr(l_out, l_amt, l_pos));
+      l_pos := l_pos + l_amt;
+    END LOOP;
+  END;
 EXCEPTION
   WHEN OTHERS THEN
     :status_code  := 500;

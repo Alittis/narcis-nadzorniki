@@ -30,7 +30,7 @@
           "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
           "scoping": "ORG_ID stamped from caller's narcis_uporabniki.organizacija; cross-org rows never returned. Returns the full org set; client filters to author-only views (e.g. RecordListScreen) using the createdBy field.",
           "response_shape": "{ records: [ { id, latitude, longitude, locationAccuracy, observedAt, createdAt, createdBy, description, actionTaken, proposedType, obhodId, types[], observers[], photos[{id,mimeType}] } ] }",
-          "status": "deployed 2026-04-26; createdBy field added 2026-04-27; obhodId field added and deployed 2026-04-27; smoke test 17/17 (full record + photo lifecycle)"
+          "status": "deployed 2026-04-26; createdBy field added 2026-04-27; obhodId field added and deployed 2026-04-27; smoke test 17/17 (full record + photo lifecycle); chunked HTP.prn emit added 2026-04-28 (response bodies above ~32 KB previously raised ORA-06502 — bug latent until orgs accumulated enough records)"
         },
         {
           "path": "disturbances/",
@@ -92,7 +92,7 @@
           "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
           "scoping": "ORG_ID stamped from caller's narcis_uporabniki.organizacija; cross-org rows never returned",
           "response_shape": "{ walks: [ { id, startedAt, endedAt, name, notes, createdAt, createdBy, pointCount, disturbanceCount } ] } - point geometry not inlined; fetch via /:id/points",
-          "status": "deployed and smoke-tested 2026-04-27; 14/14 walks lifecycle probes passed"
+          "status": "deployed and smoke-tested 2026-04-27 (small-payload only); chunked HTP.prn emit added 2026-04-28 to clear ORA-06502 above ~32 KB"
         },
         {
           "path": "walks/",
@@ -127,7 +127,7 @@
           "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
           "scoping": "404 if target walk's ORG_ID != caller's ORG_ID",
           "response_shape": "{ obhodId, points: [{seq, lat, lon, t, accuracy}, ...] } sorted by seq",
-          "status": "deployed and smoke-tested 2026-04-27; 14/14 walks lifecycle probes passed"
+          "status": "deployed and smoke-tested 2026-04-27 (small-payload only); chunked HTP.prn emit added 2026-04-28 — a real ~792-point walk hit ORA-06502 (~75 KB body); also added diag_seq + dbms_utility.format_error_backtrace to the WHEN OTHERS body for future row-specific diagnosis"
         }
       ]
     },

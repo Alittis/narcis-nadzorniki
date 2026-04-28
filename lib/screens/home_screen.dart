@@ -491,10 +491,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<Polyline> _buildPolylines(AppState state) {
     final out = <Polyline>[];
-    // Historical walks under the Obhodi layer toggle. Walks whose points
-    // haven't been fetched yet are skipped silently — open the walk in the
-    // detail screen to fetch its geometry. Eager prefetch is deferred until
-    // we have a sense of typical walk volume per user.
+    // Historical walks under the Obhodi layer toggle. Sync prefetches
+    // points for the caller's own walks, so those always render here.
+    // Teammate walks lazy-load on detail open and only show up after that.
     if (_showObhodi) {
       for (final walk in state.walks) {
         if (walk.points.isEmpty) continue;
@@ -1019,12 +1018,12 @@ class _BottomBar extends StatelessWidget {
     final activeColor = _modeDefs[activeMode]!.color;
     // FAB icon depends on active mode + walk state. Motnje keeps the "+"
     // (rotated 45° to look like a close glyph when the speed dial is open).
-    // Obhodi swaps to a walk icon when idle and a stop icon while a walk
+    // Obhodi shows a record-dot when idle and a stop icon while a walk
     // is recording, so the affordance is unambiguous from across the room.
     final IconData fabIcon;
     final bool rotateOnExpand;
     if (activeMode == AppMode.obhodi) {
-      fabIcon = walkActive ? Icons.stop : Icons.directions_walk;
+      fabIcon = walkActive ? Icons.stop : Icons.fiber_manual_record;
       rotateOnExpand = false;
     } else {
       fabIcon = Icons.add;

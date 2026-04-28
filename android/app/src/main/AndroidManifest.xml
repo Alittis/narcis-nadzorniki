@@ -23,7 +23,7 @@
          FGS isolate even with the FGS notification visible. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <application
-        android:label="Narcis Nadzorniki"
+        android:label="Terenska beležnica"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
