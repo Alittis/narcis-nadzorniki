@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:narcis_nadzorniki/models/disturbance.dart';
 import 'package:narcis_nadzorniki/models/disturbance_photo.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
+import 'package:narcis_nadzorniki/models/walk.dart';
 
 /// In-memory carrier for the credentials needed to call the disturbance
 /// CRUD endpoints. The plaintext password is required because every call
@@ -62,6 +63,7 @@ class RemoteDisturbance {
     required this.proposedType,
     required this.createdAt,
     required this.createdBy,
+    required this.obhodId,
     required this.photos,
   });
 
@@ -77,6 +79,7 @@ class RemoteDisturbance {
   final String? proposedType;
   final DateTime createdAt;
   final String? createdBy;
+  final String? obhodId;
   final List<DisturbancePhoto> photos;
 
   /// Convert into a local-store-shaped record. Photos are returned without a
@@ -97,6 +100,7 @@ class RemoteDisturbance {
       createdAt: createdAt,
       proposedType: proposedType,
       createdBy: createdBy,
+      obhodId: obhodId,
     );
   }
 
@@ -118,6 +122,10 @@ class RemoteDisturbance {
           ? DateTime.parse(json['createdAt'] as String)
           : DateTime.parse(json['observedAt'] as String),
       createdBy: json['createdBy'] as String?,
+      // The ORDS handler elides keys whose value is NULL via APEX_JSON.write,
+      // so a record with no walk link arrives without an `obhodId` key at
+      // all - read it as nullable and treat absent === null.
+      obhodId: json['obhodId'] as String?,
       photos: (json['photos'] as List<dynamic>? ?? const [])
           .map((e) => _readPhoto(e as Map<String, dynamic>))
           .toList(),
@@ -149,17 +157,83 @@ class RemoteDisturbance {
   }
 }
 
-/// HTTP client for the disturbance CRUD endpoints at
-/// `https://narcis.gov.si/ords/narcis/disturbances/`. See ARCHITECTURE.md §9.3.
+/// Server-shaped walk row returned by `GET /walks/`. Metadata only — the
+/// track points live behind `GET /walks/:id/points` to keep the list
+/// response light. The local [Walk] type carries client-side fields
+/// (pendingSync, in-memory points) that we synthesize during merge.
+class RemoteWalk {
+  const RemoteWalk({
+    required this.id,
+    required this.startedAt,
+    required this.endedAt,
+    required this.createdAt,
+    required this.pointCount,
+    required this.disturbanceCount,
+    this.name,
+    this.notes,
+    this.createdBy,
+  });
+
+  final String id;
+  final DateTime startedAt;
+  final DateTime endedAt;
+  final DateTime createdAt;
+  final int pointCount;
+  final int disturbanceCount;
+  final String? name;
+  final String? notes;
+  final String? createdBy;
+
+  Walk toLocal() {
+    return Walk(
+      id: id,
+      startedAt: startedAt,
+      endedAt: endedAt,
+      pendingSync: false,
+      name: name,
+      notes: notes,
+      createdBy: createdBy,
+      points: const [],
+      pointCount: pointCount,
+      disturbanceCount: disturbanceCount,
+    );
+  }
+
+  factory RemoteWalk.fromJson(Map<String, dynamic> json) {
+    return RemoteWalk(
+      id: json['id'] as String,
+      startedAt: DateTime.parse(json['startedAt'] as String),
+      endedAt: DateTime.parse(json['endedAt'] as String),
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'] as String)
+          : DateTime.parse(json['startedAt'] as String),
+      pointCount: (json['pointCount'] as num?)?.toInt() ?? 0,
+      disturbanceCount: (json['disturbanceCount'] as num?)?.toInt() ?? 0,
+      name: json['name'] as String?,
+      notes: json['notes'] as String?,
+      createdBy: json['createdBy'] as String?,
+    );
+  }
+}
+
+/// HTTP client for the disturbance + walk-around CRUD endpoints at
+/// `https://narcis.gov.si/ords/narcis/`. See ARCHITECTURE.md §9.3 and §9.4.
 class RemoteApi {
-  RemoteApi({http.Client? client, Uri? baseUrl, Duration? timeout})
-      : _client = client ?? http.Client(),
+  RemoteApi({
+    http.Client? client,
+    Uri? baseUrl,
+    Uri? walksBaseUrl,
+    Duration? timeout,
+  })  : _client = client ?? http.Client(),
         _baseUrl = baseUrl ??
             Uri.parse('https://narcis.gov.si/ords/narcis/disturbances/'),
+        _walksBaseUrl = walksBaseUrl ??
+            Uri.parse('https://narcis.gov.si/ords/narcis/walks/'),
         _timeout = timeout ?? const Duration(seconds: 30);
 
   final http.Client _client;
   final Uri _baseUrl;
+  final Uri _walksBaseUrl;
   final Duration _timeout;
 
   Future<List<RemoteDisturbance>> fetchRecords(SyncCredentials credentials) async {
@@ -278,6 +352,91 @@ class RemoteApi {
     _ensureStatus(response, const {200, 204, 404});
   }
 
+  Future<List<RemoteWalk>> fetchWalks(SyncCredentials credentials) async {
+    final response = await _send(
+      () => _client.get(_walksBaseUrl, headers: _jsonHeaders(credentials)),
+    );
+    _ensureStatus(response, const {200});
+    final decoded = jsonDecode(response.body);
+    final List<dynamic> walks;
+    if (decoded is Map<String, dynamic> && decoded['walks'] is List) {
+      walks = decoded['walks'] as List<dynamic>;
+    } else {
+      throw RemoteApiException(
+        statusCode: response.statusCode,
+        body: response.body,
+      );
+    }
+    return walks
+        .map((e) => RemoteWalk.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<WalkPoint>> fetchWalkPoints(
+    String walkId,
+    SyncCredentials credentials,
+  ) async {
+    final response = await _send(
+      () => _client.get(
+        _walkPointsUri(walkId),
+        headers: _jsonHeaders(credentials),
+      ),
+    );
+    _ensureStatus(response, const {200});
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    final pts = decoded['points'] as List<dynamic>? ?? const [];
+    return pts
+        .map((e) => WalkPoint.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> createWalk(Walk walk, SyncCredentials credentials) async {
+    final response = await _send(
+      () => _client.post(
+        _walksBaseUrl,
+        headers: _jsonHeaders(credentials),
+        body: jsonEncode(_walkPayload(walk)),
+      ),
+    );
+    _ensureStatus(response, const {200, 201});
+  }
+
+  /// Updates the walk's name + notes. Server rejects any attempt to mutate
+  /// times or points; we don't even send them.
+  Future<void> updateWalk(Walk walk, SyncCredentials credentials) async {
+    final response = await _send(
+      () => _client.put(
+        _walkUri(walk.id),
+        headers: _jsonHeaders(credentials),
+        body: jsonEncode({'name': walk.name, 'notes': walk.notes}),
+      ),
+    );
+    _ensureStatus(response, const {200});
+  }
+
+  Future<void> deleteWalk(String id, SyncCredentials credentials) async {
+    final response = await _send(
+      () => _client.delete(
+        _walkUri(id),
+        headers: _jsonHeaders(credentials),
+      ),
+    );
+    _ensureStatus(response, const {200, 204, 404});
+  }
+
+  Uri _walkUri(String id) => _walksBaseUrl.resolve(Uri.encodeComponent(id));
+  Uri _walkPointsUri(String id) =>
+      _walksBaseUrl.resolve('${Uri.encodeComponent(id)}/points');
+
+  Map<String, dynamic> _walkPayload(Walk w) => {
+        'id': w.id,
+        'startedAt': w.startedAt.toUtc().toIso8601String(),
+        'endedAt': w.endedAt.toUtc().toIso8601String(),
+        'name': w.name,
+        'notes': w.notes,
+        'points': w.points.map((p) => p.toJson()).toList(),
+      };
+
   Uri _recordUri(String id) => _baseUrl.resolve(Uri.encodeComponent(id));
 
   Uri _photoUri(String motnjaId, String photoId) =>
@@ -307,6 +466,7 @@ class RemoteApi {
         'observers': d.observers,
         'actionTaken': d.actionTaken,
         'proposedType': d.proposedType,
+        'obhodId': d.obhodId,
       };
 
   Future<http.Response> _send(Future<http.Response> Function() request) async {

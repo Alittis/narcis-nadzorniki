@@ -21,7 +21,7 @@ import 'package:narcis_nadzorniki/state/app_state.dart';
 import 'package:narcis_nadzorniki/widgets/basemap.dart';
 import 'package:provider/provider.dart';
 
-enum AppMode { motnje, sprehod, mode3, mode4 }
+enum AppMode { motnje, obhodi, mode3, mode4 }
 
 class _ModeDef {
   const _ModeDef({
@@ -44,11 +44,11 @@ const Map<AppMode, _ModeDef> _modeDefs = {
     label: 'Motnje',
     enabled: true,
   ),
-  AppMode.sprehod: _ModeDef(
+  AppMode.obhodi: _ModeDef(
     icon: Icons.directions_walk,
     color: Colors.green,
-    label: 'Sprehod',
-    enabled: false,
+    label: 'Obhodi',
+    enabled: true,
   ),
   AppMode.mode3: _ModeDef(
     icon: Icons.help_outline,
@@ -92,6 +92,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   AppMode _activeMode = AppMode.motnje;
   bool _showMotnje = true;
+  bool _showObhodi = false;
 
   bool _plusExpanded = false;
   // Location stamped at the moment the user declared intent (tapped "+"),
@@ -263,6 +264,18 @@ class _HomeScreenState extends State<HomeScreen> {
       _showSnack('${def.label}: kmalu.');
       return;
     }
+    if (_activeMode == AppMode.obhodi) {
+      // Walk mode: single-tap toggle. Start a walk if none is running,
+      // otherwise open the end-walk sheet. No speed dial — disturbances
+      // are still captured via the Motnje mode (their obhodId is stamped
+      // automatically by AppState when a walk is active).
+      if (state.hasActiveWalk) {
+        _openEndWalkSheet(state);
+      } else {
+        unawaited(_handleStartWalk(state));
+      }
+      return;
+    }
     if (_activeMode != AppMode.motnje) {
       _showSnack('${def.label}: kmalu.');
       return;
@@ -278,6 +291,42 @@ class _HomeScreenState extends State<HomeScreen> {
     // Kick off a fresh GPS read so it's ready by the time the user picks a
     // sub-action; falls back to the last known _userLocation otherwise.
     unawaited(_refreshCapturedLocation());
+  }
+
+  Future<void> _handleStartWalk(AppState state) async {
+    if (!state.canSync && !state.isOnline) {
+      // Walks created offline still queue locally (pendingSync=true) and
+      // will push on the next online sync — same model as disturbances.
+      // No early-return; let it through.
+    }
+    await state.startWalk();
+    if (!mounted) return;
+    _showSnack('Obhod se snema.');
+  }
+
+  Future<void> _openEndWalkSheet(AppState state) async {
+    final result = await showModalBottomSheet<_EndWalkResult>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _EndWalkSheet(pointCount: state.activePoints.length),
+    );
+    if (result == null || !mounted) return;
+    if (result.discard) {
+      await state.cancelWalk();
+      if (!mounted) return;
+      _showSnack('Obhod zavržen.');
+      return;
+    }
+    final walk = await state.endWalk(
+      name: result.name,
+      notes: result.notes,
+    );
+    if (!mounted) return;
+    if (walk == null) {
+      _showSnack('Obhod brez točk — zavržen.');
+    } else {
+      _showSnack('Obhod shranjen (${walk.points.length} točk).');
+    }
   }
 
   void _collapseSpeedDial() {
@@ -384,6 +433,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         _userLocation!,
                         _userAccuracy!,
                       ),
+                    if (_buildPolylines(state).isNotEmpty)
+                      PolylineLayer(polylines: _buildPolylines(state)),
                     MarkerLayer(markers: _buildMarkers(state)),
                   ],
                 ),
@@ -392,6 +443,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 state: state,
                 basemapMode: _basemapMode,
                 showMotnje: _showMotnje,
+                showObhodi: _showObhodi,
                 showLegacy: state.showLegacy,
                 onAvatarTap: () {
                   Navigator.of(context).push(
@@ -403,6 +455,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 onBasemapChanged: (m) => setState(() => _basemapMode = m),
                 onMotnjeToggle: () =>
                     setState(() => _showMotnje = !_showMotnje),
+                onObhodiToggle: () =>
+                    setState(() => _showObhodi = !_showObhodi),
                 onLegacyToggle: () => state.setShowLegacy(!state.showLegacy),
                 onPlaceholderTap: (label) => _showSnack('$label: kmalu.'),
               ),
@@ -420,6 +474,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 onModeTap: _onModeTap,
                 onPlusTap: () => _onPlusTap(state),
                 plusExpanded: _plusExpanded,
+                walkActive: state.hasActiveWalk,
               ),
               if (_plusExpanded)
                 _SpeedDialMiniFabs(
@@ -432,6 +487,38 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       },
     );
+  }
+
+  List<Polyline> _buildPolylines(AppState state) {
+    final out = <Polyline>[];
+    // Historical walks under the Obhodi layer toggle. Walks whose points
+    // haven't been fetched yet are skipped silently — open the walk in the
+    // detail screen to fetch its geometry. Eager prefetch is deferred until
+    // we have a sense of typical walk volume per user.
+    if (_showObhodi) {
+      for (final walk in state.walks) {
+        if (walk.points.isEmpty) continue;
+        out.add(
+          Polyline(
+            points: walk.points.map((p) => p.location).toList(),
+            color: Colors.blueGrey.withValues(alpha: 0.55),
+            strokeWidth: 3,
+          ),
+        );
+      }
+    }
+    // Active walk (always rendered, regardless of Obhodi toggle, so the
+    // user sees their path drawing while it records).
+    if (state.hasActiveWalk && state.activePoints.length >= 2) {
+      out.add(
+        Polyline(
+          points: state.activePoints.map((p) => p.location).toList(),
+          color: Colors.green.withValues(alpha: 0.85),
+          strokeWidth: 5,
+        ),
+      );
+    }
+    return out;
   }
 
   List<Marker> _buildMarkers(AppState state) {
@@ -507,12 +594,14 @@ class _TopChrome extends StatelessWidget {
     required this.state,
     required this.basemapMode,
     required this.showMotnje,
+    required this.showObhodi,
     required this.showLegacy,
     required this.onAvatarTap,
     required this.onSearchTap,
     required this.onSyncTap,
     required this.onBasemapChanged,
     required this.onMotnjeToggle,
+    required this.onObhodiToggle,
     required this.onLegacyToggle,
     required this.onPlaceholderTap,
   });
@@ -520,12 +609,14 @@ class _TopChrome extends StatelessWidget {
   final AppState state;
   final BasemapMode basemapMode;
   final bool showMotnje;
+  final bool showObhodi;
   final bool showLegacy;
   final VoidCallback onAvatarTap;
   final VoidCallback onSearchTap;
   final VoidCallback? onSyncTap;
   final ValueChanged<BasemapMode> onBasemapChanged;
   final VoidCallback onMotnjeToggle;
+  final VoidCallback onObhodiToggle;
   final VoidCallback onLegacyToggle;
   final ValueChanged<String> onPlaceholderTap;
 
@@ -581,6 +672,13 @@ class _TopChrome extends StatelessWidget {
                     selected: showMotnje,
                     enabled: true,
                     onTap: onMotnjeToggle,
+                  ),
+                  _LayerChip(
+                    icon: Icons.directions_walk,
+                    label: 'Obhodi',
+                    selected: showObhodi,
+                    enabled: true,
+                    onTap: onObhodiToggle,
                   ),
                   _LayerChip(
                     icon: Icons.shield_moon_outlined,
@@ -905,6 +1003,7 @@ class _BottomBar extends StatelessWidget {
     required this.onModeTap,
     required this.onPlusTap,
     required this.plusExpanded,
+    required this.walkActive,
   });
 
   final AppMode activeMode;
@@ -913,10 +1012,24 @@ class _BottomBar extends StatelessWidget {
   final ValueChanged<AppMode> onModeTap;
   final VoidCallback onPlusTap;
   final bool plusExpanded;
+  final bool walkActive;
 
   @override
   Widget build(BuildContext context) {
     final activeColor = _modeDefs[activeMode]!.color;
+    // FAB icon depends on active mode + walk state. Motnje keeps the "+"
+    // (rotated 45° to look like a close glyph when the speed dial is open).
+    // Obhodi swaps to a walk icon when idle and a stop icon while a walk
+    // is recording, so the affordance is unambiguous from across the room.
+    final IconData fabIcon;
+    final bool rotateOnExpand;
+    if (activeMode == AppMode.obhodi) {
+      fabIcon = walkActive ? Icons.stop : Icons.directions_walk;
+      rotateOnExpand = false;
+    } else {
+      fabIcon = Icons.add;
+      rotateOnExpand = true;
+    }
     return Positioned(
       left: 0,
       right: 0,
@@ -934,7 +1047,8 @@ class _BottomBar extends StatelessWidget {
               _ModePill(activeMode: activeMode, onTap: onModeTap),
               _PlusButton(
                 color: activeColor,
-                expanded: plusExpanded,
+                icon: fabIcon,
+                rotated: rotateOnExpand && plusExpanded,
                 onTap: onPlusTap,
               ),
             ],
@@ -1046,12 +1160,14 @@ class _SpeedDialMiniFabs extends StatelessWidget {
 class _PlusButton extends StatelessWidget {
   const _PlusButton({
     required this.color,
-    required this.expanded,
+    required this.icon,
+    required this.rotated,
     required this.onTap,
   });
 
   final Color color;
-  final bool expanded;
+  final IconData icon;
+  final bool rotated;
   final VoidCallback onTap;
 
   @override
@@ -1068,9 +1184,9 @@ class _PlusButton extends StatelessWidget {
           height: 56,
           child: Center(
             child: AnimatedRotation(
-              turns: expanded ? 0.125 : 0,
+              turns: rotated ? 0.125 : 0,
               duration: const Duration(milliseconds: 150),
-              child: const Icon(Icons.add, color: Colors.white, size: 28),
+              child: Icon(icon, color: Colors.white, size: 28),
             ),
           ),
         ),
@@ -1125,6 +1241,144 @@ class _MiniSpeedDialButton extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _EndWalkResult {
+  const _EndWalkResult({
+    required this.discard,
+    this.name,
+    this.notes,
+  });
+
+  final bool discard;
+  final String? name;
+  final String? notes;
+}
+
+class _EndWalkSheet extends StatefulWidget {
+  const _EndWalkSheet({required this.pointCount});
+
+  final int pointCount;
+
+  @override
+  State<_EndWalkSheet> createState() => _EndWalkSheetState();
+}
+
+class _EndWalkSheetState extends State<_EndWalkSheet> {
+  final _nameController = TextEditingController();
+  final _notesController = TextEditingController();
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final viewInsets = MediaQuery.viewInsetsOf(context).bottom;
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.only(bottom: viewInsets),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottomInset),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Končaj obhod',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${widget.pointCount} zajetih točk.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Ime (neobvezno)',
+                  border: OutlineInputBorder(),
+                ),
+                textInputAction: TextInputAction.next,
+                maxLength: 200,
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _notesController,
+                decoration: const InputDecoration(
+                  labelText: 'Opombe (neobvezno)',
+                  border: OutlineInputBorder(),
+                ),
+                minLines: 2,
+                maxLines: 4,
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () async {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (_) => AlertDialog(
+                            title: const Text('Zavrzi obhod?'),
+                            content: const Text(
+                              'Pot in zajete točke bodo izbrisane.',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () =>
+                                    Navigator.of(context).pop(false),
+                                child: const Text('Prekliči'),
+                              ),
+                              TextButton(
+                                onPressed: () =>
+                                    Navigator.of(context).pop(true),
+                                child: const Text('Zavrzi'),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirm != true) return;
+                        if (!context.mounted) return;
+                        Navigator.of(context).pop(
+                          const _EndWalkResult(discard: true),
+                        );
+                      },
+                      child: const Text('Zavrzi'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () {
+                        final name = _nameController.text.trim();
+                        final notes = _notesController.text.trim();
+                        Navigator.of(context).pop(
+                          _EndWalkResult(
+                            discard: false,
+                            name: name.isEmpty ? null : name,
+                            notes: notes.isEmpty ? null : notes,
+                          ),
+                        );
+                      },
+                      child: const Text('Shrani'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

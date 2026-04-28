@@ -51,5 +51,14 @@
 	<string>Kamera je potrebna za dodajanje fotografij.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Fotografije so potrebne za prilaganje dokazov.</string>
+	<!-- Walk-around tracking: keeps the location stream alive while the
+	     app is backgrounded, so the polyline doesn't break when the user
+	     pockets the phone mid-walk. AppState only enables background
+	     updates while a walk is active; idle app gets the standard
+	     foreground-only stream. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 </dict>
 </plist>

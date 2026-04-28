@@ -4,26 +4,34 @@ import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:narcis_nadzorniki/data/disturbance_types.dart';
 import 'package:narcis_nadzorniki/data/legacy_records.dart';
 import 'package:narcis_nadzorniki/data/local_store.dart';
 import 'package:narcis_nadzorniki/data/remote_api.dart';
+import 'package:narcis_nadzorniki/data/walks_local_store.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
 import 'package:narcis_nadzorniki/models/disturbance_photo.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
 import 'package:narcis_nadzorniki/models/legacy_disturbance.dart';
+import 'package:narcis_nadzorniki/models/walk.dart';
 import 'package:narcis_nadzorniki/services/auth_service.dart';
 import 'package:narcis_nadzorniki/services/photo_storage.dart';
+import 'package:narcis_nadzorniki/services/walk_task_handler.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:uuid/uuid.dart';
 
 class AppState extends ChangeNotifier {
   AppState({
     LocalStore? localStore,
+    WalksLocalStore? walksStore,
     RemoteApi? remoteApi,
     Connectivity? connectivity,
     AuthService? authService,
     LegacyRecordsLoader? legacyLoader,
     PhotoStorage? photoStorage,
   })  : _localStore = localStore ?? LocalStore(),
+        _walksStore = walksStore ?? WalksLocalStore(),
         _remoteApi = remoteApi ?? RemoteApi(),
         _connectivity = connectivity ?? Connectivity(),
         _authService = authService ?? AuthService(),
@@ -31,11 +39,13 @@ class AppState extends ChangeNotifier {
         _photoStorage = photoStorage ?? PhotoStorage();
 
   final LocalStore _localStore;
+  final WalksLocalStore _walksStore;
   final RemoteApi _remoteApi;
   final Connectivity _connectivity;
   final AuthService _authService;
   final LegacyRecordsLoader _legacyLoader;
   final PhotoStorage _photoStorage;
+  final _uuid = const Uuid();
 
   List<Disturbance> _records = [];
   List<LegacyDisturbance> _legacyRecords = [];
@@ -61,6 +71,20 @@ class AppState extends ChangeNotifier {
   // recover them. Null until the first successful pull.
   Set<String>? _lastRemoteIds;
 
+  // Walk-around (obhod) state. Completed walks live in `_walks`. The
+  // in-progress walk's metadata + growing point buffer live in
+  // `active_walk.json`; the source of truth is the file (written by the
+  // WalkTaskHandler background isolate). `_activeWalk` and `_activePoints`
+  // are an in-memory mirror updated via SendPort messages from the FGS
+  // isolate, so the UI can render live without re-reading the file every
+  // frame. On app resume from a Samsung Freecess freeze the mirror is
+  // rebuilt from the file.
+  List<Walk> _walks = [];
+  Walk? _activeWalk;
+  List<WalkPoint> _activePoints = const [];
+  StreamSubscription<dynamic>? _walkServicePortSub;
+  Set<String>? _lastRemoteWalkIds;
+
   List<Disturbance> get records => List.unmodifiable(_records);
   List<LegacyDisturbance> get legacyRecords => List.unmodifiable(_legacyRecords);
   bool get showLegacy => _showLegacy;
@@ -70,6 +94,11 @@ class AppState extends ChangeNotifier {
   String? get currentUser => _currentUser;
   bool get isAuthenticated => _currentUser != null;
   bool get canSync => _currentUser != null && _sessionPassword != null;
+
+  List<Walk> get walks => List.unmodifiable(_walks);
+  Walk? get activeWalk => _activeWalk;
+  List<WalkPoint> get activePoints => List.unmodifiable(_activePoints);
+  bool get hasActiveWalk => _activeWalk != null;
 
   Future<AuthResult> login(String email, String password) async {
     final result = await _authService.login(
@@ -89,9 +118,22 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    // Drop any in-progress walk: the user is signing out, the next user
+    // would not own that data. Stop the FGS service, clear the file, and
+    // unbind the port.
+    if (await FlutterForegroundTask.isRunningService) {
+      await FlutterForegroundTask.stopService();
+    }
+    await _walkServicePortSub?.cancel();
+    _walkServicePortSub = null;
+    _activeWalk = null;
+    _activePoints = const [];
+    await _walksStore.clearActive();
+
     _currentUser = null;
     _sessionPassword = null;
     _lastRemoteIds = null;
+    _lastRemoteWalkIds = null;
     await _authService.clearCache();
     notifyListeners();
   }
@@ -120,17 +162,28 @@ class AppState extends ChangeNotifier {
 
   /// Records local-only that haven't been pushed yet (created offline or while
   /// the session password is missing) plus records whose photos still need to
-  /// be uploaded.
-  int get pendingPushCount =>
-      _records.where((r) => r.pendingSync || r.hasPendingPhotoUploads).length;
+  /// be uploaded, plus walks waiting to be pushed.
+  int get pendingPushCount {
+    final recs = _records.where((r) => r.pendingSync || r.hasPendingPhotoUploads).length;
+    final ws = _walks.where((w) => w.pendingSync).length;
+    return recs + ws;
+  }
 
   /// IDs the server reported but the local store hasn't pulled yet. Drives the
   /// "missing locally" badge on the sync icon. Empty until a successful pull.
   int get missingLocalCount {
-    final remote = _lastRemoteIds;
-    if (remote == null) return 0;
-    final localIds = _records.map((r) => r.id).toSet();
-    return remote.where((id) => !localIds.contains(id)).length;
+    var missing = 0;
+    final remoteRecs = _lastRemoteIds;
+    if (remoteRecs != null) {
+      final localIds = _records.map((r) => r.id).toSet();
+      missing += remoteRecs.where((id) => !localIds.contains(id)).length;
+    }
+    final remoteWalks = _lastRemoteWalkIds;
+    if (remoteWalks != null) {
+      final localWalkIds = _walks.map((w) => w.id).toSet();
+      missing += remoteWalks.where((id) => !localWalkIds.contains(id)).length;
+    }
+    return missing;
   }
 
   bool get isOutOfSync => pendingPushCount > 0 || missingLocalCount > 0;
@@ -143,6 +196,28 @@ class AppState extends ChangeNotifier {
     _records = await _localStore.load();
     if (_records.isNotEmpty) {
       _lastObservers = _records.last.observers;
+    }
+    _walks = await _walksStore.load();
+    // Resume any in-progress walk. The FGS background isolate is the
+    // source of truth for points; if its FGS is still running (Samsung
+    // Freecess froze main but kept the FGS alive), just rebuild the
+    // mirror from disk and re-bind the port. If the FGS isn't running
+    // but the file exists (e.g. app fully killed), restart the service
+    // — the handler will pick up the buffer from the file.
+    final restored = await _walksStore.loadActive();
+    if (restored != null) {
+      _activeWalk = restored;
+      _activePoints = restored.points;
+      final isRunning = await FlutterForegroundTask.isRunningService;
+      if (isRunning) {
+        await _bindWalkServicePort();
+        debugPrint('[walk] resumed active walk ${restored.id} '
+            '(FGS still running, ${restored.points.length} buffered points)');
+      } else {
+        await _startWalkService(restored);
+        debugPrint('[walk] resumed active walk ${restored.id} '
+            '(FGS restarted, ${restored.points.length} buffered points)');
+      }
     }
     try {
       _legacyRecords = await _legacyLoader.load();
@@ -207,10 +282,13 @@ class AppState extends ChangeNotifier {
     // this, freshly-created records render as outlined (teammate) markers
     // and hide the Avtor row from the moment the optimistic POST returns
     // until the next `_pullRemote` overwrites the local row.
+    // If a walk is in progress, link the record to it server-side via
+    // obhodId so the walk's detail view can show its captured disturbances.
     final newRecord = record.copyWith(
       photos: stablePhotos,
       pendingSync: true,
       createdBy: _currentUser,
+      obhodId: record.obhodId ?? _activeWalk?.id,
     );
     _records = [..._records, newRecord];
     _lastObservers = newRecord.observers;
@@ -220,12 +298,61 @@ class AppState extends ChangeNotifier {
         'isOnline=$isOnline canSync=$canSync');
     // Optimistic push if we can. Failure leaves the record queued for
     // syncAll() to retry (connectivity tick, manual button, next login).
+    // Skip the inline push if the record links to a walk that's not yet
+    // on the server (active walk in progress, or a queued walk waiting
+    // for its own push) — the FK on TB_MOTNJE.OBHOD_ID would 500 anyway.
+    // syncAll() drains walks before records so the next sync resolves it,
+    // and endWalk's post-push drain catches the active-walk case.
     if (isOnline && canSync) {
-      final ok = await _sendAndMarkSynced(newRecord);
-      if (ok) {
-        await _drainPendingPhotos();
+      if (_isWalkPending(newRecord.obhodId)) {
+        debugPrint('[sync] addRecord ${newRecord.id} '
+            'deferred: walk ${newRecord.obhodId} not yet on server');
+      } else {
+        final ok = await _sendAndMarkSynced(newRecord);
+        if (ok) {
+          await _drainPendingPhotos();
+        }
       }
     }
+  }
+
+  /// True when [obhodId] points at a walk that hasn't reached the server yet
+  /// — either the active walk (still being recorded) or a completed walk
+  /// queued for push. Pushing a disturbance with such an obhodId would
+  /// raise ORA-02291 (FK violation) and is therefore deferred.
+  bool _isWalkPending(String? obhodId) {
+    if (obhodId == null) return false;
+    if (_activeWalk?.id == obhodId) return true;
+    return _walks.any((w) => w.id == obhodId && w.pendingSync);
+  }
+
+  /// Triggers the OS permission dialog for POST_NOTIFICATIONS the first
+  /// time a walk is started. No-op on Android < 13 (the OS reports
+  /// granted by default). User can decline; we don't block the walk —
+  /// but on Samsung devices the FGS will likely be killed shortly after
+  /// the screen turns off without a visible notification, so the user
+  /// will see a silently broken track. Logged for diagnosis.
+  Future<void> _ensureNotificationPermission() async {
+    final status = await Permission.notification.status;
+    debugPrint('[walk] notification permission status: $status');
+    if (status.isGranted || status.isPermanentlyDenied) return;
+    final result = await Permission.notification.request();
+    debugPrint('[walk] notification permission after request: $result');
+  }
+
+  /// Pops the OS-level "Allow X to be excluded from battery optimization?"
+  /// dialog the first time a walk is started. Without this, Samsung One
+  /// UI's "Freecess" mechanism can freeze the FGS isolate even with the
+  /// notification visible — the symptom we hit during the field test
+  /// (track is a straight line through the screen-off period).
+  /// User can decline; subsequent walks won't re-prompt because the OS
+  /// remembers the decision (status becomes permanentlyDenied).
+  Future<void> _ensureBatteryOptimizationExempt() async {
+    final status = await Permission.ignoreBatteryOptimizations.status;
+    debugPrint('[walk] battery-opt status: $status');
+    if (status.isGranted || status.isPermanentlyDenied) return;
+    final result = await Permission.ignoreBatteryOptimizations.request();
+    debugPrint('[walk] battery-opt after request: $result');
   }
 
   Future<List<DisturbancePhoto>> _materializePhotos(Disturbance record) async {
@@ -296,8 +423,32 @@ class AppState extends ChangeNotifier {
     _isSyncing = true;
     notifyListeners();
     try {
-      final pendingRecords = _records.where((r) => r.pendingSync).toList();
-      debugPrint('[sync] pending records to push: ${pendingRecords.length}');
+      // 1. Walks first. The disturbance FK on TB_MOTNJE.OBHOD_ID requires
+      //    the walk to exist server-side, so any record stamped with an
+      //    obhodId of a not-yet-pushed walk would 500 if we sent it before
+      //    its parent walk.
+      final pendingWalks = _walks.where((w) => w.pendingSync).toList();
+      debugPrint('[sync] pending walks to push: ${pendingWalks.length}');
+      for (final walk in pendingWalks) {
+        final ok = await _sendWalkAndMarkSynced(walk);
+        debugPrint('[sync]   push walk ${walk.id} → $ok');
+        if (!ok && !canSync) {
+          debugPrint('[sync] aborting after auth-clear');
+          return;
+        }
+      }
+      // Skip records whose walk is still local-only (active walk in progress,
+      // or queued walk that just failed to push above). Pushing them would
+      // 500 with ORA-02291; endWalk's post-push drain or the next syncAll
+      // (after the walk lands) will catch them up.
+      final pendingRecords = _records
+          .where((r) => r.pendingSync && !_isWalkPending(r.obhodId))
+          .toList();
+      final deferred = _records
+          .where((r) => r.pendingSync && _isWalkPending(r.obhodId))
+          .length;
+      debugPrint('[sync] pending records to push: ${pendingRecords.length} '
+          '(deferred waiting on walk: $deferred)');
       for (final record in pendingRecords) {
         final ok = await _sendAndMarkSynced(record);
         debugPrint('[sync]   push ${record.id} → $ok');
@@ -311,6 +462,7 @@ class AppState extends ChangeNotifier {
       // photos uploaded in the same sync cycle.
       await _drainPendingPhotos();
       // Pull remote list to surface any IDs the device doesn't have locally.
+      await _pullRemoteWalks();
       await _pullRemote();
     } finally {
       _isSyncing = false;
@@ -531,6 +683,300 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  // ---- Walks (obhodi) ------------------------------------------------------
+
+  /// Begins a new walk. Generates the UUID up front so the same id is used
+  /// locally and on the server (idempotent POST). The active-walk file is
+  /// flushed immediately so a crash between this call and the first GPS
+  /// tick can still be resumed (the points list is just empty).
+  ///
+  /// Caller is responsible for ensuring location permission is already
+  /// granted (typically because the home screen has been running its own
+  /// position stream since boot). We start our own subscription here so
+  /// the buffer keeps growing even if the user navigates away from home.
+  Future<Walk> startWalk() async {
+    if (_activeWalk != null) {
+      return _activeWalk!;
+    }
+    // Permission flow on Android: notification (so the FGS notification
+    // renders), then battery-optimization exemption (so Samsung One UI's
+    // Freecess doesn't freeze the FGS isolate while the screen is off).
+    // Both pop OS-level dialogs the first time; subsequent walks are
+    // silent. iOS handles its own background indicator + activity type.
+    if (Platform.isAndroid) {
+      await _ensureNotificationPermission();
+      await _ensureBatteryOptimizationExempt();
+    }
+    final now = DateTime.now();
+    final walk = Walk(
+      id: _uuid.v4(),
+      startedAt: now,
+      endedAt: now,
+      pendingSync: true,
+      createdBy: _currentUser,
+      points: const [],
+    );
+    _activeWalk = walk;
+    _activePoints = const [];
+    // Persist metadata BEFORE starting the service — the WalkTaskHandler
+    // reads active_walk.json on its onStart to know what walk it's tracking.
+    await _walksStore.saveActive(walk);
+    await _startWalkService(walk);
+    debugPrint('[walk] startWalk ${walk.id}');
+    notifyListeners();
+    return walk;
+  }
+
+  /// Ends the in-progress walk and queues it for push. [name] and [notes]
+  /// are optional metadata captured at end time. Returns the persisted
+  /// walk so the UI can show "saved with N points" feedback.
+  ///
+  /// If [discardIfEmpty] is true and no points were captured (the user
+  /// tapped Start then Stop without moving), the walk is dropped instead
+  /// of saved — saves us from a flood of empty walks on the server.
+  Future<Walk?> endWalk({
+    String? name,
+    String? notes,
+    bool discardIfEmpty = true,
+  }) async {
+    final active = _activeWalk;
+    if (active == null) return null;
+
+    // Stop the FGS first so the handler can't append after we read.
+    if (await FlutterForegroundTask.isRunningService) {
+      await FlutterForegroundTask.stopService();
+    }
+    await _walkServicePortSub?.cancel();
+    _walkServicePortSub = null;
+
+    // Source of truth is the file — the handler may have written extra
+    // points between our last received SendPort message and stopService.
+    final fromDisk = await _walksStore.loadActive();
+    final mergedPoints = fromDisk?.points ?? _activePoints;
+
+    if (discardIfEmpty && mergedPoints.isEmpty) {
+      _activeWalk = null;
+      _activePoints = const [];
+      await _walksStore.clearActive();
+      debugPrint('[walk] endWalk ${active.id}: no points, discarded');
+      notifyListeners();
+      return null;
+    }
+
+    final completed = active.copyWith(
+      endedAt: DateTime.now(),
+      name: name,
+      notes: notes,
+      points: mergedPoints,
+      pendingSync: true,
+    );
+    _walks = [..._walks, completed];
+    _activeWalk = null;
+    _activePoints = const [];
+    await _walksStore.save(_walks);
+    await _walksStore.clearActive();
+    notifyListeners();
+    debugPrint('[walk] endWalk ${completed.id}: '
+        '${completed.points.length} points, queued for push');
+    if (isOnline && canSync) {
+      final ok = await _sendWalkAndMarkSynced(completed);
+      if (ok) {
+        // Walk now exists server-side; any disturbance captured during it
+        // was deferred (or 500'd with FK) waiting for this. Push them now,
+        // then drain photos.
+        final blocked = _records
+            .where((r) => r.pendingSync && r.obhodId == completed.id)
+            .toList();
+        debugPrint('[sync] endWalk drain: '
+            '${blocked.length} record(s) waiting on walk ${completed.id}');
+        for (final rec in blocked) {
+          await _sendAndMarkSynced(rec);
+        }
+        await _drainPendingPhotos();
+      }
+    }
+    return completed;
+  }
+
+  /// Discards the in-progress walk without saving. Used when the user
+  /// explicitly cancels (no field-data value).
+  Future<void> cancelWalk() async {
+    if (_activeWalk == null) return;
+    if (await FlutterForegroundTask.isRunningService) {
+      await FlutterForegroundTask.stopService();
+    }
+    await _walkServicePortSub?.cancel();
+    _walkServicePortSub = null;
+    final id = _activeWalk!.id;
+    _activeWalk = null;
+    _activePoints = const [];
+    await _walksStore.clearActive();
+    notifyListeners();
+    debugPrint('[walk] cancelWalk $id');
+  }
+
+  Future<void> updateWalk(Walk walk) async {
+    _walks = _walks
+        .map((w) => w.id == walk.id ? walk : w)
+        .toList(growable: false);
+    await _walksStore.save(_walks);
+    notifyListeners();
+    final creds = _credentials;
+    if (isOnline && creds != null && !walk.pendingSync) {
+      try {
+        await _remoteApi.updateWalk(walk, creds);
+      } on RemoteApiException catch (e) {
+        _handleSyncException(e);
+      }
+    }
+  }
+
+  Future<void> deleteWalk(Walk walk) async {
+    _walks = _walks.where((w) => w.id != walk.id).toList();
+    await _walksStore.save(_walks);
+    notifyListeners();
+    final creds = _credentials;
+    if (isOnline && creds != null && !walk.pendingSync) {
+      try {
+        await _remoteApi.deleteWalk(walk.id, creds);
+      } on RemoteApiException catch (e) {
+        _handleSyncException(e);
+      }
+    }
+  }
+
+  /// Lazy-loads a walk's track points from the server and caches them on
+  /// the walk row. No-op if points are already loaded or we have no creds.
+  Future<List<WalkPoint>> ensureWalkPointsCached(String walkId) async {
+    final walk = _walks.where((w) => w.id == walkId).firstOrNull;
+    if (walk == null) return const [];
+    if (walk.points.isNotEmpty) return walk.points;
+    final creds = _credentials;
+    if (creds == null || !isOnline) return const [];
+    try {
+      final pts = await _remoteApi.fetchWalkPoints(walkId, creds);
+      _walks = _walks
+          .map((w) => w.id == walkId ? w.copyWith(points: pts) : w)
+          .toList(growable: false);
+      await _walksStore.save(_walks);
+      notifyListeners();
+      return pts;
+    } on RemoteApiException catch (e) {
+      _handleSyncException(e);
+      return const [];
+    }
+  }
+
+  /// Starts the flutter_foreground_task service and binds the receivePort.
+  /// The handler reads `active_walk.json` (just persisted by the caller)
+  /// to learn which walk it's tracking.
+  Future<void> _startWalkService(Walk walk) async {
+    await FlutterForegroundTask.startService(
+      notificationTitle: 'Snemanje obhoda',
+      notificationText: 'Beležimo vašo pot na terenu.',
+      callback: walkStartCallback,
+    );
+    await _bindWalkServicePort();
+  }
+
+  Future<void> _bindWalkServicePort() async {
+    await _walkServicePortSub?.cancel();
+    final port = FlutterForegroundTask.receivePort;
+    if (port == null) {
+      debugPrint('[walk] receivePort is null — cannot bind');
+      return;
+    }
+    _walkServicePortSub = port.listen(_onWalkServiceMessage);
+  }
+
+  void _onWalkServiceMessage(dynamic data) {
+    if (data is! Map) return;
+    final type = data['type'];
+    if (type == 'log') {
+      debugPrint('[walk-svc] ${data['message']}');
+      return;
+    }
+    if (type == 'tick') {
+      final raw = data['point'];
+      if (raw is! Map) return;
+      final point = WalkPoint.fromJson(
+        raw.cast<String, dynamic>(),
+      );
+      final active = _activeWalk;
+      if (active == null) return;
+      _activePoints = [..._activePoints, point];
+      _activeWalk = active.copyWith(
+        endedAt: point.timestamp,
+        points: _activePoints,
+      );
+      notifyListeners();
+    }
+  }
+
+  Future<bool> _sendWalkAndMarkSynced(Walk walk) async {
+    final creds = _credentials;
+    if (creds == null) {
+      debugPrint('[sync] _sendWalkAndMarkSynced ${walk.id}: no creds');
+      return false;
+    }
+    try {
+      await _remoteApi.createWalk(walk, creds);
+    } on RemoteApiException catch (e) {
+      debugPrint('[sync] _sendWalkAndMarkSynced ${walk.id} FAILED: $e');
+      _handleSyncException(e);
+      return false;
+    }
+    _walks = _walks
+        .map((w) => w.id == walk.id ? w.copyWith(pendingSync: false) : w)
+        .toList(growable: false);
+    await _walksStore.save(_walks);
+    notifyListeners();
+    return true;
+  }
+
+  Future<void> _pullRemoteWalks() async {
+    final creds = _credentials;
+    if (creds == null) return;
+    try {
+      final remote = await _remoteApi.fetchWalks(creds);
+      _lastRemoteWalkIds = remote.map((r) => r.id).toSet();
+      _walks = _mergeRemoteWalksIntoLocal(remote);
+      await _walksStore.save(_walks);
+      notifyListeners();
+    } on RemoteApiException catch (e) {
+      _handleSyncException(e);
+    }
+  }
+
+  List<Walk> _mergeRemoteWalksIntoLocal(List<RemoteWalk> remote) {
+    final byId = {for (final w in _walks) w.id: w};
+    for (final r in remote) {
+      final local = byId[r.id];
+      if (local == null) {
+        // Server-only walk: pull metadata in. Points are NOT included in
+        // the list response; they'll lazy-fetch via ensureWalkPointsCached
+        // when the user opens the walk's detail view.
+        byId[r.id] = r.toLocal();
+      } else if (local.pendingSync) {
+        // Local has a queued walk with the same id (rare — would only
+        // happen if a previous push partially completed). Trust local; the
+        // next push is idempotent so the server state will catch up.
+      } else {
+        // Both sides have it. Server wins on metadata; preserve any
+        // already-fetched points so we don't re-download.
+        byId[r.id] = r.toLocal().copyWith(
+              points: local.points,
+              pointCount: r.pointCount,
+              disturbanceCount: r.disturbanceCount,
+            );
+      }
+    }
+    return byId.values.toList()
+      ..sort((a, b) => b.startedAt.compareTo(a.startedAt));
+  }
+
+  // -------------------------------------------------------------------------
+
   void _handleSyncException(RemoteApiException e) {
     if (e.isUnauthorized) {
       _sessionPassword = null;
@@ -542,6 +988,7 @@ class AppState extends ChangeNotifier {
   @override
   void dispose() {
     _connectivitySub?.cancel();
+    _walkServicePortSub?.cancel();
     super.dispose();
   }
 }

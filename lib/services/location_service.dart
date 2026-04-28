@@ -33,8 +33,11 @@ class LocationService {
   /// Continuous stream of the device location while in foreground. The
   /// 5 m distance filter trims battery draw and notify churn — the dot
   /// only repaints when the user has actually moved a perceptible amount.
-  /// Without ACCESS_BACKGROUND_LOCATION (which we don't request), the OS
-  /// stops emitting when the app is backgrounded and resumes on foreground.
+  /// Without ACCESS_BACKGROUND_LOCATION (which we don't request from this
+  /// stream), the OS pauses delivery when the app is backgrounded and
+  /// resumes on foreground. Walk-around recording uses a separate isolate
+  /// (see `walk_task_handler.dart`) tied to a flutter_foreground_task FGS
+  /// for true background tracking.
   /// Caller is responsible for ensuring permission is granted first
   /// (typically by calling `getCurrentPosition` once at startup) — calling
   /// `requestPermission` concurrently with another call can race.

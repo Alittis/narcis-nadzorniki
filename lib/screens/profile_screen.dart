@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:narcis_nadzorniki/screens/record_list_screen.dart';
+import 'package:narcis_nadzorniki/screens/walks_list_screen.dart';
 import 'package:narcis_nadzorniki/state/app_state.dart';
 import 'package:provider/provider.dart';
 
@@ -111,6 +112,19 @@ class ProfileScreen extends StatelessWidget {
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const RecordListScreen(),
+                    ),
+                  );
+                },
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.directions_walk),
+                title: const Text('Seznam obhodov'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const WalksListScreen(),
                     ),
                   );
                 },

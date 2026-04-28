@@ -2,11 +2,26 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
+    <!-- Walk-around tracking: flutter_foreground_task runs the location
+         stream in a separate Dart isolate tied to a real foreground service,
+         so it survives Samsung One UI's "Freecess" freezing of the main app
+         process. The service is started/stopped by AppState's
+         startWalk/endWalk; idle app runs no service. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Lets us pop the OS-level "Allow this app to run in the background?"
+         dialog at startWalk via permission_handler. Without this exemption,
+         Samsung One UI / aggressive OEM battery savers can still freeze the
+         FGS isolate even with the FGS notification visible. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <application
         android:label="Narcis Nadzorniki"
         android:name="${applicationName}"
@@ -38,6 +53,18 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- flutter_foreground_task: runs the walk-tracking isolate in a
+             location-typed foreground service. RestartReceiver re-starts
+             the service on system events (boot, app updates) when the
+             plugin's auto-restart is enabled. -->
+        <service
+            android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+        <receiver
+            android:name="com.pravera.flutter_foreground_task.service.RestartReceiver"
+            android:exported="false" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

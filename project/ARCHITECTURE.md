@@ -335,6 +335,57 @@ Defined in [tools/ords/walks_schema.sql](../tools/ords/walks_schema.sql). Same `
 
 Order of operations on the wire: clients must POST the walk row before any disturbance referencing it, otherwise the FK on the disturbance INSERT raises ORA-02291 → 500. The client's `syncAll` drains pending walks before pending disturbances for this reason.
 
+## 17. Walk-around UX (Flutter client)
+Implemented across [lib/state/app_state.dart](../lib/state/app_state.dart), [lib/screens/home_screen.dart](../lib/screens/home_screen.dart), [lib/screens/walks_list_screen.dart](../lib/screens/walks_list_screen.dart), and [lib/screens/walk_detail_screen.dart](../lib/screens/walk_detail_screen.dart). Models live in [lib/models/walk.dart](../lib/models/walk.dart); local persistence in [lib/data/walks_local_store.dart](../lib/data/walks_local_store.dart).
+
+**Mode pill.** The bottom-bar mode pill on `HomeScreen` carries an `Obhodi` mode (replaces the placeholder `Sprehod` mode that was disabled in earlier builds). Tapping the mode swaps the FAB:
+- **Motnje mode**: existing speed-dial (Foto + Šifrant). FAB icon `+`, rotates to ✕ when expanded.
+- **Obhodi mode + no active walk**: single-tap `directions_walk` FAB → `AppState.startWalk()`. Generates a UUID, stamps `pendingSync=true`, persists the active-walk file, subscribes to `LocationService.watchPosition()` (5 m distance filter, same as the live-dot stream), starts buffering `WalkPoint`s.
+- **Obhodi mode + active walk**: single-tap `stop` FAB → `_EndWalkSheet` bottom sheet (optional name + notes, "Shrani" or "Zavrzi" with confirm). On Shrani the walk moves into `_walks` queued for push; on Zavrzi it's wiped via `cancelWalk()` (no upload, no local row).
+
+Disturbances captured during a walk are linked automatically: `AppState.addRecord` stamps `record.obhodId = _activeWalk?.id` if one is running, regardless of which mode the user is in when they tap "+". Switching back to Motnje mode mid-walk preserves the link.
+
+**Live polyline.** While `state.hasActiveWalk` is true, the active-walk path renders as a green polyline on the home map (alpha 0.85, stroke 5). Always shown — the mode you're in only affects the FAB, not the rendering.
+
+**Historical walks layer.** A "Obhodi" chip in the layer row toggles a blueGrey polyline overlay for completed walks. Renders only walks whose points are already cached locally (i.e. opened in the detail screen at least once); eager prefetch is deferred until we have a sense of typical per-user walk volume — a 2-hour walk's points payload is ~150 KB, multiplied by every walk in the org adds up fast on cellular.
+
+**Background tracking architecture.** A first attempt used geolocator's built-in `AndroidSettings.foregroundNotificationConfig` to run a location-typed FGS from the main isolate. It failed on Samsung A56 / One UI: even with all permissions granted, Samsung's proprietary "Freecess" mechanism froze the main app process when the screen turned off (`FreecessHandler: freeze … result: 12` in logcat), killing the in-main-isolate position stream. The persistent notification also never rendered. Replaced with a **separate-isolate FGS** modelled on the [Kolpa Alert app](../../../kolpa_alert_app)'s working pattern.
+
+Architecture:
+- **`flutter_foreground_task` plugin** ([lib/main.dart](../lib/main.dart) calls `FlutterForegroundTask.init` at app boot with channel + icon + interval config). Manifest declares `com.pravera.flutter_foreground_task.service.ForegroundService` (foregroundServiceType=`location`) and `RestartReceiver`.
+- **`WalkTaskHandler`** ([lib/services/walk_task_handler.dart](../lib/services/walk_task_handler.dart)) — top-level `walkStartCallback` registered via `@pragma('vm:entry-point')`. Runs in its own Dart isolate, owns the `Geolocator.getPositionStream()` subscription. Reads the active-walk metadata from `active_walk.json` on `onStart`, applies the tick filter (below), persists each accepted point back to that same file with an atomic temp-file rename, and pings the main isolate via `SendPort`. The FGS keeps this isolate alive across screen-off / Freecess; the main isolate is free to be frozen.
+- **`AppState.startWalk`** does the permission flow (notifications, then `Permission.ignoreBatteryOptimizations` — both pop OS dialogs the first time and remember the user's choice), persists the empty walk to `active_walk.json`, calls `FlutterForegroundTask.startService(callback: walkStartCallback)`, then binds `FlutterForegroundTask.receivePort` so the UI can mirror ticks live for the polyline.
+- **`AppState.endWalk` / `cancelWalk`** call `FlutterForegroundTask.stopService()` and unbind the port. `endWalk` re-reads `active_walk.json` after stopping (handler may have written extra points between our last received SendPort message and `stopService`) so nothing is lost.
+- **`AppState.init`** detects an in-progress walk via `FlutterForegroundTask.isRunningService`. If true, the FGS survived a main-isolate kill — re-bind the port, rebuild the in-memory mirror from disk, no service restart. If false but the file exists (full app kill), `_startWalkService` restarts the FGS with the existing buffer.
+
+**Permissions added to AndroidManifest.xml** (beyond the existing fine + coarse location):
+- `ACCESS_BACKGROUND_LOCATION` — declared for parity with Kolpa, not currently requested at runtime (FGS + WhenInUse is sufficient for our use case).
+- `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_LOCATION` — required for any location-typed FGS on Android 14+.
+- `POST_NOTIFICATIONS` — Android 13+ runtime permission for the FGS notification. Without it, Samsung kills the FGS shortly after screen-off.
+- `WAKE_LOCK` — used by `flutter_foreground_task` to keep the CPU alive during ticks.
+- `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` — enables the `Permission.ignoreBatteryOptimizations.request()` OS dialog. **This is the key permission against Samsung Freecess** — the notification + FGS alone weren't enough on the A56 test device.
+
+**Notification channel.** ID `narcis_obhod`, name "Beleženje obhoda", importance `DEFAULT`. Persistent "Snemanje obhoda — Beležimo vašo pot na terenu." notification stays visible on the lock screen and in the main shade for the duration of the walk. Channel was initially set to `LOW` (matching Kolpa) but Samsung One UI hides `LOW` ongoing notifications under the collapsed "Silent" group; bumped to `DEFAULT` so the user has visible confirmation the recording is alive.
+
+**iOS.** `Info.plist` declares `UIBackgroundModes: [location]`. Geolocator's default `AppleSettings` are used in the handler with `allowBackgroundLocationUpdates: true, activityType: fitness, pauseLocationUpdatesAutomatically: false`. Single iOS permission ("When in use") is sufficient; iOS shows its own blue status-bar indicator while backgrounded. iOS testing not yet performed.
+
+**Walk-tick filter (in the handler isolate).** OS position streams occasionally deliver bad fixes — most visibly cached "phantom" points right after a foreground resume. `WalkTaskHandler._onTick` rejects three classes before committing to the buffer:
+1. **Stale fix:** `position.timestamp` more than 30 s behind `DateTime.now()` — a cached value, not a fresh GPS read.
+2. **Poor accuracy:** `position.accuracy > 50 m` — wifi/cell triangulation, not the GPS chip; would distort the polyline.
+3. **Teleport:** implied speed from the previous accepted point > 8 m/s (~28 km/h, generous against running pace) — one of the two fixes is bogus; skip the new one and let the next clean fix re-anchor.
+
+All rejections are sent to the main isolate as `{type: 'log', message: 'reject: …'}` and surface as `[walk-svc] reject: …` debug prints; accepted ticks come through as `{type: 'tick', point: {…}}` and append to the polyline.
+
+**Active-walk crash safety.** The growing point buffer is flushed to `<docs>/active_walk.json` on every accepted tick by the handler isolate, with an atomic temp-file-rename write. On `AppState.init()` the file is loaded; if present, the walk resumes (FGS reattach if running, restart if not). The file is deleted only on a clean `endWalk` / `cancelWalk` / `logout`.
+
+**Sync ordering.** `syncAll` drains pending walks first, then disturbances, then photos, then pulls remote walks + remote disturbances. The walks-first ordering exists so that a freshly-stopped walk and a disturbance captured during it (both `pendingSync=true`) push in the right order — the FK on `TB_MOTNJE.OBHOD_ID` would otherwise fail with ORA-02291 (§16).
+
+**Inline-push gate (`_isWalkPending`).** A disturbance whose `obhodId` points at a walk that hasn't reached the server yet (active walk being recorded, or completed walk queued for push) cannot be pushed yet — the FK would 500 with ORA-02291. Both `addRecord`'s optimistic inline push and `syncAll`'s record loop skip such records. They stay `pendingSync=true` and are drained by `endWalk` (after the walk push lands) or by the next `syncAll` once the walk is no longer pending. Without this gate, capturing a disturbance during an active walk produces a stream of 500-noise on the wire and leaves the user needing to manually tap sync after stopping the walk; with it, the flow is silent and self-healing.
+
+**Post-walk drain.** After `endWalk` successfully pushes the walk, it iterates any disturbance with `pendingSync=true && obhodId == walk.id` and pushes them inline, then drains pending photos. This catches the records that were deferred (or 500'd before the gate was added) while the walk was local-only.
+
+**List + detail.** Profile → "Seznam obhodov" opens [walks_list_screen.dart](../lib/screens/walks_list_screen.dart), which lists all walks (own + teammate from the org pull) sorted newest-first with point/duration/disturbance counts. Tapping opens [walk_detail_screen.dart](../lib/screens/walk_detail_screen.dart) — a non-interactive map showing the polyline + linked-disturbance markers, plus a list of those disturbances. Points are lazy-fetched via `state.ensureWalkPointsCached()` on screen open.
+
 ## Documentation Authority
 The /project directory is the single source of truth for:
 - Architecture

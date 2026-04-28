@@ -17,6 +17,7 @@ class Disturbance {
     required this.createdAt,
     this.proposedType,
     this.createdBy,
+    this.obhodId,
   });
 
   final String id;
@@ -36,6 +37,9 @@ class Disturbance {
   // that haven't been pushed yet (the caller is the author by definition);
   // populated from `ustvarjen_od` when pulled from the server.
   final String? createdBy;
+  // Walk-around (obhod) the record was captured during. Stamped in
+  // `AppState.addRecord` when a walk is active; null otherwise.
+  final String? obhodId;
 
   bool get hasPendingPhotoUploads => photos.any((p) => p.pendingUpload);
 
@@ -53,6 +57,7 @@ class Disturbance {
     DateTime? createdAt,
     String? proposedType,
     String? createdBy,
+    String? obhodId,
   }) {
     return Disturbance(
       id: id,
@@ -69,6 +74,7 @@ class Disturbance {
       createdAt: createdAt ?? this.createdAt,
       proposedType: proposedType ?? this.proposedType,
       createdBy: createdBy ?? this.createdBy,
+      obhodId: obhodId ?? this.obhodId,
     );
   }
 
@@ -87,6 +93,7 @@ class Disturbance {
         'createdAt': createdAt.toIso8601String(),
         'proposedType': proposedType,
         'createdBy': createdBy,
+        'obhodId': obhodId,
       };
 
   factory Disturbance.fromJson(Map<String, dynamic> json) {
@@ -107,6 +114,7 @@ class Disturbance {
       createdAt: DateTime.parse(json['createdAt'] as String),
       proposedType: json['proposedType'] as String?,
       createdBy: json['createdBy'] as String?,
+      obhodId: json['obhodId'] as String?,
     );
   }
 
