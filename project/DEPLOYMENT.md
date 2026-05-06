@@ -41,6 +41,9 @@ These fingerprints are public (they're the public-key cert digest). Not the same
 **Permissions philosophy:**
 - The manifest declares **only** permissions the app actually requests at runtime. `ACCESS_BACKGROUND_LOCATION` is intentionally NOT declared: walk tracking uses a foreground service typed `location`, which Android grants continuous location to without the background-location permission. Re-declaring it would force a "prominent disclosure" review form for a feature we don't have. See the comment in `AndroidManifest.xml` for the gating rule before adding it back.
 
+**Hardware features (`<uses-feature>`) philosophy:**
+- The manifest also declares `android.hardware.camera`, `android.hardware.camera.autofocus`, `android.hardware.location`, and `android.hardware.location.gps` as `required="false"`. Without those explicit lines, Google Play implicitly infers them as **required=true** from the `CAMERA` and `ACCESS_FINE_LOCATION` permissions, and silently filters the listing off devices whose system feature manifest (`/system/etc/permissions/*.xml`) doesn't declare every sub-feature — even when the hardware is physically present. This bit a real opted-in internal tester on a Blackview Active 8 Pro (Play showed "Ta izdelek ni na voljo" / "This app is not available for your device" despite the device having both camera and GNSS). Marking the features optional widens device coverage; the app already degrades gracefully at runtime if a feature is genuinely absent. To diagnose future "tester can't install" reports, look up the device model in Play Console → Test and release → Reach and devices → Device catalog — the exclusion reason is shown in plain text.
+
 ### 3.2 Per-release build
 
 Bump `version: X.Y.Z+B` in `pubspec.yaml` (Play requires monotonic `versionCode` = `+B`), then:
@@ -56,9 +59,9 @@ Sanity-check the signed AAB before upload:
 # Confirm the merged manifest has the right applicationId and no surprise permissions
 mkdir -p /tmp/aab && unzip -qo build/app/outputs/bundle/release/app-release.aab -d /tmp/aab
 strings /tmp/aab/base/manifest/AndroidManifest.xml | \
-  grep -E 'si\.terenska|com\.example|BACKGROUND_LOCATION|FOREGROUND_SERVICE|CAMERA|POST_NOTIFICATIONS' | sort -u
+  grep -E 'si\.terenska|com\.example|BACKGROUND_LOCATION|FOREGROUND_SERVICE|CAMERA|POST_NOTIFICATIONS|hardware\.camera|hardware\.location' | sort -u
 ```
-Expected: `si.terenska.beleznica` present; `com.example` and `BACKGROUND_LOCATION` absent.
+Expected: `si.terenska.beleznica` present; `com.example` and `BACKGROUND_LOCATION` absent; all four `android.hardware.camera*` / `android.hardware.location*` feature names present (declared `required="false"` in source).
 
 Upload the AAB to **Google Play Console → Internal testing → Create new release**, attach the testers list, and roll out. Play App Signing re-signs with the app-signing key automatically.
 

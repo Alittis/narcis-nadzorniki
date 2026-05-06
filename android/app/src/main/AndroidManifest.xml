@@ -29,6 +29,21 @@
          Samsung One UI / aggressive OEM battery savers can still freeze the
          FGS isolate even with the FGS notification visible. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- Hardware features declared explicitly as NOT required so Google Play
+         does not filter the app off devices whose system feature manifest is
+         incomplete. Without these lines, Play infers `android.hardware.camera`
+         and `android.hardware.camera.autofocus` from CAMERA, and
+         `android.hardware.location` + `android.hardware.location.gps` from
+         ACCESS_FINE_LOCATION, all as required=true — and silently hides the
+         listing on devices like the Blackview Active 8 Pro that have the
+         hardware but don't declare every sub-feature in /system/etc/permissions.
+         The app already degrades gracefully if a feature is genuinely absent
+         (camera button is hidden, GPS-dependent UI shows a message), so
+         marking these optional only widens device coverage. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+    <uses-feature android:name="android.hardware.location" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
     <application
         android:label="Terenska beležnica"
         android:name="${applicationName}"
