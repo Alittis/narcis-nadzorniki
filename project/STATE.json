@@ -26,9 +26,9 @@
     "manifest_permissions_truthful": "ACCESS_BACKGROUND_LOCATION intentionally NOT declared — walk tracking is foreground-service-only (FGS type 'location'); permission would be required only for a future feature that needs location while no FGS is running",
     "first_aab_built": "2026-04-28 (45.5 MB, signed with upload key, manifest verified clean of com.example and BACKGROUND_LOCATION)",
     "first_aab_archived_at": "/Users/Alexis/Releases/terenska-beleznica-1.0.0+1.aab",
-    "latest_aab_built": "2026-05-06 — version 1.0.1+2 (45.5 MB) — manifest now declares android.hardware.camera, .camera.autofocus, .location, .location.gps as required=false so Play stops filtering the listing on devices with incomplete system feature manifests (e.g. Blackview Active 8 Pro, where Play showed 'Ta izdelek ni na voljo' / 'This app is not available for your device' for an opted-in tester)",
-    "latest_aab_archived_at": "/Users/Alexis/Releases/terenska-beleznica-1.0.1+2.aab",
-    "play_console_status": "Internal testing track LIVE since 2026-04-28; v1.0.0+1 rolled out 2026-04-28; v1.0.1+2 built 2026-05-06 (device-compatibility fix); next step is direct upload to a new Closed testing track ('ARSO – zaprti test'), workflow + all listing/App Content/tester texts in project/PLAY_CLOSED_TEST.md (drafted 2026-05-07)",
+    "latest_aab_built": "2026-05-11 — version 1.1.0+3 (45.5 MB) — adds Zakonska podlaga + Status obravnave fields and expands action-taken dropdown from 4 to 15 options (see commit 3a5fc7b). Manifest sanity-check clean: si.terenska.beleznica present, com.example/BACKGROUND_LOCATION absent, all four hardware.camera*/hardware.location* features declared required=false.",
+    "latest_aab_archived_at": "/Users/Alexis/Releases/terenska-beleznica-1.1.0+3.aab",
+    "play_console_status": "Internal testing track LIVE since 2026-04-28; v1.0.0+1 rolled out 2026-04-28; v1.0.1+2 built 2026-05-06 (device-compatibility fix, not yet rolled out as superseded by v1.1.0+3); v1.1.0+3 built 2026-05-11 (legalBasis + caseStatus + expanded ukrepi) and ready for upload to Internal testing; next step after Internal is direct upload to a new Closed testing track ('ARSO – zaprti test'), workflow + all listing/App Content/tester texts in project/PLAY_CLOSED_TEST.md (drafted 2026-05-07)",
     "closed_test_track": {
       "status": "PLANNED — track not yet created in Play Console as of 2026-05-07",
       "track_name_intent": "ARSO – zaprti test",
