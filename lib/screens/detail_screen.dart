@@ -122,6 +122,8 @@ class _DetailScreenState extends State<DetailScreen> {
                     const SizedBox(height: 10),
                     _FooterRow(
                       actionTaken: live.actionTaken,
+                      legalBasis: live.legalBasis,
+                      caseStatus: live.caseStatus,
                       observers: live.observers,
                     ),
                   ],
@@ -442,10 +444,14 @@ class _MetaStrip extends StatelessWidget {
 class _FooterRow extends StatelessWidget {
   const _FooterRow({
     required this.actionTaken,
+    required this.legalBasis,
+    required this.caseStatus,
     required this.observers,
   });
 
   final String actionTaken;
+  final String? legalBasis;
+  final String caseStatus;
   final List<String> observers;
 
   @override
@@ -455,6 +461,9 @@ class _FooterRow extends StatelessWidget {
       runSpacing: 6,
       children: [
         _Pill(icon: Icons.gavel_rounded, text: actionTaken),
+        if (legalBasis != null && legalBasis!.isNotEmpty)
+          _Pill(icon: Icons.menu_book_outlined, text: legalBasis!),
+        _Pill(icon: Icons.flag_outlined, text: caseStatus),
         if (observers.isNotEmpty)
           _Pill(icon: Icons.group_outlined, text: observers.join(', ')),
       ],

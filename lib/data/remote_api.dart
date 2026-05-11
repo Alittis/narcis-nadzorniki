@@ -60,6 +60,8 @@ class RemoteDisturbance {
     required this.description,
     required this.observers,
     required this.actionTaken,
+    required this.legalBasis,
+    required this.caseStatus,
     required this.proposedType,
     required this.createdAt,
     required this.createdBy,
@@ -76,6 +78,8 @@ class RemoteDisturbance {
   final String description;
   final List<String> observers;
   final String actionTaken;
+  final String? legalBasis;
+  final String caseStatus;
   final String? proposedType;
   final DateTime createdAt;
   final String? createdBy;
@@ -96,6 +100,8 @@ class RemoteDisturbance {
       photos: photos,
       observers: observers,
       actionTaken: actionTaken,
+      legalBasis: legalBasis,
+      caseStatus: caseStatus,
       pendingSync: false,
       createdAt: createdAt,
       proposedType: proposedType,
@@ -117,6 +123,12 @@ class RemoteDisturbance {
       description: (json['description'] as String?) ?? '',
       observers: (json['observers'] as List<dynamic>? ?? const []).cast<String>(),
       actionTaken: json['actionTaken'] as String,
+      // APEX_JSON elides NULL-valued keys, so legalBasis arrives absent
+      // (not `null`) on records with no value. Treat missing == null.
+      legalBasis: json['legalBasis'] as String?,
+      // caseStatus is NOT NULL DB-side; old rows backfilled to 'Odprto'.
+      // Defensive fallback handles a server build that pre-dates this field.
+      caseStatus: (json['caseStatus'] as String?) ?? 'Odprto',
       proposedType: json['proposedType'] as String?,
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'] as String)
@@ -465,6 +477,8 @@ class RemoteApi {
         'description': d.description,
         'observers': d.observers,
         'actionTaken': d.actionTaken,
+        'legalBasis': d.legalBasis,
+        'caseStatus': d.caseStatus,
         'proposedType': d.proposedType,
         'obhodId': d.obhodId,
       };

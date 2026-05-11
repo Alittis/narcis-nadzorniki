@@ -41,6 +41,7 @@ Disturbance _sample({String id = '11111111-2222-3333-4444-555555555555'}) {
     photos: const [],
     observers: const ['Alexis Zrimec'],
     actionTaken: 'Brez ukrepanja',
+    caseStatus: 'Odprto',
     pendingSync: false,
     createdAt: DateTime.utc(2026, 4, 25, 12, 0, 0),
   );

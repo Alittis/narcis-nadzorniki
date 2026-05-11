@@ -54,7 +54,9 @@ class _FormScreenState extends State<FormScreen> {
   List<SelectedDisturbanceType> _types = [];
   List<DisturbancePhoto> _photos = [];
   List<String> _observers = [];
-  String _actionTaken = 'Brez ukrepanja';
+  String _actionTaken = 'Brez ukrepa';
+  String? _legalBasis;
+  String _caseStatus = 'Odprto';
   bool _pickedOnMap = false;
 
   @override
@@ -367,6 +369,8 @@ class _FormScreenState extends State<FormScreen> {
       photos: _photos,
       observers: _observers,
       actionTaken: _actionTaken,
+      legalBasis: _legalBasis,
+      caseStatus: _caseStatus,
       pendingSync: true,
       createdAt: DateTime.now(),
       proposedType: _proposedTypeController.text.trim().isEmpty
@@ -500,37 +504,81 @@ class _FormScreenState extends State<FormScreen> {
               colors: colors,
               icon: Icons.gavel_rounded,
               title: 'Ukrepanje',
-              child: DropdownButtonFormField<String>(
-                value: _actionTaken,
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: colors.surface,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: colors.outlineVariant),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  DropdownButtonFormField<String>(
+                    value: _actionTaken,
+                    decoration: _ukrepanjeFieldDecoration(colors),
+                    items: const [
+                      DropdownMenuItem(value: 'Brez ukrepa', child: Text('Brez ukrepa')),
+                      DropdownMenuItem(value: 'Ustno opozorilo', child: Text('Ustno opozorilo')),
+                      DropdownMenuItem(value: 'Pisno opozorilo', child: Text('Pisno opozorilo')),
+                      DropdownMenuItem(value: 'Zapisnik', child: Text('Zapisnik')),
+                      DropdownMenuItem(value: 'Plačilni nalog', child: Text('Plačilni nalog')),
+                      DropdownMenuItem(value: 'Obvestilo pristojnim', child: Text('Obvestilo pristojnim')),
+                      DropdownMenuItem(value: 'Obvestilo drugi službi', child: Text('Obvestilo drugi službi')),
+                      DropdownMenuItem(value: 'Prijava inšpekciji', child: Text('Prijava inšpekciji')),
+                      DropdownMenuItem(value: 'Prijava policiji', child: Text('Prijava policiji')),
+                      DropdownMenuItem(value: 'Evidentiranje', child: Text('Evidentiranje')),
+                      DropdownMenuItem(value: 'Nadzor', child: Text('Nadzor')),
+                      DropdownMenuItem(value: 'Svetovanje', child: Text('Svetovanje')),
+                      DropdownMenuItem(value: 'Navodila', child: Text('Navodila')),
+                      DropdownMenuItem(value: 'Potrebno nadaljnje spremljanje', child: Text('Potrebno nadaljnje spremljanje')),
+                      DropdownMenuItem(value: 'Drugo', child: Text('Drugo')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() {
+                          _actionTaken = value;
+                        });
+                      }
+                    },
                   ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: colors.outlineVariant),
+                  const SizedBox(height: 10),
+                  // Empty options list for now; the dropdown renders as a
+                  // disabled placeholder showing "Zakonska podlaga" until
+                  // the codebook is wired up.
+                  DropdownButtonFormField<String>(
+                    value: _legalBasis,
+                    decoration: _ukrepanjeFieldDecoration(colors).copyWith(
+                      hintText: 'Zakonska podlaga',
+                    ),
+                    items: const [],
+                    onChanged: (value) {
+                      setState(() {
+                        _legalBasis = value;
+                      });
+                    },
                   ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 12,
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4, bottom: 4),
+                    child: Text(
+                      'Status obravnave',
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                            color: colors.onSurfaceVariant,
+                          ),
+                    ),
                   ),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'Brez ukrepanja', child: Text('Brez ukrepanja')),
-                  DropdownMenuItem(value: 'Ustno opozorilo', child: Text('Ustno opozorilo')),
-                  DropdownMenuItem(value: 'Pisno opozorilo', child: Text('Pisno opozorilo')),
-                  DropdownMenuItem(value: 'Drugo', child: Text('Drugo')),
+                  DropdownButtonFormField<String>(
+                    value: _caseStatus,
+                    decoration: _ukrepanjeFieldDecoration(colors),
+                    items: const [
+                      DropdownMenuItem(value: 'Odprto', child: Text('Odprto')),
+                      DropdownMenuItem(value: 'V obravnavi', child: Text('V obravnavi')),
+                      DropdownMenuItem(value: 'Zaključeno', child: Text('Zaključeno')),
+                      DropdownMenuItem(value: 'Predano drugi službi', child: Text('Predano drugi službi')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() {
+                          _caseStatus = value;
+                        });
+                      }
+                    },
+                  ),
                 ],
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() {
-                      _actionTaken = value;
-                    });
-                  }
-                },
               ),
             ),
             const SizedBox(height: 12),
@@ -660,6 +708,29 @@ class _FormScreenState extends State<FormScreen> {
             const SizedBox(height: 12),
           ],
         ),
+      ),
+    );
+  }
+
+  InputDecoration _ukrepanjeFieldDecoration(ColorScheme colors) {
+    return InputDecoration(
+      filled: true,
+      fillColor: colors.surface,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: colors.outlineVariant),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: colors.outlineVariant),
+      ),
+      disabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: colors.outlineVariant),
+      ),
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 12,
       ),
     );
   }

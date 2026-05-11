@@ -28,7 +28,22 @@
     "first_aab_archived_at": "/Users/Alexis/Releases/terenska-beleznica-1.0.0+1.aab",
     "latest_aab_built": "2026-05-06 — version 1.0.1+2 (45.5 MB) — manifest now declares android.hardware.camera, .camera.autofocus, .location, .location.gps as required=false so Play stops filtering the listing on devices with incomplete system feature manifests (e.g. Blackview Active 8 Pro, where Play showed 'Ta izdelek ni na voljo' / 'This app is not available for your device' for an opted-in tester)",
     "latest_aab_archived_at": "/Users/Alexis/Releases/terenska-beleznica-1.0.1+2.aab",
-    "play_console_status": "Internal testing track LIVE since 2026-04-28; v1.0.0+1 rolled out 2026-04-28; v1.0.1+2 built 2026-05-06 (device-compatibility fix) — pending upload to Internal testing"
+    "play_console_status": "Internal testing track LIVE since 2026-04-28; v1.0.0+1 rolled out 2026-04-28; v1.0.1+2 built 2026-05-06 (device-compatibility fix); next step is direct upload to a new Closed testing track ('ARSO – zaprti test'), workflow + all listing/App Content/tester texts in project/PLAY_CLOSED_TEST.md (drafted 2026-05-07)",
+    "closed_test_track": {
+      "status": "PLANNED — track not yet created in Play Console as of 2026-05-07",
+      "track_name_intent": "ARSO – zaprti test",
+      "tester_source_intent": "Google Group (recommended) or Play Console email list — decision in PLAY_CLOSED_TEST.md §0",
+      "feedback_email": "admin@alittis.com",
+      "opt_in_url_after_rollout": "https://play.google.com/apps/testing/si.terenska.beleznica",
+      "store_listing_languages": ["sl", "en-US"],
+      "category": "Productivity",
+      "open_items": [
+        "Author 1024x500 feature graphic (currently missing)",
+        "Capture 6 phone screenshots on A56 (login, home map, form, detail, walk-active, profile)",
+        "Confirm Closed track name with stakeholders",
+        "After rollout: record Play app-signing cert SHA-1/SHA-256 into android_release.play_app_signing_cert_sha*"
+      ]
+    }
   },
   "external_services": [
     {
@@ -54,8 +69,8 @@
           "host": "narcis.gov.si",
           "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
           "scoping": "ORG_ID stamped from caller's narcis_uporabniki.organizacija; cross-org rows never returned. Returns the full org set; client filters to author-only views (e.g. RecordListScreen) using the createdBy field.",
-          "response_shape": "{ records: [ { id, latitude, longitude, locationAccuracy, observedAt, createdAt, createdBy, description, actionTaken, proposedType, obhodId, types[], observers[], photos[{id,mimeType}] } ] }",
-          "status": "deployed 2026-04-26; createdBy field added 2026-04-27; obhodId field added and deployed 2026-04-27; smoke test 17/17 (full record + photo lifecycle); chunked HTP.prn emit added 2026-04-28 (response bodies above ~32 KB previously raised ORA-06502 — bug latent until orgs accumulated enough records)"
+          "response_shape": "{ records: [ { id, latitude, longitude, locationAccuracy, observedAt, createdAt, createdBy, description, actionTaken, legalBasis, caseStatus, proposedType, obhodId, types[], observers[], photos[{id,mimeType}] } ] }",
+          "status": "deployed 2026-04-26; createdBy field added 2026-04-27; obhodId field added and deployed 2026-04-27; smoke test 17/17 (full record + photo lifecycle); chunked HTP.prn emit added 2026-04-28 (response bodies above ~32 KB previously raised ORA-06502 — bug latent until orgs accumulated enough records); legalBasis + caseStatus fields added and deployed 2026-05-11 (schema ALTER backfilled existing rows via DEFAULT 'Odprto' NOT NULL; endpoints redeployed; 17/17 smoke probes passed post-deploy)"
         },
         {
           "path": "disturbances/",
@@ -228,7 +243,7 @@
     }
   },
   "disturbance_schema": {
-    "status": "deployed to Oracle 2026-04-26; smoke test 9/9 passed; OBHOD_ID column applied 2026-04-27 via walks_schema.sql ALTER and re-deployed disturbance_endpoints.sql (17/17 lifecycle probes passed)",
+    "status": "deployed to Oracle 2026-04-26; smoke test 9/9 passed; OBHOD_ID column applied 2026-04-27 via walks_schema.sql ALTER and re-deployed disturbance_endpoints.sql (17/17 lifecycle probes passed). 2026-05-11: ZAKONSKA_PODLAGA VARCHAR2(200) NULL and STATUS_OBRAVNAVE VARCHAR2(30) DEFAULT 'Odprto' NOT NULL (CHECK to four workflow states) deployed via idempotent ALTER block at the end of disturbance_schema.sql; disturbance_endpoints.sql re-deployed in the same session; 17/17 smoke probes passed end-to-end including POST/PUT/GET round-trip of the new fields.",
     "deploy_order": [
       "tools/ords/disturbance_schema.sql",
       "tools/ords/disturbance_codebook_seed.sql",

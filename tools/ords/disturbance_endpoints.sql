@@ -34,10 +34,15 @@
 --     "description": "...",
 --     "observers": ["...", ...],
 --     "actionTaken": "...",
+--     "legalBasis": "..." | null,
+--     "caseStatus": "Odprto" | "V obravnavi" | "Zaključeno" | "Predano drugi službi",
 --     "proposedType": "..." | null,
 --     "obhodId": "<uuid>" | null
 --   }
 --   (createdAt, groupName/typeName, photos, pendingSync are ignored.)
+--   `caseStatus` is required by the DB CHECK; if missing the handler
+--   substitutes 'Odprto' on POST and the existing row's value on PUT so
+--   older clients keep working. `legalBasis` is free-text and may be NULL.
 --   `obhodId` links the record to a walk-around (TB_OBHODI). May be NULL
 --   for records created outside a walk. The walk row must already exist
 --   (FK is validated server-side) - the client should POST the walk first.
@@ -55,6 +60,8 @@
 --         "description": "...",
 --         "observers":  ["...", ...],
 --         "actionTaken": "...",
+--         "legalBasis": "..." | null,
+--         "caseStatus": "Odprto" | "V obravnavi" | "Zaključeno" | "Predano drugi službi",
 --         "proposedType": "..." | null,
 --         "obhodId":    "..." | null,
 --         "photos":     [{ "id": "...", "mimeType": "image/jpeg" }, ...]
@@ -115,8 +122,8 @@ BEGIN
   APEX_JSON.open_array('records');
   FOR rec IN (
     SELECT motnja_id, geo_sirina, geo_dolzina, natancnost_lok,
-           cas_opazovanja, opis, ukrepanje, predlog_tipa, ustvarjen,
-           ustvarjen_od, obhod_id
+           cas_opazovanja, opis, ukrepanje, zakonska_podlaga, status_obravnave,
+           predlog_tipa, ustvarjen, ustvarjen_od, obhod_id
       FROM tb_motnje
      WHERE org_id = l_ctx.org_id
      ORDER BY cas_opazovanja DESC, ustvarjen DESC
@@ -135,6 +142,8 @@ BEGIN
     APEX_JSON.write('createdBy',    rec.ustvarjen_od);
     APEX_JSON.write('description',  rec.opis);
     APEX_JSON.write('actionTaken',  rec.ukrepanje);
+    APEX_JSON.write('legalBasis',   rec.zakonska_podlaga);
+    APEX_JSON.write('caseStatus',   rec.status_obravnave);
     APEX_JSON.write('proposedType', rec.predlog_tipa);
     APEX_JSON.write('obhodId',      rec.obhod_id);
 
@@ -239,6 +248,8 @@ DECLARE
   l_observed_str VARCHAR2(40);
   l_description  CLOB;
   l_action       VARCHAR2(50);
+  l_legal        VARCHAR2(200);
+  l_case_status  VARCHAR2(30);
   l_proposed     VARCHAR2(500);
   l_obhod_id     VARCHAR2(36);
   l_types_n      PLS_INTEGER;
@@ -285,8 +296,17 @@ BEGIN
   l_observed_str := APEX_JSON.get_varchar2(p_path => 'observedAt');
   l_description  := APEX_JSON.get_clob    (p_path => 'description');
   l_action       := APEX_JSON.get_varchar2(p_path => 'actionTaken');
+  l_legal        := APEX_JSON.get_varchar2(p_path => 'legalBasis');
+  l_case_status  := APEX_JSON.get_varchar2(p_path => 'caseStatus');
   l_proposed     := APEX_JSON.get_varchar2(p_path => 'proposedType');
   l_obhod_id     := APEX_JSON.get_varchar2(p_path => 'obhodId');
+
+  -- Defense in depth: older clients won't send caseStatus. The column is
+  -- NOT NULL with DB-side default 'Odprto', and an INSERT with a NULL bind
+  -- would fail the constraint - so substitute the default here.
+  IF l_case_status IS NULL THEN
+    l_case_status := 'Odprto';
+  END IF;
 
   IF l_motnja_id IS NULL
      OR l_lat IS NULL OR l_lon IS NULL
@@ -332,10 +352,12 @@ BEGIN
   --    the walk before any of its disturbances.
   INSERT INTO tb_motnje (
     motnja_id, org_id, geo_sirina, geo_dolzina, natancnost_lok,
-    cas_opazovanja, opis, ukrepanje, predlog_tipa, obhod_id, ustvarjen_od
+    cas_opazovanja, opis, ukrepanje, zakonska_podlaga, status_obravnave,
+    predlog_tipa, obhod_id, ustvarjen_od
   ) VALUES (
     l_motnja_id, l_ctx.org_id, l_lat, l_lon, l_loc_acc,
-    l_observed_at, l_description, l_action, l_proposed, l_obhod_id, l_ctx.email
+    l_observed_at, l_description, l_action, l_legal, l_case_status,
+    l_proposed, l_obhod_id, l_ctx.email
   );
 
   -- 5. Insert type junction rows
@@ -435,6 +457,8 @@ DECLARE
   l_observed_at  TIMESTAMP;
   l_description  CLOB;
   l_action       VARCHAR2(50);
+  l_legal        VARCHAR2(200);
+  l_case_status  VARCHAR2(30);
   l_proposed     VARCHAR2(500);
   l_obhod_id     VARCHAR2(36);
   l_types_n      PLS_INTEGER;
@@ -477,8 +501,22 @@ BEGIN
   l_observed_str := APEX_JSON.get_varchar2(p_path => 'observedAt');
   l_description  := APEX_JSON.get_clob    (p_path => 'description');
   l_action       := APEX_JSON.get_varchar2(p_path => 'actionTaken');
+  l_legal        := APEX_JSON.get_varchar2(p_path => 'legalBasis');
+  l_case_status  := APEX_JSON.get_varchar2(p_path => 'caseStatus');
   l_proposed     := APEX_JSON.get_varchar2(p_path => 'proposedType');
   l_obhod_id     := APEX_JSON.get_varchar2(p_path => 'obhodId');
+
+  -- Older PUT-capable clients won't send caseStatus; preserve the existing
+  -- DB row's value rather than NULLing it out. Easier than COALESCEing in SQL.
+  IF l_case_status IS NULL THEN
+    BEGIN
+      SELECT status_obravnave INTO l_case_status
+        FROM tb_motnje WHERE motnja_id = l_motnja_id;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        l_case_status := 'Odprto';
+    END;
+  END IF;
 
   IF l_lat IS NULL OR l_lon IS NULL OR l_loc_acc IS NULL
      OR l_observed_str IS NULL OR l_action IS NULL
@@ -527,16 +565,18 @@ BEGIN
   END IF;
 
   UPDATE tb_motnje
-     SET geo_sirina     = l_lat,
-         geo_dolzina    = l_lon,
-         natancnost_lok = l_loc_acc,
-         cas_opazovanja = l_observed_at,
-         opis           = l_description,
-         ukrepanje      = l_action,
-         predlog_tipa   = l_proposed,
-         obhod_id       = l_obhod_id,
-         spremenjen_od  = l_ctx.email,
-         spremenjen     = SYSTIMESTAMP
+     SET geo_sirina       = l_lat,
+         geo_dolzina      = l_lon,
+         natancnost_lok   = l_loc_acc,
+         cas_opazovanja   = l_observed_at,
+         opis             = l_description,
+         ukrepanje        = l_action,
+         zakonska_podlaga = l_legal,
+         status_obravnave = l_case_status,
+         predlog_tipa     = l_proposed,
+         obhod_id         = l_obhod_id,
+         spremenjen_od    = l_ctx.email,
+         spremenjen       = SYSTIMESTAMP
    WHERE motnja_id = l_motnja_id;
 
   -- Replace junctions wholesale: simpler than diffing.

@@ -13,8 +13,10 @@ class Disturbance {
     required this.photos,
     required this.observers,
     required this.actionTaken,
+    required this.caseStatus,
     required this.pendingSync,
     required this.createdAt,
+    this.legalBasis,
     this.proposedType,
     this.createdBy,
     this.obhodId,
@@ -30,6 +32,12 @@ class Disturbance {
   final List<DisturbancePhoto> photos;
   final List<String> observers;
   final String actionTaken;
+  // Free-text legal basis for the action taken against the perpetrator.
+  // Currently nullable; the dropdown will be populated later.
+  final String? legalBasis;
+  // Workflow state. DB-side CHECK pins this to: 'Odprto', 'V obravnavi',
+  // 'Zaključeno', 'Predano drugi službi'. Default 'Odprto' for new records.
+  final String caseStatus;
   final bool pendingSync;
   final DateTime createdAt;
   final String? proposedType;
@@ -53,6 +61,8 @@ class Disturbance {
     List<DisturbancePhoto>? photos,
     List<String>? observers,
     String? actionTaken,
+    String? legalBasis,
+    String? caseStatus,
     bool? pendingSync,
     DateTime? createdAt,
     String? proposedType,
@@ -70,6 +80,8 @@ class Disturbance {
       photos: photos ?? this.photos,
       observers: observers ?? this.observers,
       actionTaken: actionTaken ?? this.actionTaken,
+      legalBasis: legalBasis ?? this.legalBasis,
+      caseStatus: caseStatus ?? this.caseStatus,
       pendingSync: pendingSync ?? this.pendingSync,
       createdAt: createdAt ?? this.createdAt,
       proposedType: proposedType ?? this.proposedType,
@@ -89,6 +101,8 @@ class Disturbance {
         'photos': photos.map((p) => p.toJson()).toList(),
         'observers': observers,
         'actionTaken': actionTaken,
+        'legalBasis': legalBasis,
+        'caseStatus': caseStatus,
         'pendingSync': pendingSync,
         'createdAt': createdAt.toIso8601String(),
         'proposedType': proposedType,
@@ -110,6 +124,11 @@ class Disturbance {
       photos: _readPhotos(json),
       observers: (json['observers'] as List<dynamic>).cast<String>(),
       actionTaken: json['actionTaken'] as String,
+      // Records persisted before these fields existed will be missing both
+      // keys; default legalBasis to null and caseStatus to 'Odprto' so the
+      // local store rehydrates without throwing.
+      legalBasis: json['legalBasis'] as String?,
+      caseStatus: (json['caseStatus'] as String?) ?? 'Odprto',
       pendingSync: json['pendingSync'] as bool,
       createdAt: DateTime.parse(json['createdAt'] as String),
       proposedType: json['proposedType'] as String?,

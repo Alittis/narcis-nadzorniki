@@ -105,25 +105,29 @@ BEGIN
   IF l_exists = 0 THEN
     EXECUTE IMMEDIATE q'~
       CREATE TABLE tb_motnje (
-        motnja_id        VARCHAR2(36)   NOT NULL,
-        org_id           NUMBER         NOT NULL,
-        geo_sirina       NUMBER(10,7)   NOT NULL,
-        geo_dolzina      NUMBER(10,7)   NOT NULL,
-        natancnost_lok   VARCHAR2(20)   NOT NULL,
-        cas_opazovanja   TIMESTAMP      NOT NULL,
-        opis             CLOB           NULL,
-        ukrepanje        VARCHAR2(50)   NOT NULL,
-        predlog_tipa     VARCHAR2(500)  NULL,
-        ustvarjen_od     VARCHAR2(255)  NOT NULL,
-        ustvarjen        TIMESTAMP      DEFAULT SYSTIMESTAMP NOT NULL,
-        spremenjen_od    VARCHAR2(255)  NULL,
-        spremenjen       TIMESTAMP      NULL,
-        CONSTRAINT pk_tb_motnje      PRIMARY KEY (motnja_id),
-        CONSTRAINT fk_tb_motnje_org  FOREIGN KEY (org_id)
-                                     REFERENCES narcis_organizacije (id),
-        CONSTRAINT ck_tb_motnje_lat  CHECK (geo_sirina  BETWEEN -90  AND 90),
-        CONSTRAINT ck_tb_motnje_lon  CHECK (geo_dolzina BETWEEN -180 AND 180),
-        CONSTRAINT ck_tb_motnje_loc  CHECK (natancnost_lok IN ('Natančna','Približna'))
+        motnja_id         VARCHAR2(36)   NOT NULL,
+        org_id            NUMBER         NOT NULL,
+        geo_sirina        NUMBER(10,7)   NOT NULL,
+        geo_dolzina       NUMBER(10,7)   NOT NULL,
+        natancnost_lok    VARCHAR2(20)   NOT NULL,
+        cas_opazovanja    TIMESTAMP      NOT NULL,
+        opis              CLOB           NULL,
+        ukrepanje         VARCHAR2(50)   NOT NULL,
+        zakonska_podlaga  VARCHAR2(200)  NULL,
+        status_obravnave  VARCHAR2(30)   DEFAULT 'Odprto' NOT NULL,
+        predlog_tipa      VARCHAR2(500)  NULL,
+        ustvarjen_od      VARCHAR2(255)  NOT NULL,
+        ustvarjen         TIMESTAMP      DEFAULT SYSTIMESTAMP NOT NULL,
+        spremenjen_od     VARCHAR2(255)  NULL,
+        spremenjen        TIMESTAMP      NULL,
+        CONSTRAINT pk_tb_motnje       PRIMARY KEY (motnja_id),
+        CONSTRAINT fk_tb_motnje_org   FOREIGN KEY (org_id)
+                                      REFERENCES narcis_organizacije (id),
+        CONSTRAINT ck_tb_motnje_lat   CHECK (geo_sirina  BETWEEN -90  AND 90),
+        CONSTRAINT ck_tb_motnje_lon   CHECK (geo_dolzina BETWEEN -180 AND 180),
+        CONSTRAINT ck_tb_motnje_loc   CHECK (natancnost_lok IN ('Natančna','Približna')),
+        CONSTRAINT ck_tb_motnje_stat  CHECK (status_obravnave IN
+                                             ('Odprto','V obravnavi','Zaključeno','Predano drugi službi'))
       )
     ~';
     EXECUTE IMMEDIATE 'CREATE INDEX ix_tb_motnje_org_cas ON tb_motnje (org_id, cas_opazovanja DESC)';
@@ -211,6 +215,45 @@ BEGIN
     -- compressed so plain SECUREFILE storage is the right default; revisit
     -- if Advanced Compression is later licensed on this database.
     EXECUTE IMMEDIATE 'CREATE INDEX ix_tb_motnje_foto_mot ON tb_motnje_foto (motnja_id)';
+  END IF;
+END;
+/
+
+-- 7. Add ZAKONSKA_PODLAGA / STATUS_OBRAVNAVE to existing TB_MOTNJE ----------
+-- Live deployments already have TB_MOTNJE; the CREATE block above is a no-op
+-- there. These idempotent ALTERs back-fill the two new columns. STATUS_OBRAVNAVE
+-- gets DEFAULT 'Odprto' NOT NULL in one statement so existing rows are filled
+-- atomically without a second UPDATE pass.
+DECLARE
+  l_col_lp NUMBER;
+  l_col_so NUMBER;
+  l_ck     NUMBER;
+BEGIN
+  SELECT COUNT(*) INTO l_col_lp
+    FROM user_tab_columns
+   WHERE table_name = 'TB_MOTNJE' AND column_name = 'ZAKONSKA_PODLAGA';
+  IF l_col_lp = 0 THEN
+    EXECUTE IMMEDIATE 'ALTER TABLE tb_motnje ADD zakonska_podlaga VARCHAR2(200) NULL';
+  END IF;
+
+  SELECT COUNT(*) INTO l_col_so
+    FROM user_tab_columns
+   WHERE table_name = 'TB_MOTNJE' AND column_name = 'STATUS_OBRAVNAVE';
+  IF l_col_so = 0 THEN
+    EXECUTE IMMEDIATE
+      'ALTER TABLE tb_motnje ADD status_obravnave VARCHAR2(30) DEFAULT ''Odprto'' NOT NULL';
+  END IF;
+
+  SELECT COUNT(*) INTO l_ck
+    FROM user_constraints
+   WHERE table_name = 'TB_MOTNJE' AND constraint_name = 'CK_TB_MOTNJE_STAT';
+  IF l_ck = 0 THEN
+    EXECUTE IMMEDIATE q'~
+      ALTER TABLE tb_motnje
+        ADD CONSTRAINT ck_tb_motnje_stat
+        CHECK (status_obravnave IN
+               ('Odprto','V obravnavi','Zaključeno','Predano drugi službi'))
+    ~';
   END IF;
 END;
 /
