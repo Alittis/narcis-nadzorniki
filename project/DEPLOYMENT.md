@@ -65,7 +65,10 @@ Expected: `si.terenska.beleznica` present; `com.example` and `BACKGROUND_LOCATIO
 
 Upload the AAB to **Google Play Console → Internal testing → Create new release**, attach the testers list, and roll out. Play App Signing re-signs with the app-signing key automatically.
 
-### 3.3 Rollback
+### 3.3 Closed testing — store-listing copy, App Content, tester onboarding
+This file (DEPLOYMENT.md) covers the build / signing / upload pipeline. The **Closed Test workflow** — full Slovene + English store listing, release notes, every App Content questionnaire answer, the Data Safety form, the tester invitation email, and the per-phase Play Console click-path — lives in [PLAY_CLOSED_TEST.md](PLAY_CLOSED_TEST.md). Read that doc when promoting from Internal to Closed (or shipping a fresh Closed release).
+
+### 3.4 Rollback
 Play Console doesn't allow rollback of an internal-testing release in place — instead, build a higher `versionCode` with the previous source state and roll that out:
 ```bash
 git checkout <previous-tag>

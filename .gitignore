@@ -50,3 +50,8 @@ app.*.map.json
 /android/key.properties
 *.jks
 *.keystore
+
+# Local-only credentials sidecars referenced from /project docs (e.g. the
+# Google Play App-access demo password). Email goes in the public doc;
+# password goes here so it stays out of git history.
+/project/.credentials.local.md
