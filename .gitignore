@@ -55,3 +55,9 @@ app.*.map.json
 # Google Play App-access demo password). Email goes in the public doc;
 # password goes here so it stays out of git history.
 /project/.credentials.local.md
+
+# Claude Code per-machine state. .claude/settings.json (shared, no .local)
+# can be committed if/when a team-wide permission allowlist is desired;
+# the .local variant and worktrees scratch dir stay off the wire.
+.claude/settings.local.json
+.claude/worktrees/
