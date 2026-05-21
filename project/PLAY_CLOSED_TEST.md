@@ -503,7 +503,7 @@ For each tester collected via reply email, store: full name, role / organisation
 | Asset | Spec | Status | Source |
 |---|---|---|---|
 | App icon (Play listing) | 512×512 PNG, 32-bit, < 1 MB | Need to generate from existing 1024×1024 | `sips -z 512 512 assets/icon/app_icon.png --out /tmp/play_icon_512.png` |
-| Feature graphic | 1024×500 PNG/JPG, 24-bit (no alpha), < 15 MB | **Missing — must be authored** | Suggest a green-background banner mirroring the launcher icon palette (`#2E7D32` background, white narcissus icon centered, "Terenska beležnica" wordmark in white). Author once, drop into `tools/icon/` and add a small Python builder mirroring `tools/icon/build_icon.py`. |
+| Feature graphic | 1024×500 PNG/JPG, 24-bit (no alpha), < 15 MB | Builder authored 2026-05-21; regenerate per upload | `python3 tools/icon/build_feature_graphic.py` → `/tmp/play_feature_graphic_1024x500.png` (~77 KB at 24-bit RGB). Flower on the left, two-line "Terenska / beležnica" wordmark stacked on the right; title font auto-sizes to fit Play's 80% center safe zone. Reuses `build_icon.draw_flower()` + the green palette, so launcher-icon tweaks propagate automatically. |
 | Phone screenshots | 16:9 or 9:16, 320–3840 px short edge, JPG/24-bit PNG, no alpha. 2 minimum, 8 maximum | **Missing — capture from A56** | Capture order: login → home map → form → detail → walk-active → profile. |
 | 7-inch tablet screenshots | optional | skip | n/a |
 | 10-inch tablet screenshots | optional | skip | n/a |
@@ -525,7 +525,7 @@ For each tester collected via reply email, store: full name, role / organisation
 
 - [ ] Provision the Google review demo account in NarcIS; paste creds into §4.2 of this doc.
 - [ ] Decide tester-source (Google Group vs. email list); create the chosen artifact.
-- [ ] Author the 1024×500 feature graphic and add a builder under `tools/icon/`.
+- [x] Author the 1024×500 feature graphic and add a builder under `tools/icon/`. (2026-05-21 — `tools/icon/build_feature_graphic.py`; output at `/tmp/play_feature_graphic_1024x500.png`)
 - [ ] Capture the 6 phone screenshots on the A56.
 - [ ] Confirm the chosen Closed track name (`ARSO – zaprti test`) is the right label for stakeholders.
 - [ ] Confirm category choice (Productivity vs. Tools).
