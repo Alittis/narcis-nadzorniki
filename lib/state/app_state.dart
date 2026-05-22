@@ -134,6 +134,18 @@ class AppState extends ChangeNotifier {
     _activePoints = const [];
     await _walksStore.clearActive();
 
+    // Clear cached records + walks + recently-used observer suggestions so a
+    // subsequent login as a DIFFERENT user on the same device doesn't see
+    // the previous user's data. Persisted store files are overwritten so the
+    // next AppState.init() loads empty. Photo files under
+    // <docs>/disturbance_photos/ become orphans (no record points at them);
+    // sweeping them is a follow-up.
+    _records = [];
+    _walks = [];
+    _lastObservers = [];
+    await _localStore.save(_records);
+    await _walksStore.save(_walks);
+
     _currentUser = null;
     _sessionPassword = null;
     _lastRemoteIds = null;
@@ -576,7 +588,17 @@ class AppState extends ChangeNotifier {
   }
 
   List<Disturbance> _mergeRemoteIntoLocal(List<RemoteDisturbance> remote) {
-    final byId = {for (final r in _records) r.id: r};
+    final remoteIds = remote.map((r) => r.id).toSet();
+    // Seed with local records that are either (a) still claimed by the
+    // server or (b) queued for push (pendingSync). This evicts non-pending
+    // local records the server no longer reports — typically because the
+    // caller's org changed (e.g. same device, different tester account).
+    // Without this gate, the previous session's records render on the map
+    // for the new user (cross-account bleed).
+    final byId = <String, Disturbance>{
+      for (final r in _records)
+        if (r.pendingSync || remoteIds.contains(r.id)) r.id: r,
+    };
     for (final remoteRec in remote) {
       final local = byId[remoteRec.id];
       if (local == null) {
@@ -994,7 +1016,13 @@ class AppState extends ChangeNotifier {
   }
 
   List<Walk> _mergeRemoteWalksIntoLocal(List<RemoteWalk> remote) {
-    final byId = {for (final w in _walks) w.id: w};
+    final remoteIds = remote.map((w) => w.id).toSet();
+    // Same cross-account-bleed eviction as _mergeRemoteIntoLocal — keep
+    // pendingSync walks plus anything the server still claims.
+    final byId = <String, Walk>{
+      for (final w in _walks)
+        if (w.pendingSync || remoteIds.contains(w.id)) w.id: w,
+    };
     for (final r in remote) {
       final local = byId[r.id];
       if (local == null) {
