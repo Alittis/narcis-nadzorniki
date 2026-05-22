@@ -684,13 +684,10 @@ class _TopChrome extends StatelessWidget {
                     enabled: false,
                     onTap: () => onPlaceholderTap('Parcele'),
                   ),
-                  _LayerChip(
-                    icon: Icons.history,
-                    label: 'Zgodovina',
-                    selected: showLegacy,
-                    enabled: true,
-                    onTap: onLegacyToggle,
-                  ),
+                  // "Zgodovina" chip removed 2026-05-22 — legacy overlay
+                  // data is now in TB_MOTNJE (commit 1430a5a). Full removal
+                  // of the layer (AppState field, loader, detail screen,
+                  // showLegacy/onLegacyToggle params) is a follow-up.
                 ],
               ),
             ),

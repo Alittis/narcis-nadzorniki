@@ -49,7 +49,11 @@ class AppState extends ChangeNotifier {
 
   List<Disturbance> _records = [];
   List<LegacyDisturbance> _legacyRecords = [];
-  bool _showLegacy = true;
+  // Legacy overlay disabled: its data now lives in TB_MOTNJE proper (per the
+  // 2026-05-22 Notranjski backfill, commit 1430a5a) and would duplicate the
+  // regular disturbance markers. Field + loader + detail screen kept for a
+  // follow-up full removal.
+  bool _showLegacy = false;
   bool _offlineOverride = false;
   bool _isSyncing = false;
   ConnectivityResult _connectivityResult = ConnectivityResult.none;
