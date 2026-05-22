@@ -4,6 +4,11 @@
 *.pyc
 *.swp
 .DS_Store
+
+# Generated TB_MOTNJE-shaped CSV output from the Notranjski legacy import
+# (tools/legacy_to_tb_motnje_csv.py). Regenerated on demand from the bundled
+# legacy JSON; large enough not to belong in git history.
+/tools/legacy_csv_out/
 .atom/
 .build/
 .buildlog/
