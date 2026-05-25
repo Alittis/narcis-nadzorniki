@@ -224,7 +224,27 @@ The app is intended for nature-protection wardens and authorised collaborators o
 This release is part of a closed test. Participation requires an invitation from the administrator and an existing NarcIS account with the appropriate authorization. For access or feedback, write to admin@alittis.com.
 ```
 
-### 3.3 Release notes — v1.0.1+2
+### 3.3 Release notes — v1.1.3+6 (current)
+
+**Slovene** (max 500 chars):
+```
+Različica 1.1.3 (build 6)
+• Nova plast "Parcele": katastrske parcele iz javnega WMS-ja GURS (meje + številke pri večji povečavi). Vir: e-prostor, CC BY 4.0.
+• Spodnja vrstica preoblikovana: drsni izbirnik načina (Motnje / Obhodi) z dvignjenim "+" gumbom.
+• Po prijavi se počistijo zapisi prejšnjega uporabnika — menjava računa na napravi ne pušča sledi.
+• Zgodovinski zapisi Notranjskega regijskega parka so zdaj del rednih motenj.
+```
+
+**English** (max 500 chars):
+```
+Version 1.1.3 (build 6)
+• New "Parcele" map layer: Slovenian cadastral parcels from the public GURS WMS (boundaries + parcel numbers at higher zoom). Source: e-prostor, CC BY 4.0.
+• Bottom bar redesigned: sliding mode picker (Motnje / Obhodi) with a raised "+" FAB.
+• On sign-in, records from a previously signed-in user are cleared — switching accounts on a shared device no longer leaks data.
+• Historical Notranjska Regional Park entries are now part of the regular Motnje layer.
+```
+
+### 3.3a Release notes — v1.0.1+2 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
