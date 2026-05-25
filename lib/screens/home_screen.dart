@@ -1052,45 +1052,102 @@ class _ModePill extends StatelessWidget {
   final AppMode activeMode;
   final ValueChanged<AppMode> onTap;
 
+  // Per-slot geometry — kept in one place so the thumb position math
+  // (slot * index + centering offset) stays self-consistent.
+  static const double _slot = 44;
+  static const double _thumb = 40;
+  static const Duration _slide = Duration(milliseconds: 240);
+  static const Curve _slideCurve = Curves.easeOutCubic;
+
   @override
   Widget build(BuildContext context) {
+    final modes = AppMode.values;
+    final activeIndex = modes.indexOf(activeMode);
+    final activeColor = _modeDefs[activeMode]!.color;
+    final scheme = Theme.of(context).colorScheme;
+    // Slightly darker than surface so the raised thumb reads as elevated
+    // against a recessed groove.
+    final pillColor =
+        Color.lerp(scheme.surface, Colors.black, 0.06) ?? scheme.surface;
+
     return Material(
-      color: Theme.of(context).colorScheme.surface,
+      color: pillColor,
       shape: const StadiumBorder(),
-      elevation: 4,
+      elevation: 2,
+      shadowColor: Colors.black54,
       child: Padding(
         padding: const EdgeInsets.all(4),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: AppMode.values.map((mode) {
-            final def = _modeDefs[mode]!;
-            final isActive = mode == activeMode;
-            final Color iconColor;
-            if (!def.enabled) {
-              iconColor = Colors.black26;
-            } else if (isActive) {
-              iconColor = Colors.white;
-            } else {
-              iconColor = Colors.black87;
-            }
-            return InkWell(
-              customBorder: const CircleBorder(),
-              onTap: () => onTap(mode),
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 2),
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: isActive ? def.color : Colors.transparent,
-                  shape: BoxShape.circle,
-                ),
-                child: Tooltip(
-                  message: def.label,
-                  child: Icon(def.icon, color: iconColor, size: 22),
+        child: SizedBox(
+          width: modes.length * _slot,
+          height: _thumb,
+          child: Stack(
+            children: [
+              AnimatedPositioned(
+                duration: _slide,
+                curve: _slideCurve,
+                left: activeIndex * _slot + (_slot - _thumb) / 2,
+                top: 0,
+                width: _thumb,
+                height: _thumb,
+                child: AnimatedContainer(
+                  duration: _slide,
+                  curve: _slideCurve,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Color.lerp(activeColor, Colors.white, 0.28) ??
+                            activeColor,
+                        activeColor,
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: activeColor.withValues(alpha: 0.45),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                      const BoxShadow(
+                        color: Colors.black38,
+                        blurRadius: 4,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            );
-          }).toList(),
+              Row(
+                children: modes.map((mode) {
+                  final def = _modeDefs[mode]!;
+                  final isActive = mode == activeMode;
+                  final Color iconColor;
+                  if (!def.enabled) {
+                    iconColor = Colors.black26;
+                  } else if (isActive) {
+                    iconColor = Colors.white;
+                  } else {
+                    iconColor = Colors.black87;
+                  }
+                  return SizedBox(
+                    width: _slot,
+                    height: _thumb,
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: () => onTap(mode),
+                      child: Center(
+                        child: Tooltip(
+                          message: def.label,
+                          child: Icon(def.icon, color: iconColor, size: 22),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1116,9 +1173,9 @@ class _SpeedDialMiniFabs extends StatelessWidget {
       child: SafeArea(
         top: false,
         minimum: const EdgeInsets.only(bottom: 8),
-        // Bar inner vertical pad (12) + plus button (56) + gap (12) above the +.
+        // Bar inner vertical pad (12) + plus button (64) + lift (6) + gap (12).
         child: Padding(
-          padding: const EdgeInsets.only(bottom: 80),
+          padding: const EdgeInsets.only(bottom: 94),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -1159,21 +1216,81 @@ class _PlusButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: color,
-      shape: const CircleBorder(),
-      elevation: 6,
-      child: InkWell(
-        customBorder: const CircleBorder(),
+    return Transform.translate(
+      // Lift the FAB above the pill's vertical centerline so it reads as
+      // hovering over the bottom row rather than sitting flush with it.
+      offset: const Offset(0, -6),
+      child: _RaisedCircleButton(
+        color: color,
+        size: 64,
         onTap: onTap,
-        child: SizedBox(
-          width: 56,
-          height: 56,
-          child: Center(
-            child: AnimatedRotation(
-              turns: rotated ? 0.125 : 0,
-              duration: const Duration(milliseconds: 150),
-              child: Icon(icon, color: Colors.white, size: 28),
+        child: AnimatedRotation(
+          turns: rotated ? 0.125 : 0,
+          duration: const Duration(milliseconds: 150),
+          child: Icon(icon, color: Colors.white, size: 30),
+        ),
+      ),
+    );
+  }
+}
+
+class _RaisedCircleButton extends StatelessWidget {
+  const _RaisedCircleButton({
+    required this.color,
+    required this.size,
+    required this.onTap,
+    required this.child,
+  });
+
+  final Color color;
+  final double size;
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        boxShadow: [
+          // Wide diffuse colored glow — atmospheric, not edge-defining.
+          BoxShadow(
+            color: color.withValues(alpha: 0.22),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+          // Tight neutral contact shadow — defines the edge.
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 5,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        elevation: 0,
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: Ink(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color.lerp(color, Colors.white, 0.3) ?? color,
+                color,
+              ],
+            ),
+          ),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onTap,
+            child: SizedBox(
+              width: size,
+              height: size,
+              child: Center(child: child),
             ),
           ),
         ),
@@ -1213,19 +1330,11 @@ class _MiniSpeedDialButton extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        Material(
+        _RaisedCircleButton(
           color: color,
-          shape: const CircleBorder(),
-          elevation: 4,
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: onTap,
-            child: SizedBox(
-              width: 48,
-              height: 48,
-              child: Icon(icon, color: Colors.white, size: 24),
-            ),
-          ),
+          size: 48,
+          onTap: onTap,
+          child: Icon(icon, color: Colors.white, size: 24),
         ),
       ],
     );
