@@ -17,6 +17,49 @@ const String _esriLabelsUrl =
     'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}';
 const String _userAgent = 'si.terenska.beleznica';
 
+// GURS public WMS (kataster nepremičnin / real-estate cadaster), CC BY 4.0.
+// The PARCELE layer publishes two single-purpose styles; we stack them so
+// the user gets both boundaries and labels. Server enforces its own scale
+// gates: boundaries visible 1:50 → 1:10 000 (≈ z16+), labels visible
+// 1:50 → 1:5 000 (≈ z17+). The TileLayer minZooms match those gates so
+// we don't ship requests the server would answer with a blank PNG.
+const String _gursParceleWmsBase =
+    'https://ipi.eprostor.gov.si/wms-si-gurs-kn/ows?';
+const String _gursParceleLayer = 'SI.GURS.KN:PARCELE';
+
+/// Translucent overlay of Slovenian cadastral parcels: green polygon
+/// outlines at z ≥ 16, parcel-number labels at z ≥ 17.
+List<Widget> parceleOverlayTileLayers() {
+  return [
+    TileLayer(
+      wmsOptions: WMSTileLayerOptions(
+        baseUrl: _gursParceleWmsBase,
+        layers: const [_gursParceleLayer],
+        styles: const ['nep_kn_parcele'],
+        format: 'image/png',
+        transparent: true,
+        version: '1.3.0',
+      ),
+      minZoom: 16,
+      maxZoom: 19,
+      userAgentPackageName: _userAgent,
+    ),
+    TileLayer(
+      wmsOptions: WMSTileLayerOptions(
+        baseUrl: _gursParceleWmsBase,
+        layers: const [_gursParceleLayer],
+        styles: const ['nep_kn_parcele_lbl'],
+        format: 'image/png',
+        transparent: true,
+        version: '1.3.0',
+      ),
+      minZoom: 17,
+      maxZoom: 19,
+      userAgentPackageName: _userAgent,
+    ),
+  ];
+}
+
 List<Widget> basemapTileLayers(BasemapMode mode) {
   switch (mode) {
     case BasemapMode.osm:

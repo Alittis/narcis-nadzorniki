@@ -217,6 +217,18 @@ Shared implementation: `lib/widgets/basemap.dart` (`BasemapMode`, `basemapTileLa
 
 No API key is required for either provider at this time. STATUS: UNKNOWN – REQUIRES CONFIRMATION whether Esri terms permit production/commercial use of this app without licensing.
 
+### 10.1 Overlay: Cadastral Parcels (GURS, WMS)
+Optional translucent overlay of Slovenian cadastral parcel boundaries with parcel-number labels, toggled by the "Parcele" chip in the home-map layer row.
+
+- **Endpoint**: `https://ipi.eprostor.gov.si/wms-si-gurs-kn/ows` (OGC WMS 1.3.0, public, no auth).
+- **Layer**: `SI.GURS.KN:PARCELE`. **Styles** (stacked, two TileLayers): `nep_kn_parcele` for the green polygon outlines, `nep_kn_parcele_lbl` for the green parcel-number labels. Each style is single-purpose; picking only one of them was the cause of the 2026-05-25 "labels but no boundaries" bug.
+- **CRS used**: `EPSG:3857` (Web Mercator, matches the basemaps). Server also advertises `EPSG:3794` (SI-D96/TM), `4326`, `3035`, `3912`, `4258`, `4765`.
+- **Format**: `image/png`, transparent. Server-rendered per tile via `flutter_map`'s `WMSTileLayerOptions`; no local caching beyond the in-memory tile cache that `flutter_map` already keeps for basemap tiles.
+- **Zoom gating**: the WMS publishes scale-dependent visibility — boundaries at 1:50 → 1:10 000 (≈ z16+) and labels at 1:50 → 1:5 000 (≈ z17+). The two TileLayers carry matching `minZoom` values (16 and 17) so we don't ship requests the server would answer with a blank PNG. Below z16 the toggle stays on but nothing renders; the layer reappears as the user zooms in.
+- **Attribution**: data is published under CC BY 4.0 by GURS (Geodetska uprava RS, "Vir: GURS, e-prostor"). Attribution UI is **not yet rendered on-map** — same gap as OSM/Esri, tracked as a follow-up across all three providers rather than added piecemeal for this one layer.
+- **Discovery audit (2026-05-25)**: ruled-out endpoints — `gis.gov.si/arcgis` (expired SSL, retired), `prostor3.gov.si` / `prostor4.gov.si` (DNS/cert dead), `storitve.eprostor.gov.si/ows-pub-wms/` (alive but exposes only utility-infrastructure / topographic layers, not the cadaster), `geopedia.si` (DNS dead). Working endpoint located via the e-prostor INSPIRE metadata catalog at `eprostor.gov.si/imps/srv/api/q?any=katastrske+parcele&type=service`.
+- Implementation: `parceleOverlayTileLayers()` in `lib/widgets/basemap.dart` (returns the two stacked `TileLayer`s); toggle state `_showParcele` in `home_screen.dart` (widget-local, not persisted across launches — matches the Motnje/Obhodi toggles).
+
 ## 11. Legacy Data (Read-Only Historical Context)
 Historical disturbance records from another app (Notranjski regijski park's WordPress Formidable form at `nadzor.notranjski-park.si`) are bundled as a read-only JSON asset so observers can see prior field activity on the map.
 

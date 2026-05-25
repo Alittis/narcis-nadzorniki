@@ -97,6 +97,7 @@ class _HomeScreenState extends State<HomeScreen> {
   AppMode _activeMode = AppMode.motnje;
   bool _showMotnje = true;
   bool _showObhodi = false;
+  bool _showParcele = false;
 
   bool _plusExpanded = false;
   // Location stamped at the moment the user declared intent (tapped "+"),
@@ -424,6 +425,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   children: [
                     ...basemapTileLayers(_basemapMode),
+                    if (_showParcele) ...parceleOverlayTileLayers(),
                     if (_userLocation != null && _userAccuracy != null)
                       userAccuracyCircleLayer(
                         _userLocation!,
@@ -440,6 +442,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 basemapMode: _basemapMode,
                 showMotnje: _showMotnje,
                 showObhodi: _showObhodi,
+                showParcele: _showParcele,
                 showLegacy: state.showLegacy,
                 onAvatarTap: () {
                   Navigator.of(context).push(
@@ -453,6 +456,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     setState(() => _showMotnje = !_showMotnje),
                 onObhodiToggle: () =>
                     setState(() => _showObhodi = !_showObhodi),
+                onParceleToggle: () =>
+                    setState(() => _showParcele = !_showParcele),
                 onLegacyToggle: () => state.setShowLegacy(!state.showLegacy),
                 onPlaceholderTap: (label) => _showSnack('$label: kmalu.'),
               ),
@@ -585,6 +590,7 @@ class _TopChrome extends StatelessWidget {
     required this.basemapMode,
     required this.showMotnje,
     required this.showObhodi,
+    required this.showParcele,
     required this.showLegacy,
     required this.onAvatarTap,
     required this.onSearchTap,
@@ -592,6 +598,7 @@ class _TopChrome extends StatelessWidget {
     required this.onBasemapChanged,
     required this.onMotnjeToggle,
     required this.onObhodiToggle,
+    required this.onParceleToggle,
     required this.onLegacyToggle,
     required this.onPlaceholderTap,
   });
@@ -600,6 +607,7 @@ class _TopChrome extends StatelessWidget {
   final BasemapMode basemapMode;
   final bool showMotnje;
   final bool showObhodi;
+  final bool showParcele;
   final bool showLegacy;
   final VoidCallback onAvatarTap;
   final VoidCallback onSearchTap;
@@ -607,6 +615,7 @@ class _TopChrome extends StatelessWidget {
   final ValueChanged<BasemapMode> onBasemapChanged;
   final VoidCallback onMotnjeToggle;
   final VoidCallback onObhodiToggle;
+  final VoidCallback onParceleToggle;
   final VoidCallback onLegacyToggle;
   final ValueChanged<String> onPlaceholderTap;
 
@@ -680,9 +689,9 @@ class _TopChrome extends StatelessWidget {
                   _LayerChip(
                     icon: Icons.grid_on,
                     label: 'Parcele',
-                    selected: false,
-                    enabled: false,
-                    onTap: () => onPlaceholderTap('Parcele'),
+                    selected: showParcele,
+                    enabled: true,
+                    onTap: onParceleToggle,
                   ),
                   // "Zgodovina" chip removed 2026-05-22 — legacy overlay
                   // data is now in TB_MOTNJE (commit 1430a5a). Full removal
