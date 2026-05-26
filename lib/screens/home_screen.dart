@@ -6,7 +6,6 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:narcis_nadzorniki/data/map_view_store.dart';
-import 'package:narcis_nadzorniki/models/disturbance.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
 import 'package:narcis_nadzorniki/models/legacy_disturbance.dart';
 import 'package:narcis_nadzorniki/screens/detail_screen.dart';
@@ -528,8 +527,8 @@ class _HomeScreenState extends State<HomeScreen> {
         markers.add(
           Marker(
             point: LatLng(record.latitude, record.longitude),
-            width: 30,
-            height: 30,
+            width: 22,
+            height: 22,
             child: GestureDetector(
               onTap: () => _openLegacyDetail(record),
               child: const LegacyRecordMarker(),
@@ -539,42 +538,34 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
     if (_showMotnje) {
-      // Two passes so the user's own markers always sit on top of teammates'
-      // when they overlap. flutter_map draws markers in list order.
-      final mine = <Disturbance>[];
-      final others = <Disturbance>[];
-      for (final record in state.records) {
-        (state.isAuthoredByCurrentUser(record) ? mine : others).add(record);
-      }
-      Marker buildMarker(Disturbance record, {required bool isMine}) {
-        // Color encodes age (red ≤31d, orange ≤365d, blue older) for both
-        // own and teammate records; shape encodes authorship (own = filled
-        // disc, teammate = ring). White halo keeps both legible against
-        // any basemap.
-        return Marker(
-          point: LatLng(record.latitude, record.longitude),
-          width: 44,
-          height: 44,
-          child: GestureDetector(
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => DetailScreen(record: record),
-                ),
-              );
-            },
-            child: RecordMarker(
-              color: recordMarkerColorForAge(record.observedAt),
-              isMine: isMine,
+      // Sort by observedAt ascending so the youngest records end up last in
+      // the list and render on top — flutter_map draws markers in list order.
+      // Color encodes age (red ≤31d, orange ≤365d, blue older); shape encodes
+      // authorship (own = filled disc, teammate = ring). White halo keeps
+      // both legible against any basemap.
+      final sorted = [...state.records]
+        ..sort((a, b) => a.observedAt.compareTo(b.observedAt));
+      for (final record in sorted) {
+        markers.add(
+          Marker(
+            point: LatLng(record.latitude, record.longitude),
+            width: 32,
+            height: 32,
+            child: GestureDetector(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => DetailScreen(record: record),
+                  ),
+                );
+              },
+              child: RecordMarker(
+                color: recordMarkerColorForAge(record.observedAt),
+                isMine: state.isAuthoredByCurrentUser(record),
+              ),
             ),
           ),
         );
-      }
-      for (final r in others) {
-        markers.add(buildMarker(r, isMine: false));
-      }
-      for (final r in mine) {
-        markers.add(buildMarker(r, isMine: true));
       }
     }
     if (_userLocation != null) {

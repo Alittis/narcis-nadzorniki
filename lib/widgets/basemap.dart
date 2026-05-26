@@ -152,8 +152,8 @@ class RecordMarker extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Container(
-        width: 26,
-        height: 26,
+        width: 18,
+        height: 18,
         decoration: const BoxDecoration(
           shape: BoxShape.circle,
           color: Colors.white,
@@ -167,8 +167,8 @@ class RecordMarker extends StatelessWidget {
         ),
         alignment: Alignment.center,
         child: Container(
-          width: 20,
-          height: 20,
+          width: 14,
+          height: 14,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: color,
@@ -177,8 +177,8 @@ class RecordMarker extends StatelessWidget {
           child: isMine
               ? null
               : Container(
-                  width: 10,
-                  height: 10,
+                  width: 7,
+                  height: 7,
                   decoration: const BoxDecoration(
                     shape: BoxShape.circle,
                     color: Colors.white,
@@ -199,8 +199,8 @@ class LegacyRecordMarker extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Container(
-        width: 16,
-        height: 16,
+        width: 11,
+        height: 11,
         decoration: const BoxDecoration(
           shape: BoxShape.circle,
           color: Colors.white,
@@ -214,8 +214,8 @@ class LegacyRecordMarker extends StatelessWidget {
         ),
         alignment: Alignment.center,
         child: Container(
-          width: 12,
-          height: 12,
+          width: 8,
+          height: 8,
           decoration: const BoxDecoration(
             shape: BoxShape.circle,
             color: Colors.deepPurple,
