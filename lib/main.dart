@@ -56,9 +56,29 @@ class MotenjApp extends StatelessWidget {
           useMaterial3: true,
         ),
         home: Consumer<AppState>(
-          builder: (context, state, _) =>
-              state.isAuthenticated ? const HomeScreen() : const LoginScreen(),
+          builder: (context, state, _) {
+            // While init() restores any persisted session, show a brief splash
+            // instead of flashing the login screen on every cold start.
+            if (state.isBootstrapping) return const _SplashScreen();
+            return state.isAuthenticated
+                ? const HomeScreen()
+                : const LoginScreen();
+          },
         ),
+      ),
+    );
+  }
+}
+
+class _SplashScreen extends StatelessWidget {
+  const _SplashScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: Color(0xFF2E7D32),
+      body: Center(
+        child: CircularProgressIndicator(color: Colors.white),
       ),
     );
   }

@@ -63,6 +63,9 @@ http.Response _unauthorized() =>
         }),
         401);
 
+http.Response _okWithToken(String email, String token) => http.Response(
+    jsonEncode({'authenticated': true, 'user': email, 'token': token}), 200);
+
 void main() {
   group('AuthService.login (online path)', () {
     test('200 with authenticated:true succeeds', () async {
@@ -270,6 +273,81 @@ void main() {
       final r2 = await svc.login('alice@example.com', '', online: true);
       expect(r2.success, false);
       expect(calls, 0);
+    });
+  });
+
+  group('AuthService bearer token', () {
+    test('online login captures, returns and persists the token', () async {
+      final store = _InMemoryStore();
+      final svc = _service(
+        respond: (_) async => _okWithToken('alice@example.com', 'tok-xyz'),
+        store: store,
+      );
+      final result =
+          await svc.login('alice@example.com', 'hunter2', online: true);
+      expect(result.success, true);
+      expect(result.token, 'tok-xyz');
+
+      final session = await svc.readStoredSession();
+      expect(session, isNotNull);
+      expect(session!.email, 'alice@example.com');
+      expect(session.token, 'tok-xyz');
+    });
+
+    test('online login with no token leaves no restorable session', () async {
+      final store = _InMemoryStore();
+      final svc = _service(
+        respond: (_) async => _ok('alice@example.com'),
+        store: store,
+      );
+      final result =
+          await svc.login('alice@example.com', 'hunter2', online: true);
+      expect(result.success, true);
+      expect(result.token, isNull);
+      // PBKDF2 cache is written, but with no token there is no auto-login.
+      expect(await svc.readStoredSession(), isNull);
+    });
+
+    test('clearCache removes the persisted token', () async {
+      final store = _InMemoryStore();
+      final svc = _service(
+        respond: (_) async => _okWithToken('alice@example.com', 'tok-xyz'),
+        store: store,
+      );
+      await svc.login('alice@example.com', 'hunter2', online: true);
+      expect(await svc.readStoredSession(), isNotNull);
+
+      await svc.clearCache();
+      expect(await svc.readStoredSession(), isNull);
+    });
+
+    test('a definite 401 wipes a previously stored token', () async {
+      final store = _InMemoryStore();
+      final priming = _service(
+        respond: (_) async => _okWithToken('alice@example.com', 'tok-xyz'),
+        store: store,
+      );
+      await priming.login('alice@example.com', 'hunter2', online: true);
+      expect(await priming.readStoredSession(), isNotNull);
+
+      final svc = _service(respond: (_) async => _unauthorized(), store: store);
+      await svc.login('alice@example.com', 'hunter2', online: true);
+      expect(await svc.readStoredSession(), isNull);
+    });
+
+    test('revokeToken POSTs to /app-auth/logout with a Bearer header',
+        () async {
+      late http.Request captured;
+      final svc = _service(
+        respond: (req) async {
+          captured = req;
+          return http.Response('{"revoked":true}', 200);
+        },
+      );
+      await svc.revokeToken('tok-xyz');
+      expect(captured.method, 'POST');
+      expect(captured.url.path, endsWith('/app-auth/logout'));
+      expect(captured.headers['X-Narcis-Auth'], 'Bearer tok-xyz');
     });
   });
 }

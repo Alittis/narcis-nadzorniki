@@ -60,14 +60,22 @@ class AppState extends ChangeNotifier {
   StreamSubscription<dynamic>? _connectivitySub;
   List<String> _lastObservers = [];
   String? _currentUser;
-  // Plaintext password held in memory ONLY after a successful online login.
-  // Required because the disturbance CRUD endpoints re-authenticate every
-  // call via X-Narcis-Auth: Basic <base64(email:password)>. Cleared on
-  // logout, on a 401 from sync, and never written to disk - the offline
-  // cache stores a one-way PBKDF2 hash, not the plaintext.
-  // Implication: if the user logged in offline (cache hit, no plaintext),
-  // queued records do not sync until the next online login.
+  // Bearer session token: the primary sync credential. Minted by the server on
+  // a successful ONLINE login (see AuthService), persisted in secure storage,
+  // and restored on app start for a sticky session across cold starts. Sent as
+  // X-Narcis-Auth: Bearer <token> on every CRUD call - the password is never
+  // stored or re-sent. Cleared on logout and on a sync 401 (revoked/expired).
+  String? _sessionToken;
+  // Fallback credential: the plaintext password, held in memory ONLY for the
+  // current session and ONLY when the server didn't mint a token (older ORDS
+  // deploy). Never written to disk. If neither a token nor this is present
+  // (e.g. an offline manual login) queued records don't sync until the next
+  // online login.
   String? _sessionPassword;
+  // True until init() has restored any persisted session and decided whether to
+  // show Home or Login - lets main.dart show a splash instead of flashing the
+  // login screen on every cold start (incl. OS-killed background resumes).
+  bool _bootstrapping = true;
 
   // Set of motnja IDs the server reported on the most recent successful pull.
   // Used to drive the "out of sync" indicator: if the server has IDs we
@@ -97,7 +105,9 @@ class AppState extends ChangeNotifier {
   List<String> get lastObservers => List.unmodifiable(_lastObservers);
   String? get currentUser => _currentUser;
   bool get isAuthenticated => _currentUser != null;
-  bool get canSync => _currentUser != null && _sessionPassword != null;
+  bool get canSync =>
+      _currentUser != null && (_sessionToken != null || _sessionPassword != null);
+  bool get isBootstrapping => _bootstrapping;
 
   List<Walk> get walks => List.unmodifiable(_walks);
   Walk? get activeWalk => _activeWalk;
@@ -112,7 +122,17 @@ class AppState extends ChangeNotifier {
     );
     if (result.success) {
       _currentUser = result.user;
-      _sessionPassword = result.wasOffline ? null : password;
+      if (result.token != null) {
+        // Online login minted a token: persistent, password not retained.
+        _sessionToken = result.token;
+        _sessionPassword = null;
+      } else {
+        // No token: either an offline login (can't sync) or an older backend
+        // that doesn't mint - keep the password in memory for this session
+        // only so sync still works via the Basic fallback.
+        _sessionToken = null;
+        _sessionPassword = result.wasOffline ? null : password;
+      }
       notifyListeners();
       if (canSync) {
         unawaited(syncAll());
@@ -146,7 +166,17 @@ class AppState extends ChangeNotifier {
     await _localStore.save(_records);
     await _walksStore.save(_walks);
 
+    // Revoke the token server-side (best-effort, fire-and-forget so logout
+    // stays snappy on a poor connection). revokeToken captures the token by
+    // value, so clearing the local copy below doesn't disturb the in-flight
+    // request; if it never lands, the token still expires on its own.
+    final token = _sessionToken;
+    if (token != null) {
+      unawaited(_authService.revokeToken(token));
+    }
+
     _currentUser = null;
+    _sessionToken = null;
     _sessionPassword = null;
     _lastRemoteIds = null;
     _lastRemoteWalkIds = null;
@@ -156,9 +186,16 @@ class AppState extends ChangeNotifier {
 
   SyncCredentials? get _credentials {
     final email = _currentUser;
+    if (email == null) return null;
+    // Prefer the bearer token; fall back to the in-memory password (older
+    // backend that didn't mint a token).
+    final token = _sessionToken;
+    if (token != null) return SyncCredentials.token(token);
     final password = _sessionPassword;
-    if (email == null || password == null) return null;
-    return SyncCredentials(email: email, password: password);
+    if (password != null) {
+      return SyncCredentials.basic(email: email, password: password);
+    }
+    return null;
   }
 
   bool get isOnline => !_offlineOverride && _connectivityResult != ConnectivityResult.none;
@@ -218,36 +255,52 @@ class AppState extends ChangeNotifier {
   int get pendingCount => pendingPushCount + missingLocalCount;
 
   Future<void> init() async {
-    _records = await _localStore.load();
-    if (_records.isNotEmpty) {
-      _lastObservers = _records.last.observers;
-    }
-    _walks = await _walksStore.load();
-    // Resume any in-progress walk. The FGS background isolate is the
-    // source of truth for points; if its FGS is still running (Samsung
-    // Freecess froze main but kept the FGS alive), just rebuild the
-    // mirror from disk and re-bind the port. If the FGS isn't running
-    // but the file exists (e.g. app fully killed), restart the service
-    // — the handler will pick up the buffer from the file.
-    final restored = await _walksStore.loadActive();
-    if (restored != null) {
-      _activeWalk = restored;
-      _activePoints = restored.points;
-      final isRunning = await FlutterForegroundTask.isRunningService;
-      if (isRunning) {
-        await _bindWalkServicePort();
-        debugPrint('[walk] resumed active walk ${restored.id} '
-            '(FGS still running, ${restored.points.length} buffered points)');
-      } else {
-        await _startWalkService(restored);
-        debugPrint('[walk] resumed active walk ${restored.id} '
-            '(FGS restarted, ${restored.points.length} buffered points)');
-      }
-    }
     try {
-      _legacyRecords = await _legacyLoader.load();
-    } catch (_) {
-      _legacyRecords = const [];
+      _records = await _localStore.load();
+      if (_records.isNotEmpty) {
+        _lastObservers = _records.last.observers;
+      }
+      _walks = await _walksStore.load();
+      // Resume any in-progress walk. The FGS background isolate is the
+      // source of truth for points; if its FGS is still running (Samsung
+      // Freecess froze main but kept the FGS alive), just rebuild the
+      // mirror from disk and re-bind the port. If the FGS isn't running
+      // but the file exists (e.g. app fully killed), restart the service
+      // — the handler will pick up the buffer from the file.
+      final restored = await _walksStore.loadActive();
+      if (restored != null) {
+        _activeWalk = restored;
+        _activePoints = restored.points;
+        final isRunning = await FlutterForegroundTask.isRunningService;
+        if (isRunning) {
+          await _bindWalkServicePort();
+          debugPrint('[walk] resumed active walk ${restored.id} '
+              '(FGS still running, ${restored.points.length} buffered points)');
+        } else {
+          await _startWalkService(restored);
+          debugPrint('[walk] resumed active walk ${restored.id} '
+              '(FGS restarted, ${restored.points.length} buffered points)');
+        }
+      }
+      try {
+        _legacyRecords = await _legacyLoader.load();
+      } catch (_) {
+        _legacyRecords = const [];
+      }
+      // Restore a persisted bearer-token session so the user stays logged in
+      // across cold starts (including OS-killed background processes). The
+      // token is validated lazily by the first sync call below; a revoked or
+      // expired token 401s and clears the session (_handleSyncException).
+      final session = await _authService.readStoredSession();
+      if (session != null) {
+        _currentUser = session.email;
+        _sessionToken = session.token;
+      }
+    } finally {
+      // Reveal Home or Login now — don't make the splash wait for the network
+      // sync that follows.
+      _bootstrapping = false;
+      notifyListeners();
     }
     final result = await _connectivity.checkConnectivity();
     _connectivityResult = _normalizeConnectivity(result);
@@ -1052,6 +1105,10 @@ class AppState extends ChangeNotifier {
 
   void _handleSyncException(RemoteApiException e) {
     if (e.isUnauthorized) {
+      // Token (or password) no longer accepted: drop the sync credential and
+      // wipe the persisted token + offline cache so the next cold start lands
+      // on the login screen. Queued records stay until the next online login.
+      _sessionToken = null;
       _sessionPassword = null;
       unawaited(_authService.clearCache());
       notifyListeners();

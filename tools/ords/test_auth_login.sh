@@ -129,6 +129,48 @@ else
   printf '\n(skipping 200 success-path test; export APP_AUTH_EMAIL and APP_AUTH_PASSWORD to enable)\n'
 fi
 
+# 5. Bearer-token lifecycle — only if credentials provided.
+#    Mints a token via login, uses it as Bearer against a CRUD endpoint,
+#    revokes it via /app-auth/logout, then confirms the revoked token 401s.
+if [ -n "${APP_AUTH_EMAIL:-}" ] && [ -n "${APP_AUTH_PASSWORD:-}" ]; then
+  LOGOUT_URL="${APP_LOGOUT_URL:-${URL%/login}/logout}"
+  CRUD_URL="${APP_DISTURBANCES_URL:-https://narcis.gov.si/ords/narcis/disturbances/}"
+
+  tok_creds_b64=$(printf '%s:%s' "$APP_AUTH_EMAIL" "$APP_AUTH_PASSWORD" | base64 | tr -d '\n')
+  login_body=$(curl -sS -H "X-Narcis-Auth: Basic $tok_creds_b64" "$URL")
+  TOKEN=$(printf '%s' "$login_body" | python3 -c 'import json,sys
+try:
+    print(json.load(sys.stdin).get("token") or "")
+except Exception:
+    print("")' 2>/dev/null)
+
+  printf '\n--- bearer token lifecycle ---\n'
+  if [ -z "$TOKEN" ]; then
+    printf '  login returned NO token (backend without token support yet?) — SKIP\n'
+  else
+    printf '  minted token  : %s… (%s chars)\n' "${TOKEN:0:8}" "${#TOKEN}"
+
+    st_use=$(curl -sS -o /dev/null -w '%{http_code}' \
+      -H "X-Narcis-Auth: Bearer $TOKEN" "$CRUD_URL")
+    printf '  Bearer GET %s : %s (expected 200)\n' "$CRUD_URL" "$st_use"
+    if [ "$st_use" = "200" ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); fi
+
+    revoked=$(curl -sS -X POST -H "X-Narcis-Auth: Bearer $TOKEN" "$LOGOUT_URL" \
+      | python3 -c 'import json,sys
+try:
+    print(json.load(sys.stdin).get("revoked"))
+except Exception:
+    print("PARSE_ERROR")' 2>/dev/null)
+    printf '  POST logout   : revoked=%s (expected True)\n' "$revoked"
+    if [ "$revoked" = "True" ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); fi
+
+    st_rev=$(curl -sS -o /dev/null -w '%{http_code}' \
+      -H "X-Narcis-Auth: Bearer $TOKEN" "$CRUD_URL")
+    printf '  Bearer GET (revoked token) : %s (expected 401)\n' "$st_rev"
+    if [ "$st_rev" = "401" ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); fi
+  fi
+fi
+
 # Cross-check: failure messages must be identical across failure modes
 # (no enumeration leak between "no creds" / "bad password" / "not authorized").
 # This is informational only; failures of this check are not counted as test failures

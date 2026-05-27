@@ -5,8 +5,14 @@
 --
 -- Wire format:
 --   Request : X-Narcis-Auth: Basic <base64(email:password)>
---   Success : HTTP 200  {"authenticated":true,"user":"<email>"}
+--   Success : HTTP 200  {"authenticated":true,"user":"<email>",
+--                        "token":"<hex>","expiresAt":"<iso-8601 UTC>"}
+--             token/expiresAt are present when minting succeeds (see
+--             pkg_tb_auth.mint_token); the client uses the token for
+--             subsequent calls as `X-Narcis-Auth: Bearer <token>`.
 --   Failure : HTTP 401  {"authenticated":false,"message":"Neveljavni podatki za prijavo."}
+--   Logout  : POST app-auth/logout with `X-Narcis-Auth: Bearer <token>` ->
+--             HTTP 200 {"revoked":true} (revokes the token; idempotent).
 --
 -- Why X-Narcis-Auth and not the standard Authorization header:
 --   This ORDS instance consumes Authorization: Basic for its own first-party
@@ -83,6 +89,8 @@ DECLARE
   l_ok          BOOLEAN := FALSE;
   l_step        VARCHAR2(40) := 'init';   -- DEBUG: tracks where we exited
   l_body        CLOB;
+  l_token       VARCHAR2(64);             -- minted Bearer token (NULL if mint fails)
+  l_expires_utc TIMESTAMP;                -- advisory token expiry, UTC ISO-8601
   l_env_dump    CLOB;                     -- DEBUG: full CGI env snapshot
 BEGIN
   -- DEBUG: snapshot every CGI variable ORDS exposes, so we can see exactly
@@ -215,6 +223,23 @@ BEGIN
   l_step := 'ok';
   l_ok   := TRUE;
 
+  -- Mint a session token so the client can authenticate subsequent calls with
+  -- `X-Narcis-Auth: Bearer <token>` instead of re-sending the password. If
+  -- minting fails (e.g. DBMS_CRYPTO grant or TB_AUTH_TOKENS missing) do NOT
+  -- fail the login: return a tokenless 200 and let the client fall back to its
+  -- in-memory Basic path for that session. l_token stays NULL -> omitted below.
+  BEGIN
+    l_token := pkg_tb_auth.mint_token(
+                 p_user_id     => l_id,
+                 p_device_info => OWA_UTIL.get_cgi_env('HTTP_USER_AGENT')
+               );
+    l_expires_utc := SYS_EXTRACT_UTC(SYSTIMESTAMP)
+                     + NUMTODSINTERVAL(pkg_tb_auth.c_token_ttl_days, 'DAY');
+  EXCEPTION
+    WHEN OTHERS THEN
+      l_token := NULL;
+  END;
+
   <<respond>>
   -- DEBUG instrumentation. Logs one row per request to narcis_auth_debug.
   -- Wrapped in its own block so a missing table (post-diagnosis cleanup)
@@ -264,6 +289,13 @@ BEGIN
   IF l_ok THEN
     APEX_JSON.write('authenticated', TRUE);
     APEX_JSON.write('user', l_email);
+    -- Token fields appear only when minting succeeded. Older clients that
+    -- don't know about them simply ignore the extra keys.
+    IF l_token IS NOT NULL THEN
+      APEX_JSON.write('token', l_token);
+      APEX_JSON.write('expiresAt',
+        TO_CHAR(l_expires_utc, 'YYYY-MM-DD"T"HH24:MI:SS.FF3"Z"'));
+    END IF;
   ELSE
     APEX_JSON.write('authenticated', FALSE);
     APEX_JSON.write('message', 'Neveljavni podatki za prijavo.');
@@ -298,6 +330,66 @@ END;
     p_module_name        => 'narcis_app_auth',
     p_pattern            => 'login',
     p_method             => 'GET',
+    p_name               => 'Content-Type',
+    p_bind_variable_name => 'content_type',
+    p_source_type        => 'HEADER',
+    p_param_type         => 'STRING',
+    p_access_method      => 'OUT'
+  );
+
+  ----------------------------------------------------------------------------
+  -- POST app-auth/logout : revoke the presented Bearer token.
+  -- Idempotent and non-enumerating: always 200 {"revoked":true}, whether or
+  -- not the token was known. Reachable without ORDS first-party auth (same as
+  -- login) because the module carries no DEFINE_PRIVILEGE.
+  ----------------------------------------------------------------------------
+  ORDS.DEFINE_TEMPLATE(
+    p_module_name => 'narcis_app_auth',
+    p_pattern     => 'logout'
+  );
+
+  ORDS.DEFINE_HANDLER(
+    p_module_name => 'narcis_app_auth',
+    p_pattern     => 'logout',
+    p_method      => 'POST',
+    p_source_type => ORDS.source_type_plsql,
+    p_source      => q'~
+DECLARE
+  l_hdr VARCHAR2(4000);
+BEGIN
+  l_hdr := pkg_tb_auth.get_auth_header;
+  IF l_hdr IS NOT NULL AND SUBSTR(l_hdr, 1, 7) = 'Bearer ' THEN
+    pkg_tb_auth.revoke_token(SUBSTR(l_hdr, 8));
+  END IF;
+
+  :status_code  := 200;
+  :content_type := 'application/json';
+
+  APEX_JSON.initialize_clob_output;
+  APEX_JSON.open_object;
+  APEX_JSON.write('revoked', TRUE);
+  APEX_JSON.close_object;
+  HTP.prn(APEX_JSON.get_clob_output);
+  APEX_JSON.free_output;
+END;
+~'
+  );
+
+  ORDS.DEFINE_PARAMETER(
+    p_module_name        => 'narcis_app_auth',
+    p_pattern            => 'logout',
+    p_method             => 'POST',
+    p_name               => 'X-ORDS-STATUS-CODE',
+    p_bind_variable_name => 'status_code',
+    p_source_type        => 'HEADER',
+    p_param_type         => 'INT',
+    p_access_method      => 'OUT'
+  );
+
+  ORDS.DEFINE_PARAMETER(
+    p_module_name        => 'narcis_app_auth',
+    p_pattern            => 'logout',
+    p_method             => 'POST',
     p_name               => 'Content-Type',
     p_bind_variable_name => 'content_type',
     p_source_type        => 'HEADER',

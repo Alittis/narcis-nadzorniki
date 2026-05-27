@@ -66,14 +66,23 @@
           "path": "app-auth/login",
           "method": "GET",
           "host": "narcis.gov.si",
-          "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
-          "status": "deployed; A56 real-device validation passed 2026-04-25; debug instrumentation remains (credentials redacted) for broader-device coverage"
+          "auth": "X-Narcis-Auth: Basic <base64(email:password)> (login is Basic-only; mints a Bearer token on success)",
+          "response": "{authenticated, user, token, expiresAt} - token/expiresAt present when minting succeeds; tokenless 200 fallback if mint fails",
+          "status": "deployed (Basic); token mint implemented in source 2026-05-27, pending deploy. A56 real-device validation passed 2026-04-25; debug instrumentation remains (credentials redacted) for broader-device coverage"
+        },
+        {
+          "path": "app-auth/logout",
+          "method": "POST",
+          "host": "narcis.gov.si",
+          "auth": "X-Narcis-Auth: Bearer <token>",
+          "response": "{\"revoked\":true} - idempotent, non-enumerating (200 even for unknown/already-revoked token)",
+          "status": "revokes the presented token via pkg_tb_auth.revoke_token; implemented in source 2026-05-27, pending deploy"
         },
         {
           "path": "disturbances/",
           "method": "GET",
           "host": "narcis.gov.si",
-          "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
+          "auth": "X-Narcis-Auth: Bearer <token> or Basic <base64(email:password)>",
           "scoping": "ORG_ID stamped from caller's narcis_uporabniki.organizacija; cross-org rows never returned. Returns the full org set; client filters to author-only views (e.g. RecordListScreen) using the createdBy field.",
           "response_shape": "{ records: [ { id, latitude, longitude, locationAccuracy, observedAt, createdAt, createdBy, description, actionTaken, legalBasis, caseStatus, proposedType, obhodId, types[], observers[], photos[{id,mimeType}] } ] }",
           "status": "deployed 2026-04-26; createdBy field added 2026-04-27; obhodId field added and deployed 2026-04-27; smoke test 17/17 (full record + photo lifecycle); chunked HTP.prn emit added 2026-04-28 (response bodies above ~32 KB previously raised ORA-06502 — bug latent until orgs accumulated enough records); legalBasis + caseStatus fields added and deployed 2026-05-11 (schema ALTER backfilled existing rows via DEFAULT 'Odprto' NOT NULL; endpoints redeployed; 17/17 smoke probes passed post-deploy)"
@@ -82,7 +91,7 @@
           "path": "disturbances/",
           "method": "POST",
           "host": "narcis.gov.si",
-          "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
+          "auth": "X-Narcis-Auth: Bearer <token> or Basic <base64(email:password)>",
           "idempotency": "client UUID as PK; duplicate POST returns 200 instead of 201",
           "request_extras": "accepts optional obhodId linking the record to a TB_OBHODI walk; FK validated server-side (walk must already exist, otherwise 500 with ORA-02291)",
           "status": "deployed 2026-04-26; obhodId field added and deployed 2026-04-27; smoke test 9/9"
@@ -91,7 +100,7 @@
           "path": "disturbances/:id",
           "method": "PUT",
           "host": "narcis.gov.si",
-          "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
+          "auth": "X-Narcis-Auth: Bearer <token> or Basic <base64(email:password)>",
           "scoping": "404 if target row's ORG_ID != caller's ORG_ID (no cross-tenant leak)",
           "request_extras": "accepts optional obhodId; passing null clears any existing link",
           "status": "deployed 2026-04-26; obhodId field added and deployed 2026-04-27; smoke test 9/9"
@@ -100,7 +109,7 @@
           "path": "disturbances/:id",
           "method": "DELETE",
           "host": "narcis.gov.si",
-          "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
+          "auth": "X-Narcis-Auth: Bearer <token> or Basic <base64(email:password)>",
           "scoping": "404 if target row's ORG_ID != caller's ORG_ID",
           "status": "deployed 2026-04-26; smoke test 9/9"
         },
@@ -108,7 +117,7 @@
           "path": "disturbances/:id/photos/:photoId",
           "method": "POST",
           "host": "narcis.gov.si",
-          "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
+          "auth": "X-Narcis-Auth: Bearer <token> or Basic <base64(email:password)>",
           "body": "raw image bytes; Content-Type from request (image/jpeg|png|webp|heic)",
           "idempotency": "client UUID as PK; duplicate POST returns 200 instead of 201",
           "limits": "10 MB max body; 415 on unknown MIME",
@@ -118,7 +127,7 @@
           "path": "disturbances/:id/photos/:photoId",
           "method": "GET",
           "host": "narcis.gov.si",
-          "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
+          "auth": "X-Narcis-Auth: Bearer <token> or Basic <base64(email:password)>",
           "response": "binary image with Content-Type from row",
           "scoping": "404 if record or photo not in caller's ORG_ID",
           "status": "deployed 2026-04-26; smoke test 17/17 (full record + photo lifecycle)"
@@ -127,7 +136,7 @@
           "path": "disturbances/:id/photos/:photoId",
           "method": "DELETE",
           "host": "narcis.gov.si",
-          "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
+          "auth": "X-Narcis-Auth: Bearer <token> or Basic <base64(email:password)>",
           "scoping": "404 if record or photo not in caller's ORG_ID",
           "status": "deployed 2026-04-26; smoke test 17/17 (full record + photo lifecycle)"
         },
@@ -135,7 +144,7 @@
           "path": "walks/",
           "method": "GET",
           "host": "narcis.gov.si",
-          "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
+          "auth": "X-Narcis-Auth: Bearer <token> or Basic <base64(email:password)>",
           "scoping": "ORG_ID stamped from caller's narcis_uporabniki.organizacija; cross-org rows never returned",
           "response_shape": "{ walks: [ { id, startedAt, endedAt, name, notes, createdAt, createdBy, pointCount, disturbanceCount } ] } - point geometry not inlined; fetch via /:id/points",
           "status": "deployed and smoke-tested 2026-04-27 (small-payload only); chunked HTP.prn emit added 2026-04-28 to clear ORA-06502 above ~32 KB"
@@ -144,7 +153,7 @@
           "path": "walks/",
           "method": "POST",
           "host": "narcis.gov.si",
-          "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
+          "auth": "X-Narcis-Auth: Bearer <token> or Basic <base64(email:password)>",
           "idempotency": "client UUID as PK; duplicate POST returns 200 instead of 201; first POST is the source of truth for points (duplicates do NOT replace points)",
           "request_shape": "{ id, startedAt, endedAt, name, notes, points: [{seq, lat, lon, t, accuracy}, ...] }",
           "status": "deployed and smoke-tested 2026-04-27; 14/14 walks lifecycle probes passed"
@@ -153,7 +162,7 @@
           "path": "walks/:id",
           "method": "PUT",
           "host": "narcis.gov.si",
-          "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
+          "auth": "X-Narcis-Auth: Bearer <token> or Basic <base64(email:password)>",
           "scoping": "404 if target walk's ORG_ID != caller's ORG_ID",
           "request_shape": "{ name, notes } - times and points are write-once",
           "status": "deployed and smoke-tested 2026-04-27; 14/14 walks lifecycle probes passed"
@@ -162,7 +171,7 @@
           "path": "walks/:id",
           "method": "DELETE",
           "host": "narcis.gov.si",
-          "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
+          "auth": "X-Narcis-Auth: Bearer <token> or Basic <base64(email:password)>",
           "scoping": "404 if target walk's ORG_ID != caller's ORG_ID; track points cascade; linked TB_MOTNJE.OBHOD_ID set NULL by FK rule",
           "status": "deployed and smoke-tested 2026-04-27; 14/14 walks lifecycle probes passed"
         },
@@ -170,7 +179,7 @@
           "path": "walks/:id/points",
           "method": "GET",
           "host": "narcis.gov.si",
-          "auth": "X-Narcis-Auth: Basic <base64(email:password)>",
+          "auth": "X-Narcis-Auth: Bearer <token> or Basic <base64(email:password)>",
           "scoping": "404 if target walk's ORG_ID != caller's ORG_ID",
           "response_shape": "{ obhodId, points: [{seq, lat, lon, t, accuracy}, ...] } sorted by seq",
           "status": "deployed and smoke-tested 2026-04-27 (small-payload only); chunked HTP.prn emit added 2026-04-28 — a real ~792-point walk hit ORA-06502 (~75 KB body); also added diag_seq + dbms_utility.format_error_backtrace to the WHEN OTHERS body for future row-specific diagnosis"
@@ -247,23 +256,37 @@
   "env_required": [],
   "ci_detected": false,
   "auth": {
-    "status": "production",
+    "status": "production for Basic; bearer-token sessions implemented in source 2026-05-27, PENDING MANUAL DEPLOY to IGEA dev then ARSO prod",
     "endpoint": "https://narcis.gov.si/ords/narcis/app-auth/login",
-    "wire_format": "X-Narcis-Auth: Basic <base64(email:password)>",
+    "logout_endpoint": "https://narcis.gov.si/ords/narcis/app-auth/logout (POST, X-Narcis-Auth: Bearer <token>, returns {\"revoked\":true})",
+    "wire_format": "X-Narcis-Auth: Bearer <token> (preferred) or Basic <base64(email:password)> (login + fallback)",
     "password_enforced": true,
-    "server_gate": "TERENSKA-BELEZNICA function via pkg_narcis_authorization",
-    "session_persistence": "in-memory (not persisted across app restarts)",
+    "server_gate": "TERENSKA-BELEZNICA function via pkg_narcis_authorization; re-checked per call on both Basic and Bearer paths",
+    "session_persistence": "bearer token persisted in flutter_secure_storage (key narcis_auth_token) and restored on app start (AuthService.readStoredSession) - sticky session across cold starts including OS-killed background processes; app shows a splash while restoring instead of flashing the login screen",
+    "bearer_token": {
+      "store_table": "TB_AUTH_TOKENS (tools/ords/auth_token_schema.sql)",
+      "server_stores": "SHA-256 hash only (RAW(32) PK); plaintext token returned once at mint, never persisted server-side",
+      "mint": "pkg_tb_auth.mint_token on successful login; 32 CSPRNG bytes via DBMS_CRYPTO -> 64-hex token",
+      "ttl_days": 30,
+      "expiry": "sliding - renewed on use (throttled to <=1/24h via autonomous txn); server 401 is authoritative",
+      "identity": "not snapshotted - email/app_user/org + TERENSKA-BELEZNICA re-derived from narcis_uporabniki per call",
+      "revoke": "logout endpoint (pkg_tb_auth.revoke_token) or operator UPDATE tb_auth_tokens SET revoked_at; revoked/expired token -> 401",
+      "dependency": "DBMS_CRYPTO EXECUTE on the NARCIS schema (PLS-00201 at deploy if missing)"
+    },
     "offline_cache": {
       "storage": "flutter_secure_storage",
       "hash": "PBKDF2-HMAC-SHA256, 100000 iters, 32-byte salt, 32-byte key",
       "algo_version_tag": "pbkdf2_sha256_100k_v1",
       "max_offline_window_days": 14,
+      "purpose": "offline MANUAL login only (the bearer token covers persistent online sessions)",
       "wiped_on": ["explicit logout", "online HTTP 401", "sync HTTP 401"]
     },
     "sync_session": {
-      "plaintext_password_held": "in-memory only, set on online login (AuthResult.wasOffline=false)",
+      "credential": "bearer token (AppState._sessionToken) preferred; in-memory plaintext password (_sessionPassword) only as fallback when the backend did not mint a token",
+      "token_persisted": true,
+      "password_persisted": false,
       "cleared_on": ["logout", "app exit", "RemoteApiException with isUnauthorized"],
-      "implication": "records created during offline-only login sessions stay queued until next online login"
+      "implication": "after a cold-start token restore canSync is true, so queued records sync as soon as connectivity returns without manual re-login; an offline-only login (no token) still queues until the next online login"
     }
   },
   "disturbance_schema": {
@@ -329,5 +352,24 @@
     ],
     "fk_to_disturbances": "TB_MOTNJE.OBHOD_ID is a nullable FK to TB_OBHODI(OBHOD_ID) with ON DELETE SET NULL — deleting a walk preserves its captured disturbances, just unlinks them",
     "wire_ordering_constraint": "client must POST a walk before any disturbance referencing it (FK on disturbance INSERT raises ORA-02291 → 500 if walk is missing); syncAll drains pending walks before pending disturbances"
+  },
+  "auth_token_schema": {
+    "status": "implemented in source 2026-05-27; PENDING MANUAL DEPLOY (deploy auth_token_schema.sql before disturbance_auth_pkg.sql)",
+    "purpose": "Bearer-token sessions: persistent login + sync without re-sending the password on every call. Primary CRUD credential going forward; Basic still accepted in parallel.",
+    "deploy_files": [
+      "tools/ords/auth_token_schema.sql",
+      "tools/ords/disturbance_auth_pkg.sql",
+      "tools/ords/auth_login.sql"
+    ],
+    "deploy_dependency": "auth_token_schema.sql must run before disturbance_auth_pkg.sql (package body reads TB_AUTH_TOKENS); auth_login.sql after the package (calls mint_token/revoke_token). Requires DBMS_CRYPTO EXECUTE on the NARCIS schema (PLS-00201 at deploy if missing).",
+    "table_prefix": "TB_AUTH",
+    "tables": [
+      {
+        "name": "TB_AUTH_TOKENS",
+        "purpose": "session tokens; PK TOKEN_HASH RAW(32) = SHA-256 of the token (plaintext never stored server-side); USER_ID FK to narcis_uporabniki ON DELETE CASCADE; CREATED_AT/EXPIRES_AT/LAST_USED_AT/REVOKED_AT/DEVICE_INFO; 30-day sliding expiry"
+      }
+    ],
+    "endpoints_redeploy_needed": false,
+    "endpoints_redeploy_note": "disturbance/walks endpoint modules unchanged - pkg_tb_auth.authenticate signature is the same; only the package body + login module change"
   }
 }

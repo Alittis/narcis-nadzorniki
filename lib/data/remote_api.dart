@@ -8,18 +8,22 @@ import 'package:narcis_nadzorniki/models/disturbance_photo.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
 import 'package:narcis_nadzorniki/models/walk.dart';
 
-/// In-memory carrier for the credentials needed to call the disturbance
-/// CRUD endpoints. The plaintext password is required because every call
-/// re-sends `X-Narcis-Auth: Basic <base64(email:password)>` (same wire format
-/// as `/app-auth/login`). See ARCHITECTURE.md §9bis / §12.
+/// Carrier for the `X-Narcis-Auth` credential sent on every disturbance/walk
+/// CRUD call. See ARCHITECTURE.md §9bis.
 class SyncCredentials {
-  const SyncCredentials({required this.email, required this.password});
+  /// Preferred: a bearer session token minted by `/app-auth/login`. Sent as
+  /// `X-Narcis-Auth: Bearer <token>` so the user's password is never re-sent.
+  const SyncCredentials.token(String token) : authHeaderValue = 'Bearer $token';
 
-  final String email;
-  final String password;
+  /// Fallback for a backend that didn't mint a token (older ORDS deploy): the
+  /// password is held in memory for the session only and sent as
+  /// `X-Narcis-Auth: Basic <base64(email:password)>`. Never persisted.
+  SyncCredentials.basic({required String email, required String password})
+      : authHeaderValue =
+            'Basic ${base64Encode(utf8.encode('$email:$password'))}';
 
-  String get authHeaderValue =>
-      'Basic ${base64Encode(utf8.encode('$email:$password'))}';
+  /// The full `X-Narcis-Auth` header value (scheme + credential).
+  final String authHeaderValue;
 }
 
 /// Thrown for any non-success response from the disturbance endpoints, plus

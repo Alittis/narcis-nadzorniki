@@ -14,6 +14,7 @@ class AuthResult {
     this.user,
     this.message,
     this.wasOffline = false,
+    this.token,
   });
 
   final bool success;
@@ -23,6 +24,22 @@ class AuthResult {
   /// True when a successful login was served from the local PBKDF2 cache
   /// (i.e. no network round-trip succeeded).
   final bool wasOffline;
+
+  /// Bearer session token minted by the server on a successful ONLINE login.
+  /// Null when the login was served offline, or when the backend didn't mint
+  /// one (older ORDS deploy → the caller falls back to an in-memory Basic
+  /// session). Persisted by [AuthService] so the session survives app restart.
+  final String? token;
+}
+
+/// A persisted session restored on app start: the logged-in email plus the
+/// bearer token to authenticate sync calls. Returned by
+/// [AuthService.readStoredSession].
+class StoredSession {
+  const StoredSession({required this.email, required this.token});
+
+  final String email;
+  final String token;
 }
 
 /// Abstraction over `flutter_secure_storage` so tests can substitute a map.
@@ -86,6 +103,9 @@ class AuthService {
   static const _kHash = 'narcis_auth_hash_b64';
   static const _kLastOnline = 'narcis_auth_last_online_at';
   static const _kAlgo = 'narcis_auth_algo';
+  // Bearer session token (plaintext). Lives in the same secure storage as the
+  // PBKDF2 cache; it is a revocable, expiring token, never the password.
+  static const _kToken = 'narcis_auth_token';
   static const _algoCurrent = 'pbkdf2_sha256_100k_v1';
   static const _pbkdf2Iters = 100000;
   static const _pbkdf2KeyBytes = 32;
@@ -119,7 +139,8 @@ class AuthService {
     return _tryOffline(normalizedEmail, password);
   }
 
-  /// Wipes the offline credential cache. Called on explicit logout.
+  /// Wipes the offline credential cache AND the bearer token. Called on
+  /// explicit logout and on any definite 401 (server revocation).
   Future<void> clearCache() async {
     await Future.wait([
       _cache.delete(_kEmail),
@@ -127,7 +148,33 @@ class AuthService {
       _cache.delete(_kHash),
       _cache.delete(_kLastOnline),
       _cache.delete(_kAlgo),
+      _cache.delete(_kToken),
     ]);
+  }
+
+  /// Returns a persisted session (email + bearer token) for silent auto-login
+  /// on app start, or null if none is stored. The token is validated lazily by
+  /// the first authenticated call — a revoked/expired token 401s, which clears
+  /// the session.
+  Future<StoredSession?> readStoredSession() async {
+    final email = await _cache.read(_kEmail);
+    final token = await _cache.read(_kToken);
+    if (email == null || token == null) return null;
+    return StoredSession(email: email, token: token);
+  }
+
+  /// Best-effort server-side revoke of a bearer token (POST /app-auth/logout).
+  /// Network errors are swallowed — the token still expires server-side and the
+  /// caller clears the local session regardless.
+  Future<void> revokeToken(String token) async {
+    try {
+      await _client.post(
+        _endpoint.resolve('logout'),
+        headers: {'X-Narcis-Auth': 'Bearer $token'},
+      ).timeout(const Duration(seconds: 10));
+    } catch (_) {
+      // Intentionally ignored.
+    }
   }
 
   // ---- internals ----
@@ -159,8 +206,10 @@ class AuthService {
 
       if (response.statusCode == 200 && body['authenticated'] == true) {
         final user = (body['user'] as String?) ?? email;
+        final token = body['token'] as String?;
         await _writeCache(email: user, password: password);
-        return AuthResult(success: true, user: user);
+        await _writeToken(token);
+        return AuthResult(success: true, user: user, token: token);
       }
 
       if (response.statusCode == 401) {
@@ -251,6 +300,16 @@ class AuthService {
     await _cache.write(_kHash, base64Encode(hash));
     await _cache.write(_kLastOnline, now);
     await _cache.write(_kEmail, email.toLowerCase());
+  }
+
+  /// Persists (or clears) the bearer token. A null/empty token deletes any
+  /// stale value — e.g. re-logging in against a backend that no longer mints.
+  Future<void> _writeToken(String? token) async {
+    if (token == null || token.isEmpty) {
+      await _cache.delete(_kToken);
+    } else {
+      await _cache.write(_kToken, token);
+    }
   }
 
   Future<_CachedAuth?> _readCache() async {

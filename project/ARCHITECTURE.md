@@ -52,7 +52,7 @@
   4. `DROP TABLE narcis_auth_debug PURGE;`
   5. Delete `tools/ords/auth_debug_table.sql`.
 - No rate limiting / account lockout on the login endpoint — STATUS: UNKNOWN – REQUIRES CONFIRMATION whether `pkg_narcis_uporabniki.preveri_geslo` enforces this internally.
-- No session/bearer token mechanism yet; the disturbance CRUD endpoints (§9.3) re-validate `X-Narcis-Auth: Basic` on every call. This is intentional for now; bearer-token migration is a follow-up. Implication: `RemoteApi` calls re-run `pkg_narcis_uporabniki.preveri_geslo` server-side per record synced.
+- Bearer-token sessions are implemented (§9.1b, §12bis, §9bis). Login mints an opaque token; the CRUD endpoints accept `X-Narcis-Auth: Bearer <token>` and re-derive identity + re-check `TERENSKA-BELEZNICA` per call (no password re-sent). `Basic` is still accepted in parallel (smoke tests + any client that didn't get a token). STATUS as of 2026-05-27: implemented in source, **pending manual deploy** to IGEA dev then ARSO prod (see OPERATIONS.md §10 "Re-deploying to Oracle"). A `Bearer` call no longer runs `pkg_narcis_uporabniki.preveri_geslo`; it does a hash lookup in `TB_AUTH_TOKENS` plus the same authorization re-check.
 - Codebook fetch endpoint (PDF §6.c.ii — "ob vsakem zagonu aplikacije naj se na telefonu posodobi seznam tipov motenj") is NOT YET IMPLEMENTED. Until it is, `lib/data/disturbance_types.dart` and `tools/ords/disturbance_codebook_seed.sql` are dual-maintained: any change to the Dart codebook must be mirrored in the seed script. Per-org codebook additions (`TB_SIF_MOTNJE_TIPI.ORG_ID` non-null) are not yet visible to the client.
 - Offline updates and offline deletes do not queue: `AppState.updateRecord` / `deleteRecord` only push to ORDS when `isOnline && canSync`. Edits made while offline persist locally but never reach the server. Tracked as a separate follow-up to the offline-create queue.
 - Release pipeline/signing/distribution process.
@@ -64,7 +64,7 @@
 - Auth: `X-Narcis-Auth: Basic <base64(email:password)>` over HTTPS only. (Custom header, not the standard `Authorization` — see note below.)
 - ORDS module: `narcis_app_auth`, base path `app-auth/`, template `login`.
 - Server logic: email → `app_user` lookup (case-insensitive, whitespace-tolerant), then `pkg_narcis_uporabniki.preveri_geslo`, then `pkg_narcis_authorization.has_function_by_id('TERENSKA-BELEZNICA', app_user)`. Any failure → 401 with a single generic message (no enumeration).
-- 200: `{"authenticated":true,"user":"<email>"}`
+- 200: `{"authenticated":true,"user":"<email>","token":"<64-hex>","expiresAt":"<iso-8601 UTC>"}`. `token`/`expiresAt` are present when minting succeeds (see §12bis); the client sends the token as `X-Narcis-Auth: Bearer <token>` on subsequent calls. If minting fails the handler still returns a tokenless 200 (the client falls back to its in-memory Basic path), so login never hard-fails on a token-store fault. Older clients ignore the extra keys.
 - 401: `{"authenticated":false,"message":"Neveljavni podatki za prijavo."}`
 - CORS: inherited from ORDS pool (`Access-Control-Allow-Origin: *`, confirmed live).
 - Source: [tools/ords/auth_login.sql](../tools/ords/auth_login.sql).
@@ -72,6 +72,13 @@
 - Why a custom header instead of the standard `Authorization`: this ORDS instance consumes `Authorization: Basic` upstream of the handler PL/SQL (verified 2026-04-25 via debug logging — `OWA_UTIL.get_cgi_env('HTTP_AUTHORIZATION')` returned NULL on every request, even when the client sent a valid Basic header). A custom `X-Narcis-Auth` header bypasses ORDS's auth filter while preserving the same base64 encoding scheme.
 - Quirk: ORDS exposes this custom header under its raw HTTP name (`x-narcis-auth`), NOT under the canonical CGI form `HTTP_X_NARCIS_AUTH`. Standard headers get both forms; custom headers only get the raw form. The handler reads it via `OWA_UTIL.get_cgi_env('X-NARCIS-AUTH')` (the function is case-insensitive). Verified by enumerating `OWA.cgi_var_name(i)` / `cgi_var_val(i)` on a live request.
 - Known cosmetic gap: response `Content-Type` header comes back as `text/html;charset=utf-8` instead of `application/json`. The `:content_type` HEADER OUT bind doesn't appear to take effect in this ORDS configuration. The body itself is valid JSON and `jsonDecode` parses it fine, so this is non-blocking.
+
+### 9.1b `POST https://narcis.gov.si/ords/narcis/app-auth/logout` (token revoke)
+- Same ORDS module `narcis_app_auth`, template `logout`. Reachable without ORDS first-party auth (no `DEFINE_PRIVILEGE`), same as login.
+- Auth: `X-Narcis-Auth: Bearer <token>`. The handler calls `pkg_tb_auth.revoke_token`, which sets `REVOKED_AT` on the matching `TB_AUTH_TOKENS` row.
+- 200: `{"revoked":true}` always — idempotent and non-enumerating (an unknown/already-revoked token also returns 200, so logout never reveals whether a token existed).
+- Client calls this best-effort on logout (`AuthService.revokeToken`); network failure is swallowed because the token still expires server-side and the local session is cleared regardless.
+- Source: [tools/ords/auth_login.sql](../tools/ords/auth_login.sql) (same file as §9.1).
 
 ### 9.2 `GET /narcis/ords/narcis/test/auth` (legacy stub, retired)
 - Headers: `username: <email>`
@@ -93,7 +100,7 @@ ORDS module: `narcis_disturbances`, base path `disturbances/`. Source: [tools/or
 | GET | `:id/photos/:photoId` | Download photo BLOB | 200 with image MIME | 401, 404 |
 | DELETE | `:id/photos/:photoId` | Delete photo | 204 | 401, 404 |
 
-- Auth: same `X-Narcis-Auth: Basic <base64(email:password)>` header as §9.1, on every call. `pkg_tb_auth.authenticate` raises `e_unauthorized` on any failure — handler returns 401 with `{"error":"unauthorized"}`. Same TERENSKA-BELEZNICA gate as login.
+- Auth: `X-Narcis-Auth` on every call, via `pkg_tb_auth.authenticate`, which accepts **either** `Bearer <token>` (preferred — see §12bis; hash lookup + live identity/`TERENSKA-BELEZNICA` re-check, no password) **or** `Basic <base64(email:password)>` (the original path, still accepted for the smoke tests and any client without a token). Any failure raises `e_unauthorized` → handler returns 401 with `{"error":"unauthorized"}`. Same `TERENSKA-BELEZNICA` gate as login on both paths.
 - `ORG_ID` is stamped server-side from `narcis_uporabniki.organizacija`; the client never sends it. PUT/DELETE/photo-* silently 404 when the target row's org doesn't match the caller's — "not yours" is indistinguishable from "not found".
 - Idempotency: POST with an already-known `motnja_id` is a no-op and returns 200 instead of 201. Same goes for photo upload on a known `photoId`. Lets the Flutter sync queue retry safely after a lost response.
 - GET `/` response shape: `{"records":[{...record fields...,"createdBy":"<email>","obhodId":"<uuid>"|null,"photos":[{"id":"<uuid>","mimeType":"image/jpeg"},...]}]}`. Includes every record from the caller's organization (org-scoped, not author-scoped); `createdBy` carries `TB_MOTNJE.USTVARJEN_OD` so the client can distinguish own vs. teammates' records (used by `RecordListScreen` to show only the user's own; the home-map Motnje layer renders the full org set). `obhodId` is the walk-around link (§9.4); NULL for stand-alone records. Photo BLOBs are NOT inlined — the client lazy-fetches each one via the per-photo GET when the user opens the detail view.
@@ -169,8 +176,8 @@ Implemented in [lib/services/auth_service.dart](../lib/services/auth_service.dar
 
 **Online path** (when `AppState.isOnline`):
 1. Build `X-Narcis-Auth: Basic <base64(email:password)>` and GET §9.1.
-2. On HTTP 200 with `authenticated:true`: cache credentials (see schema below) and return success.
-3. On HTTP 401: **wipe** the offline cache and return failure. This propagates server-side TERENSKA-BELEZNICA revocation to the device on the next online attempt.
+2. On HTTP 200 with `authenticated:true`: persist the PBKDF2 cache (schema below) **and** the returned bearer token (`narcis_auth_token`), and return success carrying the token. If the response had no `token` (older backend), the caller keeps the password in memory for that session only (Basic fallback) — nothing extra is persisted.
+3. On HTTP 401: **wipe** the offline cache **and** the stored token, and return failure. This propagates server-side TERENSKA-BELEZNICA revocation to the device on the next online attempt.
 4. On network error / timeout / 5xx: fall through to the offline path.
 
 **Offline path** (used as primary when `AppState.isOnline` is false, or as fallback after a network error):
@@ -189,12 +196,13 @@ Implemented in [lib/services/auth_service.dart](../lib/services/auth_service.dar
 | `narcis_auth_hash_b64` | PBKDF2-HMAC-SHA256(password, salt, 100000, 32 bytes), base64 |
 | `narcis_auth_last_online_at` | UTC ISO-8601 timestamp of the last successful online login |
 | `narcis_auth_algo` | `pbkdf2_sha256_100k_v1` (version tag enabling future migrations) |
+| `narcis_auth_token` | bearer session token (64-hex) — drives sticky login + sync; revocable and expiring, never the password. Absent when the backend didn't mint one. |
 
 The email is written **last** so that a partial-write crash leaves the cache effectively empty rather than half-populated.
 
-**Threat model**: PBKDF2 here is NOT defending a server-side password DB; it slows down a forensic extraction of the device's secure storage. 100k iterations is sufficient for that purpose. The `algo` version tag lets us bump iterations later without breaking existing devices (they'll be forced online once and re-cached under the new scheme).
+**Threat model**: PBKDF2 here is NOT defending a server-side password DB; it slows down a forensic extraction of the device's secure storage. 100k iterations is sufficient for that purpose. The `algo` version tag lets us bump iterations later without breaking existing devices (they'll be forced online once and re-cached under the new scheme). The stored `narcis_auth_token` is a *revocable, expiring* secret rather than the reusable government password: a forensic extraction yields a token that can be revoked server-side (logout / operator `UPDATE`) and dies on its own at the 30-day sliding window — strictly better than persisting the password would be.
 
-**Session persistence**: in-memory only (`AppState._currentUser`). App restart requires re-login, but the offline cache makes that re-login work without network. This is intentional — sticky sessions across restarts is a separate UX decision not yet made.
+**Session persistence**: the bearer token (§12bis) is persisted in `flutter_secure_storage` and restored on app start (`AppState.init` → `AuthService.readStoredSession`), so the session survives cold starts — including the OS killing a backgrounded process (the Samsung One UI case that made the app appear to "ask for login on every resume": a background-killed process cold-starts, it is not a resume). The restored token is validated lazily by the first sync call; a revoked/expired token 401s and clears the session, dropping the user to the login screen. The plaintext password is never persisted — only the revocable token. App start shows a brief splash (`main.dart`, gated on `AppState.isBootstrapping`) while the session is restored, instead of flashing the login screen.
 
 **First-time login is always online**: cache is empty until the first online success, so an unauthorized user can never establish an offline-capable cache. See OPERATIONS.md §9 for the operator-facing implications of the offline window.
 
@@ -261,10 +269,32 @@ Defined in [tools/ords/disturbance_schema.sql](../tools/ords/disturbance_schema.
 
 Cascading delete: `TB_MOTNJE → TB_MOTNJE_TIPI_DOGODKA, TB_MOTNJE_OPAZOVALCI, TB_MOTNJE_FOTO` are all `ON DELETE CASCADE`.
 
+## 12bis. Auth Token Schema (Oracle, `TB_AUTH_TOKENS`)
+Defined in [tools/ords/auth_token_schema.sql](../tools/ords/auth_token_schema.sql). Backs the bearer-token sessions (§9.1, §9.1b, §9bis). Same `TB_` prefix family.
+
+**Table `TB_AUTH_TOKENS`** — one row per active session token.
+- `TOKEN_HASH RAW(32)` PK — SHA-256 of the token. **Only the hash is stored**; the plaintext token is returned to the client once at mint and never persisted server-side, so a DB leak yields no usable tokens.
+- `USER_ID NUMBER` FK → `narcis_uporabniki(id)` `ON DELETE CASCADE`. Identity is **not** snapshotted beyond this: email / app_user / org and the `TERENSKA-BELEZNICA` authorization are re-derived from `narcis_uporabniki` on every call, so revoking the function (or moving the user's org) takes effect on the next request — the same live gate the Basic path enforces.
+- `CREATED_AT`, `EXPIRES_AT`, `LAST_USED_AT`, `REVOKED_AT` (`NULL` = active), `DEVICE_INFO` (free-text audit hint, e.g. the request User-Agent).
+- Indexes on `USER_ID` (bulk revoke + purge) and `EXPIRES_AT` (optional cleanup).
+
+**Token logic** lives in `pkg_tb_auth` ([tools/ords/disturbance_auth_pkg.sql](../tools/ords/disturbance_auth_pkg.sql)):
+- `mint_token(user_id, device_info)` — generates 32 CSPRNG bytes via `DBMS_CRYPTO.randombytes` (→ a 64-hex token on the wire), stores its SHA-256 hash with `EXPIRES_AT = now + c_token_ttl_days (30)`, opportunistically purges that user's expired/revoked rows, commits, and returns the plaintext token. Called by §9.1 on a successful login.
+- `authenticate` — dispatches on the `X-Narcis-Auth` scheme. **Bearer**: hash → look up → reject if revoked/expired → re-derive identity + re-check authorization → slide `EXPIRES_AT` forward (throttled to ≤ once / 24 h, in an `AUTONOMOUS_TRANSACTION` so the renewal is isolated from the CRUD handler's own transaction — which may be a non-committing GET or may roll back). **Basic**: unchanged password path.
+- `revoke_token(token)` — sets `REVOKED_AT`; called by §9.1b logout.
+
+**Sliding 30-day expiry.** Each use within the window renews the token; a token unused for 30 days expires. The client never hard-checks the stored expiry (sliding renewal makes the client's copy a stale lower bound) — the server's 401 is authoritative.
+
+**Operator revoke** (e.g. lost/retired device): `UPDATE tb_auth_tokens SET revoked_at = SYSTIMESTAMP WHERE user_id = (SELECT id FROM narcis_uporabniki WHERE LOWER(TRIM(email)) = '<email>') AND revoked_at IS NULL;` then `COMMIT;` — the next call from that device 401s. Full statement in the SQL file header.
+
+**Dependency:** `DBMS_CRYPTO` (`EXECUTE` on the NARCIS schema). Expected present (password hashing uses it); if not, the package body raises `PLS-00201` at deploy and needs `GRANT EXECUTE ON SYS.DBMS_CRYPTO TO <narcis_schema>`.
+
+STATUS as of 2026-05-27: implemented in source; **pending manual deploy** to IGEA dev then ARSO prod (OPERATIONS.md §10).
+
 ## 13. Sync Model (Flutter `RemoteApi` + `AppState`)
 [lib/data/remote_api.dart](../lib/data/remote_api.dart) talks to §9.3. [lib/state/app_state.dart](../lib/state/app_state.dart) owns the queue.
 
-**Session credentials.** The disturbance endpoints re-authenticate every call via `X-Narcis-Auth: Basic <base64(email:password)>`. The plaintext password is required, but `AuthService` only stores a one-way PBKDF2 hash on disk (see §9bis). Resolution: `AppState` keeps the plaintext password **in memory only**, set on a successful **online** login (`AuthResult.wasOffline == false`), cleared on logout, on app exit, and on a sync 401. Never written to disk. `AppState.canSync` is true iff `_currentUser != null && _sessionPassword != null`.
+**Session credentials.** The disturbance endpoints re-authenticate every call via `X-Narcis-Auth`. The preferred credential is the bearer token (§12bis): set on a successful online login, persisted in secure storage, restored on app start, and sent as `Bearer <token>`. `AppState._sessionToken` holds it. `_sessionPassword` is a fallback that holds the plaintext password **in memory only** for the session, used only when the backend didn't mint a token (older deploy). Both are cleared on logout and on a sync 401; the token is also wiped from disk then, never otherwise written. `AppState.canSync` is true iff `_currentUser != null && (_sessionToken != null || _sessionPassword != null)` — note this is now true immediately after a cold-start token restore, so queued records sync as soon as connectivity returns, without a manual re-login (previously, an offline login left `canSync` false until the next online login).
 
 **`syncAll` (the sync icon's tap-target).** Single entry point that runs three phases under one `_isSyncing` flag:
 1. **Push pending records.** Drain `_records.where(pendingSync)` via POST `/disturbances/`. Server's idempotent-on-UUID semantics mean retries are safe.

@@ -15,10 +15,7 @@ import 'package:narcis_nadzorniki/data/remote_api.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
 
-const _creds = SyncCredentials(
-  email: 'alexis.zrimec@gov.si',
-  password: 'hunter2',
-);
+const _creds = SyncCredentials.token('test-bearer-token-abc123');
 
 final _baseUrl = Uri.parse('https://narcis.gov.si/ords/narcis/disturbances/');
 
@@ -57,7 +54,7 @@ RemoteApi _api(Future<http.Response> Function(http.Request) respond) {
 
 void main() {
   group('createRecord', () {
-    test('POSTs JSON to base URL with X-Narcis-Auth Basic header', () async {
+    test('POSTs JSON to base URL with X-Narcis-Auth Bearer header', () async {
       late http.Request captured;
       final api = _api((req) async {
         captured = req;
@@ -68,10 +65,7 @@ void main() {
 
       expect(captured.method, 'POST');
       expect(captured.url, _baseUrl);
-      // Basic <base64("alexis.zrimec@gov.si:hunter2")>
-      final expected =
-          'Basic ${base64Encode(utf8.encode('${_creds.email}:${_creds.password}'))}';
-      expect(captured.headers['X-Narcis-Auth'], expected);
+      expect(captured.headers['X-Narcis-Auth'], 'Bearer test-bearer-token-abc123');
       expect(
         captured.headers['Content-Type'],
         startsWith('application/json'),
@@ -305,6 +299,25 @@ void main() {
         motnjaId: 'rec-1',
         photoId: 'p-1',
         credentials: _creds,
+      );
+    });
+  });
+
+  group('SyncCredentials', () {
+    test('token() builds a Bearer header', () {
+      expect(
+        const SyncCredentials.token('abc123').authHeaderValue,
+        'Bearer abc123',
+      );
+    });
+
+    test('basic() builds a Basic base64(email:password) header', () {
+      final expected =
+          'Basic ${base64Encode(utf8.encode('alice@example.com:pw'))}';
+      expect(
+        SyncCredentials.basic(email: 'alice@example.com', password: 'pw')
+            .authHeaderValue,
+        expected,
       );
     });
   });

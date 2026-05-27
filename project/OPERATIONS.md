@@ -48,11 +48,12 @@ flutter run -d <device_id>
   - 401 with `{"authenticated":false,"message":"Neveljavni podatki za prijavo."}` for all failure modes (no enumeration leak between "no creds", "bad password", "not authorized").
 
 ## 8. Authentication (Production)
-- Wire format: `X-Narcis-Auth: Basic <base64(email:password)>` over HTTPS to `https://narcis.gov.si/ords/narcis/app-auth/login` (see ARCHITECTURE.md §9.1 for why a custom header).
-- Server gates by email lookup → `pkg_narcis_uporabniki.preveri_geslo` → `TERENSKA-BELEZNICA` function authorization.
-- Client caches a PBKDF2-SHA256 hash of the password in `flutter_secure_storage` after a successful online login, enabling offline re-login for up to 14 days (see ARCHITECTURE §9bis for the full client model).
-- Session is kept in memory (`AppState._currentUser`); app restart requires re-login. The offline cache makes that re-login work without network, up to the 14-day window.
-- A definite server 401 wipes the offline cache. Network errors do NOT wipe — they fall through to offline.
+- Login wire format: `X-Narcis-Auth: Basic <base64(email:password)>` over HTTPS to `https://narcis.gov.si/ords/narcis/app-auth/login` (see ARCHITECTURE.md §9.1 for why a custom header). Server gates by email lookup → `pkg_narcis_uporabniki.preveri_geslo` → `TERENSKA-BELEZNICA` function authorization.
+- **Bearer-token sessions** (ARCHITECTURE §9.1b, §12bis, §9bis): a successful login mints an opaque token (stored server-side only as a SHA-256 hash in `TB_AUTH_TOKENS`); the client persists the token in `flutter_secure_storage` and sends it as `X-Narcis-Auth: Bearer <token>` on every subsequent call. The password is sent only at login, never persisted on the device.
+- **Sticky session**: the token is restored on app start, so the app no longer asks for login on every cold start (incl. an OS-killed background process — the Samsung One UI case). Sliding 30-day expiry, renewed on use. A revoked/expired token 401s and drops the user to the login screen.
+- Logout calls `POST /app-auth/logout` to revoke the token server-side (best-effort).
+- The PBKDF2-SHA256 password hash is still cached for **offline manual login** for up to 14 days (§9). A definite server 401 wipes both the offline cache and the stored token. Network errors do NOT wipe — they fall through to offline.
+- **Revoking a lost/retired device immediately** (no need to wait for password change or the 30-day expiry): `UPDATE tb_auth_tokens SET revoked_at = SYSTIMESTAMP WHERE user_id = (SELECT id FROM narcis_uporabniki WHERE LOWER(TRIM(email)) = '<email>') AND revoked_at IS NULL; COMMIT;`. The device's next online call 401s and the app clears its session. (Revoking `TERENSKA-BELEZNICA` also locks the token out on the next call, since authorization is re-checked per request.)
 
 ## 9. Offline Authentication — Operational Caveat
 Once offline login is enabled, an authorized user's cached credentials remain
@@ -73,19 +74,19 @@ valid for offline login until the configured max-offline window expires
   offline-capable cache in the first place.
 
 ## 10. Disturbance Sync — Operational Caveats
-The disturbance CRUD endpoints (ARCHITECTURE.md §9.3) require the user's
-plaintext password on every call (no bearer tokens yet). The Flutter client
-keeps that password in memory only after a successful **online** login.
-Operational consequences:
+The disturbance CRUD endpoints (ARCHITECTURE.md §9.3) authenticate every call
+with `X-Narcis-Auth` — a bearer token (preferred) or, as a fallback, the
+plaintext password held in memory for the session. With a persisted token the
+client can sync after a cold start without re-login. Operational consequences:
 
-- A user who logged in offline (PBKDF2 cache hit) cannot sync queued
-  records. Records continue to accumulate locally until the next online
-  login, at which point `AppState.login` triggers `syncAll()` and the
-  queue drains. This is not a bug — it's the deliberate trade for not
-  storing plaintext passwords on disk.
-- A 401 from any disturbance endpoint clears the in-memory password AND
-  wipes the offline cache (same wipe path as a §9.1 401). The user must log
-  in online again. Records remain queued.
+- A user who logged in **offline** (PBKDF2 cache hit, no token, no in-memory
+  password) cannot sync queued records. Records accumulate locally until the
+  next **online** login, which mints a token and triggers `syncAll()` to drain
+  the queue. Once a token exists and is restored on app start, this gap closes —
+  sync resumes as soon as connectivity returns, no manual re-login.
+- A 401 from any disturbance endpoint clears the session token (and any
+  in-memory password) AND wipes the offline cache + stored token (same wipe
+  path as a §9.1 401). The user must log in online again. Records remain queued.
 - Edits and deletes made *while offline* are NOT queued — they apply only
   to the local row and never reach Oracle. Only creates queue. Operators
   who care about an edit being preserved must perform it while online.
@@ -239,14 +240,26 @@ live:
 ```
 tools/ords/disturbance_schema.sql           # disturbance tables (TB_MOTNJE, TB_MOTNJE_FOTO, ...)
 tools/ords/disturbance_codebook_seed.sql    # global codebook (groups + types)
-tools/ords/disturbance_auth_pkg.sql         # pkg_tb_auth helper package
+tools/ords/auth_token_schema.sql            # TB_AUTH_TOKENS (bearer-token store) — BEFORE pkg_tb_auth
+tools/ords/disturbance_auth_pkg.sql         # pkg_tb_auth (Basic + Bearer; mint/revoke; needs DBMS_CRYPTO)
 tools/ords/walks_schema.sql                 # walk tables + ALTER TB_MOTNJE ADD OBHOD_ID
+tools/ords/auth_login.sql                   # ORDS module narcis_app_auth: login (mints token) + logout
 tools/ords/disturbance_endpoints.sql        # ORDS module narcis_disturbances (now includes obhodId)
 tools/ords/walks_endpoints.sql              # ORDS module narcis_walks
 ```
-All six are idempotent. `walks_schema.sql` must run AFTER `disturbance_schema.sql` because its ALTER adds the `OBHOD_ID` column + FK on `TB_MOTNJE`. Endpoint scripts can be deployed in either order relative to each other; both expect the schema files to be in place.
+All are idempotent. `auth_token_schema.sql` must run BEFORE `disturbance_auth_pkg.sql` (the package body reads `TB_AUTH_TOKENS`). `walks_schema.sql` must run AFTER `disturbance_schema.sql` because its ALTER adds the `OBHOD_ID` column + FK on `TB_MOTNJE`. Endpoint scripts can be deployed in either order relative to each other; all expect the schema files to be in place.
+
+**Bearer-token rollout (added 2026-05-27 — pending deploy).** Only three of the files above carry this change: `auth_token_schema.sql`, `disturbance_auth_pkg.sql`, `auth_login.sql`. The disturbance/walks endpoint modules do NOT need redeploying — `pkg_tb_auth.authenticate`'s signature is unchanged. Deploy via SQLcl as the NARCIS schema:
+```
+sql -name "Narcis razvoj IGEA"          # dev (needs VPN); use the prod connection for prod
+@tools/ords/auth_token_schema.sql
+@tools/ords/disturbance_auth_pkg.sql
+@tools/ords/auth_login.sql
+```
+Watch the `SHOW ERRORS` output after the package: if it reports `PLS-00201` on `DBMS_CRYPTO`, grant `EXECUTE ON SYS.DBMS_CRYPTO` to the schema and re-run `disturbance_auth_pkg.sql`.
 
 After deploying:
+- `bash tools/ords/test_auth_login.sh` (with creds) — failure paths + the 200 success path + the **bearer-token lifecycle** (mint → `Bearer` GET /disturbances/ → logout revoke → revoked-token 401). Creds: the demo account in `project/.credentials.local.md`. For **dev**, point it at the dev ORDS host, e.g. `APP_AUTH_URL=<dev>/app-auth/login APP_DISTURBANCES_URL=<dev>/disturbances/ APP_AUTH_EMAIL=... APP_AUTH_PASSWORD=... bash tools/ords/test_auth_login.sh`; for **prod** the script's defaults (narcis.gov.si) apply.
 - `bash tools/ords/test_disturbances.sh` (with creds) for the disturbance lifecycle.
 - `bash tools/ords/test_walks.sh` (with creds) for the walk lifecycle (POST 3-point walk → idempotent re-POST → GET list → GET points → PUT name+notes → DELETE → 404 checks).
 
