@@ -8,27 +8,15 @@ class FundingFooter extends StatelessWidget {
       '(št. 101114184 — LIFE22-NAT-SI-LIFE TRSCA), ki ga sofinancirata '
       'Evropska unija iz programa LIFE in Ministrstvo za naravne vire in prostor.';
 
-  static Widget _logoCell(String asset) =>
-      Expanded(child: Image.asset(asset, fit: BoxFit.contain));
-
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
       child: Column(
         children: [
-          SizedBox(
-            height: 56,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                _logoCell('assets/images/funding_life.png'),
-                const SizedBox(width: 12),
-                _logoCell('assets/images/funding_natura2000.png'),
-                const SizedBox(width: 12),
-                _logoCell('assets/images/funding_life_trsca.png'),
-              ],
-            ),
+          Image.asset(
+            'assets/images/funding_logos.png',
+            fit: BoxFit.contain,
           ),
           const SizedBox(height: 16),
           Text(
