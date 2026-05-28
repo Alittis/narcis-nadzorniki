@@ -224,20 +224,20 @@ The app is intended for nature-protection wardens and authorised collaborators o
 This release is part of a closed test. Participation requires an invitation from the administrator and an existing NarcIS account with the appropriate authorization. For access or feedback, write to admin@alittis.com.
 ```
 
-### 3.3 Release notes — v1.2.1+8 (current)
+### 3.3 Release notes — v1.2.2+9 (current)
 
 **Slovene** (max 500 chars):
 ```
-Različica 1.2.1 (build 8)
-• Dodana navedba financiranja: logotipi LIFE, Natura 2000 in projekta LIFE Tršca ter izjava o sofinanciranju so vidni na dnu zaslona Profil; na prijavnem zaslonu so na dnu prikazani trije logotipi.
-• Projekt LIFE Tršca (št. 101114184) sofinancirata EU iz programa LIFE in Ministrstvo za naravne vire in prostor.
+Različica 1.2.2 (build 9)
+• Dodana navedba financiranja na dnu zaslona Profil: logotipi LIFE, Natura 2000 in projekta LIFE Tršca ter izjava o sofinanciranju.
+• Projekt LIFE Tršca (št. 101114184) sofinancirata Evropska unija iz programa LIFE in Ministrstvo za naravne vire in prostor.
 ```
 
 **English** (max 500 chars):
 ```
-Version 1.2.1 (build 8)
-• Funding attribution added: LIFE, Natura 2000 and LIFE Tršca project logos plus the co-funding statement are now visible at the bottom of the Profile screen; the login screen shows the three logos at the bottom.
-• The LIFE Tršca project (no. 101114184) is co-funded by the EU LIFE programme and the Slovenian Ministry of Natural Resources and Spatial Planning.
+Version 1.2.2 (build 9)
+• Funding attribution added at the bottom of the Profile screen: LIFE, Natura 2000 and LIFE Tršca project logos plus the co-funding statement.
+• The LIFE Tršca project (no. 101114184) is co-funded by the European Union (LIFE programme) and the Slovenian Ministry of Natural Resources and Spatial Planning.
 ```
 
 ### 3.3a Release notes — v1.2.0+7 (historical, superseded)
