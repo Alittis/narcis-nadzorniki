@@ -224,7 +224,23 @@ The app is intended for nature-protection wardens and authorised collaborators o
 This release is part of a closed test. Participation requires an invitation from the administrator and an existing NarcIS account with the appropriate authorization. For access or feedback, write to admin@alittis.com.
 ```
 
-### 3.3 Release notes — v1.1.3+6 (current)
+### 3.3 Release notes — v1.2.0+7 (current)
+
+**Slovene** (max 500 chars):
+```
+Različica 1.2.0 (build 7)
+• Vztrajna prijava: aplikacija si zapomni vašo prijavo med zagoni in po vrnitvi iz ozadja. Če Android v ozadju ugasne aplikacijo (pogosto na napravah Samsung), pri naslednjem odprtju ne zahteva več ponovne prijave.
+• Geslo se v napravo ne shrani: po prvi prijavi aplikacija uporablja preklicljiv žeton, ki po 30 dneh neaktivnosti poteče. Z odjavo ga prekliče tudi na strežniku.
+```
+
+**English** (max 500 chars):
+```
+Version 1.2.0 (build 7)
+• Persistent login: the app now remembers your login across launches and across returning from the background. When Android kills the app in the background (common on Samsung devices), it no longer prompts for re-login on the next open.
+• Password is not stored on the device: after the first login the app uses a revocable token that expires after 30 days of inactivity. Signing out also revokes it server-side.
+```
+
+### 3.3a Release notes — v1.1.3+6 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -244,7 +260,7 @@ Version 1.1.3 (build 6)
 • Historical Notranjska Regional Park entries are now part of the regular Motnje layer.
 ```
 
-### 3.3a Release notes — v1.0.1+2 (historical, superseded)
+### 3.3b Release notes — v1.0.1+2 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
