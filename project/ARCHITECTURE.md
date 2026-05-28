@@ -434,6 +434,15 @@ All rejections are sent to the main isolate as `{type: 'log', message: 'reject: 
 
 **List + detail.** Profile → "Seznam obhodov" opens [walks_list_screen.dart](../lib/screens/walks_list_screen.dart), which lists only the caller's own walks (filtered via `state.isWalkAuthoredByCurrentUser`) sorted newest-first with point/duration/disturbance counts. Teammate walks are still pulled into local state and rendered on the home-map Obhodi layer, but the personal list view is author-scoped, mirroring `RecordListScreen`'s author-scoping for disturbances. Tapping opens [walk_detail_screen.dart](../lib/screens/walk_detail_screen.dart) — a non-interactive map showing the polyline + linked-disturbance markers, plus a list of those disturbances. Points are lazy-fetched via `state.ensureWalkPointsCached()` on screen open.
 
+## 18. Funding Attribution
+The app is a deliverable of LIFE project **LIFE Tršca** (grant agreement no. 101114184, ref. LIFE22-NAT-SI-LIFE TRSCA), co-funded by the European Union's LIFE programme and the Slovenian Ministry of Natural Resources and Spatial Planning ("Ministrstvo za naravne vire in prostor"). LIFE programme communication rules require the EU emblem and a funding statement be visible on funded outputs.
+
+Implemented in [lib/widgets/funding_footer.dart](../lib/widgets/funding_footer.dart) as `FundingFooter`, used in two places:
+- **Profil page bottom** ([profile_screen.dart](../lib/screens/profile_screen.dart)) — full block: three logos in a row (LIFE / Natura 2000 / Life Tršca project) + the Slovenian funding sentence. Rendered as the last item of the Profil ListView, below the Odjava (logout) row, separated by a Divider.
+- **Login screen bottom** ([login_screen.dart](../lib/screens/login_screen.dart)) — compact variant (`compact: true`): just the three logos in a translucent-white card pinned to the bottom of the SafeArea. Form area is wrapped in `Column > Expanded > Center > ...` so the footer sits below without overlapping the form.
+
+Logos are bundled as PNGs at `assets/images/funding_life.png`, `assets/images/funding_natura2000.png`, `assets/images/funding_life_trsca.png`. Source PDFs (publisher-supplied) are NOT committed; PNGs were rasterised once at 600px tall via `pdftoppm -png -scale-to-y 600`. Aspect ratios differ — Natura 2000 is portrait, LIFE and Life Tršca are landscape — so the row uses `FittedBox` with a fixed height to scale gracefully without distortion.
+
 ## Documentation Authority
 The /project directory is the single source of truth for:
 - Architecture

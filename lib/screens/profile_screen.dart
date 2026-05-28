@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:narcis_nadzorniki/screens/record_list_screen.dart';
 import 'package:narcis_nadzorniki/screens/walks_list_screen.dart';
 import 'package:narcis_nadzorniki/state/app_state.dart';
+import 'package:narcis_nadzorniki/widgets/funding_footer.dart';
 import 'package:provider/provider.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -15,8 +16,9 @@ class ProfileScreen extends StatelessWidget {
         builder: (context, state, _) {
           final email = state.currentUser ?? '';
           final initial = email.isNotEmpty ? email[0].toUpperCase() : '?';
-          final total =
-              state.records.where(state.isAuthoredByCurrentUser).length;
+          final total = state.records
+              .where(state.isAuthoredByCurrentUser)
+              .length;
           final pendingPush = state.pendingPushCount;
           final missingLocal = state.missingLocalCount;
 
@@ -29,10 +31,7 @@ class ProfileScreen extends StatelessWidget {
               Center(
                 child: CircleAvatar(
                   radius: 40,
-                  child: Text(
-                    initial,
-                    style: const TextStyle(fontSize: 32),
-                  ),
+                  child: Text(initial, style: const TextStyle(fontSize: 32)),
                 ),
               ),
               const SizedBox(height: 12),
@@ -82,11 +81,13 @@ class ProfileScreen extends StatelessWidget {
                   state.isOutOfSync ? Icons.sync_problem : Icons.cloud_done,
                   color: state.isOutOfSync ? Colors.orange : Colors.green,
                 ),
-                title: Text(state.isSyncing
-                    ? 'Sinhronizacija poteka…'
-                    : (state.isOutOfSync
-                        ? 'Sinhroniziraj zdaj'
-                        : 'Vse je sinhronizirano')),
+                title: Text(
+                  state.isSyncing
+                      ? 'Sinhronizacija poteka…'
+                      : (state.isOutOfSync
+                            ? 'Sinhroniziraj zdaj'
+                            : 'Vse je sinhronizirano'),
+                ),
                 subtitle: state.isOutOfSync
                     ? Text(_subtitleFor(pendingPush, missingLocal))
                     : null,
@@ -96,9 +97,7 @@ class ProfileScreen extends StatelessWidget {
                         height: 20,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : (state.isOutOfSync
-                        ? const Icon(Icons.refresh)
-                        : null),
+                    : (state.isOutOfSync ? const Icon(Icons.refresh) : null),
                 onTap: state.isSyncing || !state.isOnline || !state.canSync
                     ? null
                     : () => state.syncAll(),
@@ -110,9 +109,7 @@ class ProfileScreen extends StatelessWidget {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const RecordListScreen(),
-                    ),
+                    MaterialPageRoute(builder: (_) => const RecordListScreen()),
                   );
                 },
               ),
@@ -123,9 +120,7 @@ class ProfileScreen extends StatelessWidget {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const WalksListScreen(),
-                    ),
+                    MaterialPageRoute(builder: (_) => const WalksListScreen()),
                   );
                 },
               ),
@@ -135,7 +130,9 @@ class ProfileScreen extends StatelessWidget {
                 onChanged: state.setOfflineOverride,
                 secondary: const Icon(Icons.wifi_off),
                 title: const Text('Offline način'),
-                subtitle: const Text('Shranjuj lokalno in čakaj na sinhronizacijo.'),
+                subtitle: const Text(
+                  'Shranjuj lokalno in čakaj na sinhronizacijo.',
+                ),
               ),
               const Divider(height: 1),
               ListTile(
@@ -148,6 +145,8 @@ class ProfileScreen extends StatelessWidget {
                   if (navigator.canPop()) navigator.pop();
                 },
               ),
+              const Divider(height: 1),
+              const FundingFooter(),
             ],
           );
         },
@@ -179,7 +178,9 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final bg = highlighted ? scheme.errorContainer : scheme.surfaceContainerHighest;
+    final bg = highlighted
+        ? scheme.errorContainer
+        : scheme.surfaceContainerHighest;
     final fg = highlighted ? scheme.onErrorContainer : scheme.onSurface;
     return Container(
       padding: const EdgeInsets.all(16),
@@ -194,10 +195,10 @@ class _StatCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             value,
-            style: Theme.of(context)
-                .textTheme
-                .headlineSmall
-                ?.copyWith(color: fg, fontWeight: FontWeight.bold),
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              color: fg,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           Text(label, style: TextStyle(color: fg)),
         ],

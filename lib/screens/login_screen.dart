@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:narcis_nadzorniki/state/app_state.dart';
+import 'package:narcis_nadzorniki/widgets/funding_footer.dart';
 import 'package:provider/provider.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -106,108 +107,125 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
           SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 420),
-                  child: Form(
-                    key: _formKey,
-                    child: AutofillGroup(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text(
-                            'Terenska beležnica',
-                            style: Theme.of(context).textTheme.headlineSmall
-                                ?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                  shadows: const [
-                                    Shadow(
-                                      color: Colors.black54,
-                                      blurRadius: 6,
-                                      offset: Offset(0, 1),
-                                    ),
-                                  ],
+            child: Column(
+              children: [
+                Expanded(
+                  child: Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(24),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 420),
+                        child: Form(
+                          key: _formKey,
+                          child: AutofillGroup(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Text(
+                                  'Terenska beležnica',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineSmall
+                                      ?.copyWith(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                        shadows: const [
+                                          Shadow(
+                                            color: Colors.black54,
+                                            blurRadius: 6,
+                                            offset: Offset(0, 1),
+                                          ),
+                                        ],
+                                      ),
+                                  textAlign: TextAlign.center,
                                 ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 24),
-                          TextFormField(
-                            controller: _emailController,
-                            autofillHints: const [
-                              AutofillHints.username,
-                              AutofillHints.email,
-                            ],
-                            keyboardType: TextInputType.emailAddress,
-                            textInputAction: TextInputAction.next,
-                            decoration: _fieldDecoration(
-                              hint: 'E-pošta',
-                              icon: Icons.person_outline,
-                            ),
-                            validator: (value) {
-                              final v = value?.trim() ?? '';
-                              if (v.isEmpty) return 'Vnesite e-pošto.';
-                              if (!v.contains('@'))
-                                return 'Neveljaven e-poštni naslov.';
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: _passwordController,
-                            autofillHints: const [AutofillHints.password],
-                            obscureText: true,
-                            textInputAction: TextInputAction.done,
-                            onFieldSubmitted: (_) => _submit(),
-                            decoration: _fieldDecoration(
-                              hint: 'Geslo',
-                              icon: Icons.lock_outline,
-                            ),
-                            validator: (value) {
-                              if ((value ?? '').isEmpty) return 'Vnesite geslo.';
-                              return null;
-                            },
-                          ),
-                          if (_error != null) ...[
-                            const SizedBox(height: 16),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 10,
-                                horizontal: 14,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.red.shade900.withValues(alpha: 0.82),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                _error!,
-                                style: const TextStyle(color: Colors.white),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ],
-                          const SizedBox(height: 24),
-                          FilledButton(
-                            onPressed: _submitting ? null : _submit,
-                            child: _submitting
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
+                                const SizedBox(height: 24),
+                                TextFormField(
+                                  controller: _emailController,
+                                  autofillHints: const [
+                                    AutofillHints.username,
+                                    AutofillHints.email,
+                                  ],
+                                  keyboardType: TextInputType.emailAddress,
+                                  textInputAction: TextInputAction.next,
+                                  decoration: _fieldDecoration(
+                                    hint: 'E-pošta',
+                                    icon: Icons.person_outline,
+                                  ),
+                                  validator: (value) {
+                                    final v = value?.trim() ?? '';
+                                    if (v.isEmpty) return 'Vnesite e-pošto.';
+                                    if (!v.contains('@'))
+                                      return 'Neveljaven e-poštni naslov.';
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 12),
+                                TextFormField(
+                                  controller: _passwordController,
+                                  autofillHints: const [AutofillHints.password],
+                                  obscureText: true,
+                                  textInputAction: TextInputAction.done,
+                                  onFieldSubmitted: (_) => _submit(),
+                                  decoration: _fieldDecoration(
+                                    hint: 'Geslo',
+                                    icon: Icons.lock_outline,
+                                  ),
+                                  validator: (value) {
+                                    if ((value ?? '').isEmpty)
+                                      return 'Vnesite geslo.';
+                                    return null;
+                                  },
+                                ),
+                                if (_error != null) ...[
+                                  const SizedBox(height: 16),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 10,
+                                      horizontal: 14,
                                     ),
-                                  )
-                                : const Text('Prijava'),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.shade900.withValues(
+                                        alpha: 0.82,
+                                      ),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      _error!,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                ],
+                                const SizedBox(height: 24),
+                                FilledButton(
+                                  onPressed: _submitting ? null : _submit,
+                                  child: _submitting
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : const Text('Prijava'),
+                                ),
+                              ],
+                            ),
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(24, 8, 24, 16),
+                  child: FundingFooter(compact: true),
+                ),
+              ],
             ),
           ),
         ],

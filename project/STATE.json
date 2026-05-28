@@ -251,6 +251,21 @@
       "path": "assets/images/login_bg.jpg",
       "purpose": "Full-bleed background photograph for the login screen (Marsh Fritillary on a hawkbit in a meadow). Downsampled from tools/icon/sources/login_bg.jpg to 1800px longest edge at quality 78 (~375 KB) to keep APK/IPA weight low; full-res camera original is preserved in sources/.",
       "regenerated_by": "python3 tools/icon/build_login_bg.py (re-run after replacing tools/icon/sources/login_bg.jpg)"
+    },
+    {
+      "path": "assets/images/funding_life.png",
+      "purpose": "EU LIFE programme emblem. Rendered in FundingFooter on the Profil page (full block) and the login screen (compact). Required by LIFE funding visibility rules.",
+      "regenerated_by": "pdftoppm -png -scale-to-y 600 -singlefile <source-life-logo.pdf> funding_life (source PDF supplied by funder, not committed)"
+    },
+    {
+      "path": "assets/images/funding_natura2000.png",
+      "purpose": "Natura 2000 network emblem. Rendered alongside the LIFE and Life Tršca logos in FundingFooter.",
+      "regenerated_by": "pdftoppm -png -scale-to-y 600 -singlefile <source-natura2000-logo.pdf> funding_natura2000 (source PDF supplied by funder, not committed)"
+    },
+    {
+      "path": "assets/images/funding_life_trsca.png",
+      "purpose": "Project logo for LIFE Tršca (LIFE22-NAT-SI-LIFE TRSCA, grant 101114184). Rendered alongside LIFE and Natura 2000 in FundingFooter.",
+      "regenerated_by": "pdftoppm -png -scale-to-y 600 -singlefile <source-life_trsca_simbol.pdf> funding_life_trsca (source PDF supplied by project, not committed)"
     }
   ],
   "env_required": [],
