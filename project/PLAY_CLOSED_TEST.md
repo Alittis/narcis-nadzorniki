@@ -224,7 +224,23 @@ The app is intended for nature-protection wardens and authorised collaborators o
 This release is part of a closed test. Participation requires an invitation from the administrator and an existing NarcIS account with the appropriate authorization. For access or feedback, write to admin@alittis.com.
 ```
 
-### 3.3 Release notes — v1.2.0+7 (current)
+### 3.3 Release notes — v1.2.1+8 (current)
+
+**Slovene** (max 500 chars):
+```
+Različica 1.2.1 (build 8)
+• Dodana navedba financiranja: logotipi LIFE, Natura 2000 in projekta LIFE Tršca ter izjava o sofinanciranju so vidni na dnu zaslona Profil; na prijavnem zaslonu so na dnu prikazani trije logotipi.
+• Projekt LIFE Tršca (št. 101114184) sofinancirata EU iz programa LIFE in Ministrstvo za naravne vire in prostor.
+```
+
+**English** (max 500 chars):
+```
+Version 1.2.1 (build 8)
+• Funding attribution added: LIFE, Natura 2000 and LIFE Tršca project logos plus the co-funding statement are now visible at the bottom of the Profile screen; the login screen shows the three logos at the bottom.
+• The LIFE Tršca project (no. 101114184) is co-funded by the EU LIFE programme and the Slovenian Ministry of Natural Resources and Spatial Planning.
+```
+
+### 3.3a Release notes — v1.2.0+7 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -240,7 +256,7 @@ Version 1.2.0 (build 7)
 • Password is not stored on the device: after the first login the app uses a revocable token that expires after 30 days of inactivity. Signing out also revokes it server-side.
 ```
 
-### 3.3a Release notes — v1.1.3+6 (historical, superseded)
+### 3.3b Release notes — v1.1.3+6 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -260,7 +276,7 @@ Version 1.1.3 (build 6)
 • Historical Notranjska Regional Park entries are now part of the regular Motnje layer.
 ```
 
-### 3.3b Release notes — v1.0.1+2 (historical, superseded)
+### 3.3c Release notes — v1.0.1+2 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
