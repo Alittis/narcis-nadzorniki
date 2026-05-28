@@ -249,14 +249,32 @@ tools/ords/walks_endpoints.sql              # ORDS module narcis_walks
 ```
 All are idempotent. `auth_token_schema.sql` must run BEFORE `disturbance_auth_pkg.sql` (the package body reads `TB_AUTH_TOKENS`). `walks_schema.sql` must run AFTER `disturbance_schema.sql` because its ALTER adds the `OBHOD_ID` column + FK on `TB_MOTNJE`. Endpoint scripts can be deployed in either order relative to each other; all expect the schema files to be in place.
 
-**Bearer-token rollout (added 2026-05-27 — pending deploy).** Only three of the files above carry this change: `auth_token_schema.sql`, `disturbance_auth_pkg.sql`, `auth_login.sql`. The disturbance/walks endpoint modules do NOT need redeploying — `pkg_tb_auth.authenticate`'s signature is unchanged. Deploy via SQLcl as the NARCIS schema:
+**Bearer-token rollout (added 2026-05-27; deployed to ARSO prod 2026-05-28, 7/7 smoke-tested).** Only three of the files above carry this change: `auth_token_schema.sql`, `disturbance_auth_pkg.sql`, `auth_login.sql`. The disturbance/walks endpoint modules do NOT need redeploying — `pkg_tb_auth.authenticate`'s signature is unchanged.
+
+**Production deploy path.** Production NarcIS (`narcis.gov.si`, ARSO-operated) is reached via **APEX SQL Workshop in the browser** as the `NARCIS` schema; there is no SQLcl connection to prod. Open SQL Workshop → **SQL Scripts** → upload each file and run in order:
+1. `tools/ords/auth_token_schema.sql`
+2. `tools/ords/disturbance_auth_pkg.sql`
+3. `tools/ords/auth_login.sql`
+
+After step 2, verify the package compiled (the `SHOW ERRORS` directives in the file produce output Workshop may not surface in-line; this query always works):
+```sql
+SELECT name, type, line, text FROM user_errors
+ WHERE name = 'PKG_TB_AUTH' ORDER BY sequence;
 ```
-sql -name "Narcis razvoj IGEA"          # dev (needs VPN); use the prod connection for prod
-@tools/ords/auth_token_schema.sql
-@tools/ords/disturbance_auth_pkg.sql
-@tools/ords/auth_login.sql
+Empty result = clean compile. `PLS-00201` on `DBMS_CRYPTO` means the schema is missing `EXECUTE ON SYS.DBMS_CRYPTO`; request the grant (one-time, from a privileged user) and re-run step 2. After step 3, sanity-check that both templates exist in the new module:
+```sql
+SELECT name, base_path FROM user_ords_modules WHERE name = 'narcis_app_auth';
+SELECT uri_template FROM user_ords_templates
+ WHERE module_id = (SELECT id FROM user_ords_modules WHERE name = 'narcis_app_auth');
 ```
-Watch the `SHOW ERRORS` output after the package: if it reports `PLS-00201` on `DBMS_CRYPTO`, grant `EXECUTE ON SYS.DBMS_CRYPTO` to the schema and re-run `disturbance_auth_pkg.sql`.
+Expect base path `app-auth/` and templates `login` + `logout`.
+
+If a separate IGEA dev instance is available via the `Narcis razvoj IGEA` SQLcl connection, the same three files run there with `@tools/ords/<file>.sql`.
+
+**Backward-compatible.** The change is additive: `pkg_tb_auth.authenticate` still accepts `Basic`, login still works for currently-installed app builds, the disturbance/walks endpoints are untouched. The Bearer path activates only when a new app build calls it. Rollback per file:
+- `DROP TABLE tb_auth_tokens PURGE;` reverts the table.
+- Redeploy the previous git revision of `disturbance_auth_pkg.sql` (`CREATE OR REPLACE` overwrites cleanly) to revert the package.
+- Redeploy the previous `auth_login.sql` to revert the ORDS module.
 
 After deploying:
 - `bash tools/ords/test_auth_login.sh` (with creds) — failure paths + the 200 success path + the **bearer-token lifecycle** (mint → `Bearer` GET /disturbances/ → logout revoke → revoked-token 401). Creds: the demo account in `project/.credentials.local.md`. For **dev**, point it at the dev ORDS host, e.g. `APP_AUTH_URL=<dev>/app-auth/login APP_DISTURBANCES_URL=<dev>/disturbances/ APP_AUTH_EMAIL=... APP_AUTH_PASSWORD=... bash tools/ords/test_auth_login.sh`; for **prod** the script's defaults (narcis.gov.si) apply.

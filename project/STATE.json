@@ -68,7 +68,7 @@
           "host": "narcis.gov.si",
           "auth": "X-Narcis-Auth: Basic <base64(email:password)> (login is Basic-only; mints a Bearer token on success)",
           "response": "{authenticated, user, token, expiresAt} - token/expiresAt present when minting succeeds; tokenless 200 fallback if mint fails",
-          "status": "deployed (Basic); token mint implemented in source 2026-05-27, pending deploy. A56 real-device validation passed 2026-04-25; debug instrumentation remains (credentials redacted) for broader-device coverage"
+          "status": "deployed with token mint to ARSO prod 2026-05-28 (Basic baseline 2026-04-25); 7/7 token-lifecycle smoke-test passed 2026-05-28; A56 real-device validation passed 2026-04-25; debug instrumentation remains (credentials redacted) for broader-device coverage"
         },
         {
           "path": "app-auth/logout",
@@ -76,7 +76,7 @@
           "host": "narcis.gov.si",
           "auth": "X-Narcis-Auth: Bearer <token>",
           "response": "{\"revoked\":true} - idempotent, non-enumerating (200 even for unknown/already-revoked token)",
-          "status": "revokes the presented token via pkg_tb_auth.revoke_token; implemented in source 2026-05-27, pending deploy"
+          "status": "revokes the presented token via pkg_tb_auth.revoke_token; deployed to ARSO prod 2026-05-28 and smoke-tested end-to-end (revoked token confirmed -> 401 on replay)"
         },
         {
           "path": "disturbances/",
@@ -256,7 +256,7 @@
   "env_required": [],
   "ci_detected": false,
   "auth": {
-    "status": "production for Basic; bearer-token sessions implemented in source 2026-05-27, PENDING MANUAL DEPLOY to IGEA dev then ARSO prod",
+    "status": "production: Basic and bearer-token sessions both live on narcis.gov.si as of 2026-05-28 (deployed to ARSO prod via APEX SQL Workshop; smoke test 7/7 incl. mint, Bearer CRUD, logout revoke, revoked-token 401)",
     "endpoint": "https://narcis.gov.si/ords/narcis/app-auth/login",
     "logout_endpoint": "https://narcis.gov.si/ords/narcis/app-auth/logout (POST, X-Narcis-Auth: Bearer <token>, returns {\"revoked\":true})",
     "wire_format": "X-Narcis-Auth: Bearer <token> (preferred) or Basic <base64(email:password)> (login + fallback)",
@@ -354,7 +354,7 @@
     "wire_ordering_constraint": "client must POST a walk before any disturbance referencing it (FK on disturbance INSERT raises ORA-02291 → 500 if walk is missing); syncAll drains pending walks before pending disturbances"
   },
   "auth_token_schema": {
-    "status": "implemented in source 2026-05-27; PENDING MANUAL DEPLOY (deploy auth_token_schema.sql before disturbance_auth_pkg.sql)",
+    "status": "deployed to ARSO prod 2026-05-28 via APEX SQL Workshop (NARCIS schema); package PKG_TB_AUTH compiled clean (DBMS_CRYPTO grant already in place); 7/7 token-lifecycle smoke-test passed against narcis.gov.si",
     "purpose": "Bearer-token sessions: persistent login + sync without re-sending the password on every call. Primary CRUD credential going forward; Basic still accepted in parallel.",
     "deploy_files": [
       "tools/ords/auth_token_schema.sql",
