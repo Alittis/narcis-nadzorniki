@@ -66,3 +66,6 @@ app.*.map.json
 # the .local variant and worktrees scratch dir stay off the wire.
 .claude/settings.local.json
 .claude/worktrees/
+
+# Local-only misc documents (offers, contracts, ad-hoc PDFs — not versioned)
+/misc/
