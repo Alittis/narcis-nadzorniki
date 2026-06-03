@@ -1,5 +1,12 @@
 # Operations Guide
 
+## 0. Feedback & Issue Tracking
+User feedback, bugs, and tasks are tracked in [project/BACKLOG.md](BACKLOG.md) — the
+single source of truth for what's open, in progress, and shipped. Read it at the start of
+a session and keep it current: capture new items, flip status as work moves, and start the
+implementing commit's message with the item id (`TB-N:`) so the backlog and git history
+stay linked.
+
 ## 1. Service Monitoring
 - Not applicable as a VPS service from inspected repository data.
 - For app validation:
