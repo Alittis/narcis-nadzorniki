@@ -597,4 +597,4 @@ For each tester collected via reply email, store: full name, role / organisation
 - [x] Capture the 6 phone screenshots on the A56. (2026-06-15 — `~/Releases/play-screenshots-1.3.0/01-login…06-profile.png`, 1080×2340, alpha stripped, from the v1.3.0+11 dev build.)
 - [ ] Confirm the chosen Closed track name (`ARSO – zaprti test`) is the right label for stakeholders.
 - [ ] Confirm category choice (Productivity vs. Tools).
-- [ ] After the first Closed release goes live: paste the Google-assigned **app-signing** SHA-1 / SHA-256 into `STATE.json → android_release.play_app_signing_cert_sha*`.
+- [x] After the first Closed release goes live: paste the Google-assigned **app-signing** SHA-1 / SHA-256 into `STATE.json → android_release.play_app_signing_cert_sha*`. (Done 2026-06-15.)

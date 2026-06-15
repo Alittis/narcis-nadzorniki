@@ -21,8 +21,8 @@
     "upload_keystore_validity_until": "2051-04-22",
     "upload_cert_sha1": "66:06:D2:3D:09:96:28:4B:10:05:29:F1:07:99:CA:C1:FC:D7:CA:19",
     "upload_cert_sha256": "25:F1:C4:C6:20:C5:33:39:D3:8A:53:11:6C:7A:44:70:53:BD:FC:99:E8:1E:9F:AE:CA:D3:4D:BB:38:B5:E6:A2",
-    "play_app_signing_cert_sha1": "STATUS: UNKNOWN — REQUIRES CONFIRMATION (visible in Play Console after first AAB upload)",
-    "play_app_signing_cert_sha256": "STATUS: UNKNOWN — REQUIRES CONFIRMATION (visible in Play Console after first AAB upload)",
+    "play_app_signing_cert_sha1": "8E:88:34:93:C8:DE:4E:51:5C:C4:80:EF:CE:40:7F:A9:81:36:9D:B9 (Play-held app-signing key; recorded 2026-06-15 from Play Console -> Protected with Play -> Play Store distribution -> Play app signing)",
+    "play_app_signing_cert_sha256": "FA:BF:B7:27:55:65:AA:D2:A6:03:72:63:F9:62:90:0F:7B:14:91:28:B6:76:C0:03:CF:B4:75:CF:59:9B:0C:D0 (Play-held app-signing key; recorded 2026-06-15)",
     "manifest_permissions_truthful": "ACCESS_BACKGROUND_LOCATION intentionally NOT declared — walk tracking is foreground-service-only (FGS type 'location'); permission would be required only for a future feature that needs location while no FGS is running",
     "first_aab_built": "2026-04-28 (45.5 MB, signed with upload key, manifest verified clean of com.example and BACKGROUND_LOCATION)",
     "first_aab_archived_at": "/Users/Alexis/Releases/terenska-beleznica-1.0.0+1.aab",
@@ -38,8 +38,7 @@
       "store_listing_languages": ["sl", "en-US"],
       "category": "Productivity",
       "open_items": [
-        "Confirm Closed track name with stakeholders",
-        "After rollout: record Play app-signing cert SHA-1/SHA-256 into android_release.play_app_signing_cert_sha*"
+        "Confirm Closed track name with stakeholders"
       ],
       "feature_graphic": {
         "status": "Builder authored 2026-05-21",
