@@ -113,44 +113,6 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   decision drives whether this is a UI affordance over existing walks or a new record kind.
 - **Shipped:** —
 
-### TB-10 · "Območja s statusom" map overlay (5 sublayers)
-`✨ Enhancement` · `P2` · `Doing` · Maintainer-initiated · Updated: 2026-06-15
-- **Want:** Bring the `narcis-vibed` "Območja s statusom" layers to the field app — all five
-  sublayers (Natura 2000, zavarovana območja, EPO, naravne vrednote, NV-jame) as toggleable map
-  overlays with tap → list → detail.
-- **Decisions:** Server-rendered **WMS tiles** from the production NarcIS GeoServer
-  (`narcis.gov.si/ows/ows`, `SI.NARCIS` workspace `ZOS_*` layers — the same GeoServer the APEX app
-  uses), with tap-to-identify via WMS GetFeatureInfo. Pivoted here from an initial client-side
-  vector approach (GeoJSON from the ORDS `vib/zos` module + `proj4dart`) after measuring that
-  endpoint at **~14–16 s TTFB per cold request** and recognising whole-layer vector won't scale to
-  NV/NVJ. WMS tiles load per-viewport (instant) and scale to any sublayer. Per-sublayer **layer
-  picker**, N2k on by default. See ARCHITECTURE §10.2.
-- **Shipped (code):** [`obmocja_store.dart`](../lib/data/obmocja_store.dart) (`ZosKind`,
-  `zosWmsLayers`/`zosOrder`, `identify(point, activeSet)` → GetFeatureInfo, per-kind `ObmocjeFeature`),
-  `obmocjaWmsLayers(active)` in [`basemap.dart`](../lib/widgets/basemap.dart),
-  [`obmocja_picker.dart`](../lib/widgets/obmocja_picker.dart) (layer picker),
-  [`obmocje_sheet.dart`](../lib/widgets/obmocje_sheet.dart) (list ⇄ detail + per-kind presentation),
-  wired into [`home_screen.dart`](../lib/screens/home_screen.dart) (`_activeZos` set; "Območja" chip
-  opens the picker; a map tap identifies across active sublayers). `proj4dart` removed. Unit tests in
-  `test/obmocja_store_test.dart` (request shape + per-kind multi-sublayer parse) — suite 39/39 green.
-  Server-side verified: GetMap 200 for all five sublayers; GetFeatureInfo overlap across N2k/ZO/EPO/NV.
-- **Refinement — symbology accuracy (2026-06-15, maintainer feedback):** the picker dots and the
-  identify-list dots used an approximate per-kind palette that didn't match the GeoServer-rendered
-  map (most misleading for ZO, which the SLD draws in seven `ZO_VRSTA` colours). Fixed: picker drops
-  the colour dot (a single swatch can't represent a multi-category layer); the identify list/detail
-  now draw each feature's **real** SLD colour + shape via `zosSymbol`/`_ZosSwatch` in `obmocje_sheet.dart`
-  — filled area, outline-only area (N2k-POV, NV-OP), ZO circle, NV triangle, jame cave glyph — matched
-  on `tip`/`ZO_VRSTA`/`NV_POMEN`/`NV_STATUS` + geometry (`isPoint`). Palette captured from the layers'
-  WMS GetLegendGraphic. `+4` symbol tests (`test/obmocje_sheet_test.dart`); suite 43/43 green.
-- **Open before Done:** built into **v1.3.0+11** (signed release AAB archived at
-  `~/Releases/terenska-beleznica-1.3.0+11.aab`; suite 43/43; manifest clean). On-device on the A56
-  (dev profile build): layer picker, tap-to-identify and the SLD-faithful swatches — incl. the
-  corrected jame cave glyph — verified by the maintainer. **Remaining:** upload v1.3.0+11 to the Play
-  **Closed testing** track (manual, per PLAY_CLOSED_TEST.md Phase B) + roll out. Follow-ups: an on-map
-  legend, and tuning the point-layer (jame/NV/EPO points) tap tolerance if needed.
-- **Discussion:** —
-- **Shipped:** —
-
 ---
 
 ## Done
@@ -191,3 +153,18 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   ([`home_screen.dart`](../lib/screens/home_screen.dart)) — no backend/sync/model change.
   ARCHITECTURE "Historical walks layer" note updated. `flutter analyze` clean. Committed (`73edf9a`);
   ships in **v1.3.0+11**, the closed-test build.
+
+### TB-10 · "Območja s statusom" map overlay (5 sublayers)
+`✨ Enhancement` · `Done` · Maintainer-initiated
+- **Was:** The field map had no protected-area context. Wanted the `narcis-vibed` "Območja s statusom"
+  layers — Natura 2000, zavarovana območja, EPO, naravne vrednote, jame — as toggleable overlays with
+  tap → list → detail.
+- **Shipped:** All five ZOS sublayers as server-rendered WMS tiles from the production NarcIS GeoServer
+  (`narcis.gov.si/ows/ows`, `SI.NARCIS:ZOS_*`) + tap-to-identify (GetFeatureInfo), a per-sublayer layer
+  picker (N2k default), and a list ⇄ detail sheet whose swatches mirror each layer's SLD — colour +
+  shape (filled/outline areas, ZO circles, NV triangles, jame cave glyph), matched on
+  `tip`/`ZO_VRSTA`/`NV_POMEN`/`NV_STATUS` + geometry. `obmocja_store.dart`, `obmocja_picker.dart`,
+  `obmocje_sheet.dart`, `basemap.dart`, wired in `home_screen.dart`; `proj4dart` removed; suite 43/43.
+  `d5a41b3` → `b139558` → `773e43f` → `477b7d2` → `3209a2b` (release `104784a`). Shipped in **v1.3.0+11**,
+  rolled out live on the Play **Closed testing** track 2026-06-15. See ARCHITECTURE §10.2. Follow-ups
+  (separate): on-map legend; tune point-layer (jame/NV/EPO) tap tolerance.
