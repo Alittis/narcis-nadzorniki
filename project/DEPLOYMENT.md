@@ -31,7 +31,7 @@ flutter analyze                 # static analysis
 - Upload cert SHA-1: `66:06:D2:3D:09:96:28:4B:10:05:29:F1:07:99:CA:C1:FC:D7:CA:19`
 - Upload cert SHA-256: `25:F1:C4:C6:20:C5:33:39:D3:8A:53:11:6C:7A:44:70:53:BD:FC:99:E8:1E:9F:AE:CA:D3:4D:BB:38:B5:E6:A2`
 
-These fingerprints are public (they're the public-key cert digest). Not the same as the **app-signing key** that Play assigns under Play App Signing — Google holds that one and exposes its fingerprint in Play Console after the first upload; record it in `STATE.json` once available.
+These fingerprints are public (they're the public-key cert digest). Not the same as the **app-signing key** that Play assigns under Play App Signing — Google holds that one and exposes its fingerprint in Play Console after the first upload; record it in `STATE.json` once available. **Where in Play Console (2026 menu):** `Protected with Play → Play Store distribution → Go to Play app signing` → the **App signing key** section shows SHA-1 / SHA-256. (It is **not** under *Test and release* / *App integrity* — that menu was reorganised; the top-bar search for "app signing" also jumps straight there.) Copy the **App signing key certificate** fingerprints, not the upload key.
 
 **Privacy policy:**
 - Hosted at `https://alittis.github.io/terenska-beleznica/privacy/` (source: `~/Documents/PROJEKTI/alittis.github.io/terenska-beleznica/privacy/index.html`, served via the `Alittis/alittis.github.io` repo).
