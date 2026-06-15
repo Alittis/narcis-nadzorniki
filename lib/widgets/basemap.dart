@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:narcis_nadzorniki/data/obmocja_store.dart';
 
 enum BasemapMode { osm, satellite }
 
@@ -57,6 +58,56 @@ List<Widget> parceleOverlayTileLayers() {
       maxZoom: 19,
       userAgentPackageName: _userAgent,
     ),
+  ];
+}
+
+// Natura 2000 palette, matching narcis-vibed. POO (SAC) = translucent orange
+// fill + grey hairline; POV (SPA) = light red fill + solid red outline (vibed
+// draws POV as a diagonal hatch, which flutter_map's CPU painter can't do — the
+// solid outline keeps the two designations clearly distinct).
+const Color _n2kPooFill = Color(0x66D98210); // rgba(217,130,16,0.40)
+const Color _n2kPooLine = Color(0x59232323); // rgba(35,35,35,0.35)
+const Color _n2kPovFill = Color(0x24E30000); // ~rgba(227,0,0,0.14)
+const Color _n2kPovLine = Color(0xFFE30000); // #e30000
+
+/// Natura 2000 ("Območja s statusom") overlay: filled polygons coloured by
+/// designation (POO/POV), with any rare point-geometry features as small discs.
+/// `polygonCulling` drops off-screen polygons so pan/zoom stays cheap.
+List<Widget> obmocjaLayers(List<N2kArea> areas) {
+  final polygons = <Polygon>[];
+  final circles = <CircleMarker>[];
+  for (final a in areas) {
+    final fill = a.isPov ? _n2kPovFill : _n2kPooFill;
+    final line = a.isPov ? _n2kPovLine : _n2kPooLine;
+    final width = a.isPov ? 1.5 : 1.0;
+    for (final part in a.parts) {
+      polygons.add(
+        Polygon(
+          points: part.outer,
+          holePointsList: part.holes.isEmpty ? null : part.holes,
+          color: fill,
+          borderColor: line,
+          borderStrokeWidth: width,
+          isFilled: true,
+        ),
+      );
+    }
+    final pt = a.point;
+    if (pt != null) {
+      circles.add(
+        CircleMarker(
+          point: pt,
+          radius: 6,
+          color: fill,
+          borderColor: line,
+          borderStrokeWidth: width,
+        ),
+      );
+    }
+  }
+  return [
+    PolygonLayer(polygons: polygons, polygonCulling: true),
+    if (circles.isNotEmpty) CircleLayer(circles: circles),
   ];
 }
 

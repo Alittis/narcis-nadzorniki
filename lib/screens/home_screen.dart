@@ -6,6 +6,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:narcis_nadzorniki/data/map_view_store.dart';
+import 'package:narcis_nadzorniki/data/obmocja_store.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
 import 'package:narcis_nadzorniki/models/legacy_disturbance.dart';
 import 'package:narcis_nadzorniki/screens/detail_screen.dart';
@@ -18,6 +19,7 @@ import 'package:narcis_nadzorniki/services/location_service.dart';
 import 'package:narcis_nadzorniki/services/place_search_service.dart';
 import 'package:narcis_nadzorniki/state/app_state.dart';
 import 'package:narcis_nadzorniki/widgets/basemap.dart';
+import 'package:narcis_nadzorniki/widgets/obmocje_sheet.dart';
 import 'package:provider/provider.dart';
 
 enum AppMode { motnje, obhodi, mode3, mode4 }
@@ -82,6 +84,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _locationService = LocationService();
   final _imagePicker = ImagePicker();
   final _mapViewStore = MapViewStore();
+  final _obmocjaStore = ObmocjaStore();
   LatLng _center = _sloveniaCenter;
   double _initialZoom = _sloveniaZoom;
   bool _viewLoaded = false;
@@ -97,6 +100,9 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _showMotnje = true;
   bool _showObhodi = false;
   bool _showParcele = false;
+  bool _showObmocja = false;
+  // Guards against a second fetch while the first N2k load is in flight.
+  bool _obmocjaLoading = false;
 
   bool _plusExpanded = false;
   // Location stamped at the moment the user declared intent (tapped "+"),
@@ -415,6 +421,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     onTap: (tapPosition, point) {
                       _center = point;
+                      if (_showObmocja) {
+                        final hit = areaAtPoint(_obmocjaStore.areas, point);
+                        if (hit != null) {
+                          showObmocjeSheet(context, _obmocjaStore, hit);
+                        }
+                      }
                     },
                     onPositionChanged: (position, _) {
                       if (position.center != null) {
@@ -425,6 +437,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     ...basemapTileLayers(_basemapMode),
                     if (_showParcele) ...parceleOverlayTileLayers(),
+                    if (_showObmocja) ...obmocjaLayers(_obmocjaStore.areas),
                     if (_userLocation != null && _userAccuracy != null)
                       userAccuracyCircleLayer(
                         _userLocation!,
@@ -442,6 +455,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 showMotnje: _showMotnje,
                 showObhodi: _showObhodi,
                 showParcele: _showParcele,
+                showObmocja: _showObmocja,
                 showLegacy: state.showLegacy,
                 onAvatarTap: () {
                   Navigator.of(context).push(
@@ -457,8 +471,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     setState(() => _showObhodi = !_showObhodi),
                 onParceleToggle: () =>
                     setState(() => _showParcele = !_showParcele),
+                onObmocjaToggle: () => _toggleObmocja(state),
                 onLegacyToggle: () => state.setShowLegacy(!state.showLegacy),
-                onPlaceholderTap: (label) => _showSnack('$label: kmalu.'),
               ),
               if (_plusExpanded)
                 Positioned.fill(
@@ -518,6 +532,39 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
     return out;
+  }
+
+  /// Lazy-loads the Natura 2000 overlay on first enable, then toggles it. The
+  /// fetch + reprojection runs once per session and is cached in the store, so
+  /// subsequent toggles are instant.
+  Future<void> _toggleObmocja(AppState state) async {
+    if (_showObmocja) {
+      setState(() => _showObmocja = false);
+      return;
+    }
+    if (_obmocjaStore.isLoaded) {
+      setState(() => _showObmocja = true);
+      return;
+    }
+    if (_obmocjaLoading) return;
+    if (!state.isOnline) {
+      _showSnack('Območja: ni povezave.');
+      return;
+    }
+    setState(() => _obmocjaLoading = true);
+    _showSnack('Nalagam Območja …');
+    try {
+      await _obmocjaStore.loadN2k();
+      if (!mounted) return;
+      setState(() {
+        _showObmocja = true;
+        _obmocjaLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _obmocjaLoading = false);
+      _showSnack('Območja: nalaganje ni uspelo.');
+    }
   }
 
   List<Marker> _buildMarkers(AppState state) {
@@ -582,6 +629,7 @@ class _TopChrome extends StatelessWidget {
     required this.showMotnje,
     required this.showObhodi,
     required this.showParcele,
+    required this.showObmocja,
     required this.showLegacy,
     required this.onAvatarTap,
     required this.onSearchTap,
@@ -590,8 +638,8 @@ class _TopChrome extends StatelessWidget {
     required this.onMotnjeToggle,
     required this.onObhodiToggle,
     required this.onParceleToggle,
+    required this.onObmocjaToggle,
     required this.onLegacyToggle,
-    required this.onPlaceholderTap,
   });
 
   final AppState state;
@@ -599,6 +647,7 @@ class _TopChrome extends StatelessWidget {
   final bool showMotnje;
   final bool showObhodi;
   final bool showParcele;
+  final bool showObmocja;
   final bool showLegacy;
   final VoidCallback onAvatarTap;
   final VoidCallback onSearchTap;
@@ -607,8 +656,8 @@ class _TopChrome extends StatelessWidget {
   final VoidCallback onMotnjeToggle;
   final VoidCallback onObhodiToggle;
   final VoidCallback onParceleToggle;
+  final VoidCallback onObmocjaToggle;
   final VoidCallback onLegacyToggle;
-  final ValueChanged<String> onPlaceholderTap;
 
   @override
   Widget build(BuildContext context) {
@@ -673,9 +722,9 @@ class _TopChrome extends StatelessWidget {
                   _LayerChip(
                     icon: Icons.shield_moon_outlined,
                     label: 'Območja',
-                    selected: false,
-                    enabled: false,
-                    onTap: () => onPlaceholderTap('Območja'),
+                    selected: showObmocja,
+                    enabled: true,
+                    onTap: onObmocjaToggle,
                   ),
                   _LayerChip(
                     icon: Icons.grid_on,

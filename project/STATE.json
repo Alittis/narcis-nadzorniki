@@ -228,6 +228,29 @@
       "min_zoom_labels": 17,
       "license": "CC BY 4.0 (GURS / e-prostor)",
       "verified": "2026-05-25 — GetCapabilities 200 OK 67 KB; GetMap over Cerknica returned 512×512 image/png. Two-style stack verified on emulator at z17+"
+    },
+    {
+      "name": "NarcIS ORDS GIS modules (vib) — Območja overlay",
+      "base_url": "https://narcis.gov.si/ords/narcis/vib/",
+      "purpose": "Natura 2000 ('Območja s statusom') vector map overlay: protected-area polygons + per-area attribute detail for the home-map 'Območja' chip. Public read; shared upstream with the narcis-vibed web app. Single-host by design — NOT routed through narcis-vibed's narcis.alittis.com /api cache, to keep the field app dependent only on narcis.gov.si.",
+      "auth": "none (public read)",
+      "crs": "EPSG:3794 (Slovene national grid) at source; reprojected to WGS84 client-side via proj4dart (same proj string narcis-vibed uses)",
+      "endpoints": [
+        {
+          "path": "vib/zos/:tip",
+          "method": "GET",
+          "tip_used": "N2k (Natura 2000); ZO/EPO/NV/NVJ available on the same endpoint but deferred (NV 5.3k + NVJ 14.7k features need viewport-loading/clustering first)",
+          "response": "ORDS envelope {items:[{geojson:'<stringified FeatureCollection>'}]} in EPSG:3794",
+          "size": "N2k ~3.8 MB, 356 features (325 Polygon + 30 MultiPolygon + 1 Point)",
+          "status": "consumed read-only by lib/data/obmocja_store.dart; lazy-loaded on first 'Območja' chip enable, parsed+reprojected, cached per app session; unit-tested in test/obmocja_store_test.dart (golden 3794→WGS84 vertex). On-device render/pan-zoom perf on a mid-range phone UNVERIFIED as of 2026-06-15."
+        },
+        {
+          "path": "vib/zos-detail/:id",
+          "method": "GET",
+          "response": "ORDS envelope {items:[{detail:'<stringified attributes>'}]}: varstveni_status, ime_obm, koda_obm, opis, povrsina_ha, dat_ustan, n2k_tip_obmocja, n2k_biogeo_region, dat_psci/sci/sac",
+          "status": "consumed read-only for the tap-for-detail bottom sheet (lib/widgets/obmocje_sheet.dart); fails soft — sheet falls back to inline name/code/tip when offline or on error"
+        }
+      ]
     }
   ],
   "bundled_assets": [
