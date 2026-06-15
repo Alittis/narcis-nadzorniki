@@ -553,13 +553,25 @@ class _HomeScreenState extends State<HomeScreen> {
     // points for every walk in the org (own + teammate), mirroring the
     // disturbance pull, so all walks render here.
     if (_showObhodi) {
-      for (final walk in state.walks) {
-        if (walk.points.isEmpty) continue;
+      final walks = state.walks.where((w) => w.points.isNotEmpty);
+      // Teammates' walks first (drawn underneath, faint blueGrey), then the
+      // user's own on top in a distinct orange, so they can pick out their own
+      // tracks from the org's where paths overlap.
+      for (final walk in walks.where((w) => !state.isWalkAuthoredByCurrentUser(w))) {
         out.add(
           Polyline(
             points: walk.points.map((p) => p.location).toList(),
             color: Colors.blueGrey.withValues(alpha: 0.55),
             strokeWidth: 3,
+          ),
+        );
+      }
+      for (final walk in walks.where((w) => state.isWalkAuthoredByCurrentUser(w))) {
+        out.add(
+          Polyline(
+            points: walk.points.map((p) => p.location).toList(),
+            color: Colors.orange.withValues(alpha: 0.8),
+            strokeWidth: 4,
           ),
         );
       }

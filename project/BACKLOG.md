@@ -140,28 +140,6 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Discussion:** —
 - **Shipped:** —
 
-### TB-11 · Color own walks distinctly from teammates' on the map
-`✨ Enhancement` · `P3` · `Todo` (quick win) · Maintainer-initiated · Updated: 2026-06-15
-- **Problem:** On the home map the Obhodi layer draws every walk in the org — own and
-  teammates' — in the same blueGrey, so a supervisor can't tell at a glance which tracks
-  are their own.
-- **Want:** Render the logged-in user's own walks in a distinct color from teammates' walks.
-  (The active, in-progress walk already renders green — a separate state to keep alongside.)
-- **Context:** All walk polylines are built in `_buildPolylines`
-  ([`home_screen.dart`](../lib/screens/home_screen.dart), ~line 543). Today: historical org
-  walks → blueGrey (alpha 0.55, stroke 3) under the Obhodi toggle; the active recording walk →
-  green (alpha 0.85, stroke 5), always drawn. The own-vs-teammate predicate already exists:
-  `AppState.isWalkAuthoredByCurrentUser(walk)`
-  ([`app_state.dart`](../lib/state/app_state.dart), ~line 217), backed by the `createdBy` field
-  the walks GET-list returns (ARCHITECTURE §9.4) and the `Walk` model keeps
-  ([`walk.dart`](../lib/models/walk.dart)). So this is a per-walk color branch in
-  `_buildPolylines` keyed on that helper — no backend, sync, or model change.
-- **Discussion:** Choose the own-walk color so all three walk states stay distinguishable —
-  teammate (blueGrey), own historical (new color), active recording (green) — and clear of the
-  disturbance-marker palette (recent red, legacy purple, old blue). A small legend may be worth
-  adding once walks carry 2+ colors (mirrors the TB-10 legend follow-up).
-- **Shipped:** —
-
 ---
 
 ## Done
@@ -191,3 +169,15 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Was:** Red dots for recent disturbances were larger than the blue dots for old entries.
 - **Shipped:** Recent-entry discs shrunk to the old-entry size; youngest rendered on top.
   `97b5421` ("Markers: shrink discs + render youngest on top").
+
+### TB-11 · Color own walks distinctly from teammates' on the map
+`✨ Enhancement` · `Done` · Maintainer-initiated
+- **Was:** The home-map Obhodi layer drew every walk in the org — own and teammates' — in the
+  same blueGrey, so a supervisor couldn't tell which tracks were their own.
+- **Shipped:** Own walks now render orange (alpha 0.8, stroke 4) and draw on top; teammates' stay
+  blueGrey (alpha 0.55, stroke 3) underneath; the active recording track is unchanged (green).
+  Per-walk split via `state.isWalkAuthoredByCurrentUser` in `_buildPolylines`
+  ([`home_screen.dart`](../lib/screens/home_screen.dart)) — no backend/sync/model change.
+  ARCHITECTURE "Historical walks layer" note updated. `flutter analyze` clean. Committed with the
+  `TB-11:` prefix; reaches users in the next build. On-device glance on the A56 with mixed
+  own/teammate walks is still a nice-to-have.
