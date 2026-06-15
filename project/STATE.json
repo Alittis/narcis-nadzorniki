@@ -38,7 +38,6 @@
       "store_listing_languages": ["sl", "en-US"],
       "category": "Productivity",
       "open_items": [
-        "Capture 6 phone screenshots on A56 (login, home map, form, detail, walk-active, profile)",
         "Confirm Closed track name with stakeholders",
         "After rollout: record Play app-signing cert SHA-1/SHA-256 into android_release.play_app_signing_cert_sha*"
       ],
