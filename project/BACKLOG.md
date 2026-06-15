@@ -134,6 +134,14 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   opens the picker; a map tap identifies across active sublayers). `proj4dart` removed. Unit tests in
   `test/obmocja_store_test.dart` (request shape + per-kind multi-sublayer parse) — suite 39/39 green.
   Server-side verified: GetMap 200 for all five sublayers; GetFeatureInfo overlap across N2k/ZO/EPO/NV.
+- **Refinement — symbology accuracy (2026-06-15, maintainer feedback):** the picker dots and the
+  identify-list dots used an approximate per-kind palette that didn't match the GeoServer-rendered
+  map (most misleading for ZO, which the SLD draws in seven `ZO_VRSTA` colours). Fixed: picker drops
+  the colour dot (a single swatch can't represent a multi-category layer); the identify list/detail
+  now draw each feature's **real** SLD colour + shape via `zosSymbol`/`_ZosSwatch` in `obmocje_sheet.dart`
+  — filled area, outline-only area (N2k-POV, NV-OP), ZO circle, NV triangle, jame cave glyph — matched
+  on `tip`/`ZO_VRSTA`/`NV_POMEN`/`NV_STATUS` + geometry (`isPoint`). Palette captured from the layers'
+  WMS GetLegendGraphic. `+4` symbol tests (`test/obmocje_sheet_test.dart`); suite 43/43 green.
 - **Open before Done:** (1) on-device check on the A56 — N2k verified; confirm ZO/EPO/NV/jame tiles +
   picker + tap across sublayers; (2) build + release. Follow-ups: an on-map legend, and tuning the
   point-layer (jame/NV/EPO points) tap tolerance if needed.

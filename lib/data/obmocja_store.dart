@@ -45,22 +45,31 @@ ZosKind? zosKindFromFeatureId(String id) {
 class ObmocjeFeature {
   const ObmocjeFeature({
     required this.kind,
+    required this.isPoint,
     required this.ime,
     required this.koda,
     required this.tip,
+    required this.vrsta,
+    required this.pomen,
+    required this.status,
     required this.opis,
     required this.rows,
   });
 
   final ZosKind kind;
+  final bool isPoint; // point feature (from a _PNT sublayer) vs polygon (_PLG)
   final String ime; // IME_OBM
   final String koda; // KODA_OBM
   final String tip; // N2K_TIP_OBMOCJA (POV/POO) — '' for non-N2k kinds
+  final String vrsta; // ZO_VRSTA — '' for non-ZO; keys the ZO symbol colour
+  final String pomen; // NV_POMEN (državni/lokalni) — '' for non-NV
+  final String status; // NV_STATUS ('OP' ⇒ outline-only) — '' unless NV
   final String opis; // description (OPIS / NV_KRATKA_OZNAKA / '')
   final List<MapEntry<String, String>> rows; // ordered (label, value) details
 
   factory ObmocjeFeature.fromProperties(
     ZosKind kind,
+    bool isPoint,
     Map<String, dynamic> p,
   ) {
     String s(String k) => (p[k] ?? '').toString().trim();
@@ -107,9 +116,13 @@ class ObmocjeFeature {
 
     return ObmocjeFeature(
       kind: kind,
+      isPoint: isPoint,
       ime: s('IME_OBM'),
       koda: s('KODA_OBM'),
       tip: s('N2K_TIP_OBMOCJA'),
+      vrsta: s('ZO_VRSTA'),
+      pomen: s('NV_POMEN'),
+      status: s('NV_STATUS'),
       opis: opis,
       rows: rows,
     );
@@ -197,10 +210,12 @@ class ObmocjaStore {
     final out = <ObmocjeFeature>[];
     for (final f in feats) {
       if (f is! Map || f['properties'] is! Map) continue;
-      final kind = zosKindFromFeatureId('${f['id']}');
+      final id = '${f['id']}';
+      final kind = zosKindFromFeatureId(id);
       if (kind == null) continue;
       out.add(ObmocjeFeature.fromProperties(
         kind,
+        id.contains('_PNT'),
         (f['properties'] as Map).cast<String, dynamic>(),
       ));
     }

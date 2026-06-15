@@ -238,6 +238,7 @@
       "layer_used": "All five sublayers (SI.NARCIS workspace): N2k=ZOS_N2K_PLG; ZO=ZOS_ZO_PLG+ZOS_ZO_PNT; EPO=ZOS_EPO_PLG+ZOS_EPO_PNT; NV=ZOS_NV_PLG+ZOS_NV_PNT; NVJ=ZOS_NV_PNT_JAME. Per-sublayer layer picker; N2k on by default.",
       "crs": "EPSG:3857 for GetMap tiles (matches basemap); EPSG:4326 for GetFeatureInfo",
       "styles": "default published SLD (STYLES empty) — official Natura symbology rendered server-side",
+      "client_symbology": "identify list/detail swatches mirror the SLD (colour + shape per feature) via zosSymbol/_ZosSwatch in obmocje_sheet.dart; palette+rules captured from each layer's WMS GetLegendGraphic (FORMAT=application/json) on 2026-06-15 — a one-time dev lookup, not a runtime call. Picker no longer shows a per-layer colour dot (a single dot can't represent a multi-category layer).",
       "requests": [
         {
           "request": "GetMap",

@@ -1,22 +1,79 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:narcis_nadzorniki/data/obmocja_store.dart';
 
-// ── Sublayer presentation (shared with the layer picker) ────────────────────
-// Swatch/badge colours approximate the narcis-vibed palette. On-map colours
-// come from GeoServer's SLD; these are just for the picker dots and the
-// identify badges.
-Color zosColor(ZosKind k) {
-  switch (k) {
+// ── Sublayer presentation ───────────────────────────────────────────────────
+// The map tiles are server-rendered by the NarcIS GeoServer; these swatches
+// mirror that SLD so the identify list shows the SAME colour + shape the user
+// sees on the map. Colours/rules captured from GetLegendGraphic (FORMAT=
+// application/json) on the SI.NARCIS ZOS_* layers, 2026-06-15 — if ARSO restyles
+// a layer, re-pull and update here. Shape is the feature's real geometry: areas
+// (polygons) vs the per-layer point marks (circle / triangle / cave).
+
+/// The on-map mark for one identified feature: its SLD shape + fill colour.
+enum ZosShape { polygon, polygonOutline, circle, triangle, cave }
+
+class ZosSymbol {
+  const ZosSymbol(this.color, this.shape);
+  final Color color;
+  final ZosShape shape;
+}
+
+/// N2k splits POV (SPA, red outline) from POO (SAC, orange fill) on its `tip`.
+bool _n2kIsPov(ObmocjeFeature f) => f.tip.toUpperCase().startsWith('POV');
+
+/// ZO is coloured per `ZO_VRSTA` (7 categories), same colour for its polygon
+/// and point renderings. Unknown vrsta falls back to the park green.
+Color _zoVrstaColor(String vrsta) {
+  switch (vrsta.toLowerCase().trim()) {
+    case 'narodni park':
+      return const Color(0xFF6CC092);
+    case 'regijski park':
+      return const Color(0xFF80B537);
+    case 'krajinski park':
+      return const Color(0xFF8D8634);
+    case 'naravni spomenik':
+      return const Color(0xFFCD4E1B);
+    case 'naravni rezervat':
+      return const Color(0xFFD01C8B);
+    case 'strogi naravni rezervat':
+      return const Color(0xFFE683C0);
+    case 'spomenik oblikovane narave':
+      return const Color(0xFFAB61E4);
+    default:
+      return const Color(0xFF6CC092);
+  }
+}
+
+/// The real GeoServer symbol for [f] — colour + shape — matched by the same
+/// attribute its SLD rule keys on (tip / ZO_VRSTA / NV_POMEN / NV_STATUS) and
+/// by geometry (polygon vs point, via [ObmocjeFeature.isPoint]).
+ZosSymbol zosSymbol(ObmocjeFeature f) {
+  switch (f.kind) {
     case ZosKind.n2k:
-      return const Color(0xFFD98210); // orange (POO); POV shows red, see _badge
+      return _n2kIsPov(f)
+          ? const ZosSymbol(Color(0xFFE30000), ZosShape.polygonOutline)
+          : const ZosSymbol(Color(0xFFD98210), ZosShape.polygon);
     case ZosKind.zo:
-      return const Color(0xFF6CC092); // green
+      return ZosSymbol(_zoVrstaColor(f.vrsta),
+          f.isPoint ? ZosShape.circle : ZosShape.polygon);
     case ZosKind.epo:
-      return const Color(0xFFB8A800); // darkened yellow (visible as a dot)
+      return f.isPoint
+          ? const ZosSymbol(Color(0xFF0C000B), ZosShape.circle)
+          : const ZosSymbol(Color(0xFFFBFB7F), ZosShape.polygon);
     case ZosKind.nv:
-      return const Color(0xFFD6161F); // red
+      if (f.isPoint) {
+        final lokalni = f.pomen.toLowerCase().startsWith('lokal');
+        return ZosSymbol(
+            lokalni ? const Color(0xFF178D89) : const Color(0xFFD6161F),
+            ZosShape.triangle);
+      }
+      return f.status.toUpperCase() == 'OP'
+          ? const ZosSymbol(Color(0xFFD6161F), ZosShape.polygonOutline)
+          : const ZosSymbol(Color(0xFFD6161F), ZosShape.polygon);
     case ZosKind.nvj:
-      return const Color(0xFF8E1F12); // dark red (distinguish jame from NV)
+      return const ZosSymbol(Color(0xFFD6161F), ZosShape.cave);
   }
 }
 
@@ -52,17 +109,13 @@ String zosShort(ZosKind k) {
   }
 }
 
-/// Badge label + colour for one identified feature. N2k keeps the POV/POO
-/// distinction (red/orange); other kinds use their sublayer label + colour.
-(String, Color) _badge(ObmocjeFeature f) {
+/// Text label for one identified feature. N2k keeps the POV/POO distinction;
+/// other kinds use their sublayer's short label. (Colour + shape: [zosSymbol].)
+String _badgeLabel(ObmocjeFeature f) {
   if (f.kind == ZosKind.n2k && f.tip.isNotEmpty) {
-    final pov = f.tip.toUpperCase().startsWith('POV');
-    return (
-      pov ? 'Natura 2000 · POV' : 'Natura 2000 · POO',
-      pov ? const Color(0xFFE30000) : const Color(0xFFD98210),
-    );
+    return _n2kIsPov(f) ? 'Natura 2000 · POV' : 'Natura 2000 · POO';
   }
-  return (zosShort(f.kind), zosColor(f.kind));
+  return zosShort(f.kind);
 }
 
 // ── Identify result sheet ───────────────────────────────────────────────────
@@ -150,22 +203,14 @@ class _FeatureList extends StatelessWidget {
           const SizedBox(height: 4),
           for (final f in features)
             Builder(builder: (context) {
-              final (label, color) = _badge(f);
+              final label = _badgeLabel(f);
               return InkWell(
                 onTap: () => onSelect(f),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   child: Row(
                     children: [
-                      Container(
-                        width: 14,
-                        height: 14,
-                        decoration: BoxDecoration(
-                          color: color,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.black26),
-                        ),
-                      ),
+                      _ZosSwatch(zosSymbol(f)),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -206,7 +251,7 @@ class _FeatureDetail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final (label, color) = _badge(feature);
+    final label = _badgeLabel(feature);
     return SingleChildScrollView(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -230,18 +275,25 @@ class _FeatureDetail extends StatelessWidget {
               const Spacer(),
               Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.15),
+                  color: scheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _ZosSwatch(zosSymbol(feature), size: 13),
+                    const SizedBox(width: 6),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -298,4 +350,83 @@ class _DetailRow extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Small swatch drawing a feature's real GeoServer mark — colour + shape from
+/// [zosSymbol]: a translucent area for polygons, an outline for POV/OP areas,
+/// and the per-layer point marks (circle / triangle / cave glyph).
+class _ZosSwatch extends StatelessWidget {
+  const _ZosSwatch(this.symbol, {this.size = 16});
+
+  final ZosSymbol symbol;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => CustomPaint(
+        size: Size(size, size),
+        painter: _ZosSwatchPainter(symbol),
+      );
+}
+
+class _ZosSwatchPainter extends CustomPainter {
+  const _ZosSwatchPainter(this.symbol);
+
+  final ZosSymbol symbol;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = symbol.color;
+    final edge = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..color = const Color(0x66000000);
+    switch (symbol.shape) {
+      case ZosShape.polygon:
+        final rr = RRect.fromRectAndRadius(
+            (Offset.zero & size).deflate(1), const Radius.circular(3));
+        canvas.drawRRect(rr, Paint()..color = c.withValues(alpha: 0.55));
+        canvas.drawRRect(rr, edge);
+      case ZosShape.polygonOutline:
+        final rr = RRect.fromRectAndRadius(
+            (Offset.zero & size).deflate(1.2), const Radius.circular(3));
+        canvas.drawRRect(
+            rr,
+            Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 2.2
+              ..color = c);
+      case ZosShape.circle:
+        final ctr = size.center(Offset.zero);
+        final r = size.width / 2 - 1.5;
+        canvas.drawCircle(ctr, r, Paint()..color = c);
+        canvas.drawCircle(ctr, r, edge);
+      case ZosShape.triangle:
+        final p = Path()
+          ..moveTo(size.width / 2, 1.5)
+          ..lineTo(size.width - 1.5, size.height - 2)
+          ..lineTo(1.5, size.height - 2)
+          ..close();
+        canvas.drawPath(p, Paint()..color = c);
+        canvas.drawPath(p, edge);
+      case ZosShape.cave:
+        // Cave cross-section: a flat-topped red half-disc (the cavity, curving
+        // down) with the dark entrance dot resting on the rim — the GeoServer
+        // jame mark.
+        final r = size.width / 2 - 1.5;
+        final lineY = size.height * 0.5;
+        final ctr = Offset(size.width / 2, lineY);
+        final dotR = r * 0.22;
+        final cavity = Path()
+          ..addArc(Rect.fromCircle(center: ctr, radius: r), 0, math.pi)
+          ..close();
+        canvas.drawPath(cavity, Paint()..color = c);
+        canvas.drawPath(cavity, edge);
+        canvas.drawCircle(Offset(size.width / 2, lineY - dotR), dotR,
+            Paint()..color = const Color(0xFF0C000B));
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ZosSwatchPainter old) =>
+      old.symbol.color != symbol.color || old.symbol.shape != symbol.shape;
 }

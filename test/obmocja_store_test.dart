@@ -109,6 +109,15 @@ void main() {
       final nv = feats[3];
       expect(nv.opis, 'Kraško polje …'); // NV_KRATKA_OZNAKA as description
       expect(hasRow(nv, 'Pomen', 'državni'), isTrue);
+
+      // Geometry + category attributes that drive the on-map symbol (zosSymbol).
+      expect(n2k.isPoint, isFalse);
+      expect(zo.vrsta, 'regijski park');
+      expect(nv.isPoint, isFalse);
+      expect(nv.pomen, 'državni');
+      final jama = feats[4];
+      expect(jama.kind, ZosKind.nvj);
+      expect(jama.isPoint, isTrue);
     });
 
     test('empty active set issues no request and returns empty', () async {

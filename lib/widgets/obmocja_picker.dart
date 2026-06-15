@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:narcis_nadzorniki/data/obmocja_store.dart';
-import 'package:narcis_nadzorniki/widgets/obmocje_sheet.dart' show zosColor, zosTitle;
+import 'package:narcis_nadzorniki/widgets/obmocje_sheet.dart' show zosTitle;
 
 /// Layer picker for the "Območja s statusom" sublayers. Opened from the
 /// "Območja" chip; toggling a row updates the active set live (the map redraws
@@ -55,15 +55,6 @@ class _ObmocjaPickerState extends State<_ObmocjaPicker> {
                   setState(() => on ? _local.add(k) : _local.remove(k));
                   widget.onChanged(k, on);
                 },
-                secondary: Container(
-                  width: 16,
-                  height: 16,
-                  decoration: BoxDecoration(
-                    color: zosColor(k),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.black26),
-                  ),
-                ),
                 title: Text(zosTitle(k)),
               ),
           ],
