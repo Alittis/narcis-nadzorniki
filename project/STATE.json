@@ -232,25 +232,25 @@
     {
       "name": "NarcIS GeoServer (production WMS) — Območja overlay",
       "base_url": "https://narcis.gov.si/ows/ows",
-      "purpose": "Natura 2000 ('Območja s statusom') map overlay: server-rendered WMS tiles + tap-to-identify (GetFeatureInfo). The production GeoServer the APEX NarcIS app uses. Public (no auth) for these layers.",
+      "purpose": "'Območja s statusom' map overlay (all five sublayers): server-rendered WMS tiles + tap-to-identify (GetFeatureInfo). The production GeoServer the APEX NarcIS app uses. Public (no auth) for these layers.",
       "service": "OGC WMS 1.3.0",
       "workspace": "SI.NARCIS",
-      "layer_used": "SI.NARCIS:ZOS_N2K_PLG (Title 'Natura 2000'); EPO/NV/jame layers (ZOS_EPO_PLG, ZOS_EPO_PNT, ZOS_NV_PNT_JAME, …) available on the same WMS for later",
+      "layer_used": "All five sublayers (SI.NARCIS workspace): N2k=ZOS_N2K_PLG; ZO=ZOS_ZO_PLG+ZOS_ZO_PNT; EPO=ZOS_EPO_PLG+ZOS_EPO_PNT; NV=ZOS_NV_PLG+ZOS_NV_PNT; NVJ=ZOS_NV_PNT_JAME. Per-sublayer layer picker; N2k on by default.",
       "crs": "EPSG:3857 for GetMap tiles (matches basemap); EPSG:4326 for GetFeatureInfo",
       "styles": "default published SLD (STYLES empty) — official Natura symbology rendered server-side",
       "requests": [
         {
           "request": "GetMap",
-          "use": "transparent image/png 256px tiles via flutter_map WMSTileLayerOptions (obmocjaWmsLayers in lib/widgets/basemap.dart); per-viewport, instant first paint, scales to any ZOS layer"
+          "use": "transparent image/png 256px tiles via flutter_map WMSTileLayerOptions (obmocjaWmsLayers(activeSet) in lib/widgets/basemap.dart) — active sublayers stacked into one request; per-viewport, instant first paint, scales to any sublayer"
         },
         {
           "request": "GetFeatureInfo",
-          "use": "tap-to-identify (ObmocjaStore.identify); INFO_FORMAT=application/json, FEATURE_COUNT=10; one call returns all overlapping areas AND full attributes (IME_OBM, KODA_OBM, N2K_TIP_OBMOCJA, N2K_BIOGEO_REGION, POV_HA, OPIS, DAT_ZAC) — feeds both the list and the detail sheet"
+          "use": "tap-to-identify (ObmocjaStore.identify(point, activeSet)) over the active sublayers; INFO_FORMAT=application/json, FEATURE_COUNT=30; one call returns all overlapping areas across sublayers + full attributes; each feature tagged with its ZosKind from the feature-id prefix; per-kind detail rows (N2K_TIP_OBMOCJA, ZO_VRSTA/ZO_POMEN, NV_POMEN/NV_ZVRSTI; IME_OBM/KODA_OBM/OPIS/POV_HA/DAT_ZAC common) — feeds both the list and the detail sheet"
         }
       ],
       "replaces": "the prior ORDS vib/zos + vib/zos-detail GeoJSON+proj4dart approach (removed 2026-06-15): that endpoint serialises live via SDO_UTIL.TO_GEOJSON (~14-16s time-to-first-byte per cold request, measured) and whole-layer vector download did not scale to NV (5.3k) / NVJ (14.7k). proj4dart dependency removed.",
       "auth": "none (public) for SI.NARCIS:ZOS_* layers; some other GeoServer layers are HTTP-Basic gated (SPLETNI_GIS) — not used here",
-      "verified": "2026-06-15 — GetCapabilities 200 in ~0.8s (85 layers); GetMap 200 image/png; GetFeatureInfo over Cerknica returned 2 overlapping areas (Cerkniško jezero SI5000015/POV + Notranjski trikotnik SI3000232/POO) with full attributes. On-device tile render + tap on the A56 UNVERIFIED as of this edit."
+      "verified": "2026-06-15 — GetCapabilities 200 (~0.8s, 85 layers); GetMap 200 image/png for all five sublayers (ZOS_N2K/ZO/EPO/NV_PLG + ZOS_NV_PNT_JAME); GetFeatureInfo over Cerknica returned overlapping areas across N2k/ZO/EPO/NV with per-kind attributes. On-device tile render + tap on the A56 verified for N2k; ZO/EPO/NV/jame on-device UNVERIFIED as of this edit."
     }
   ],
   "bundled_assets": [

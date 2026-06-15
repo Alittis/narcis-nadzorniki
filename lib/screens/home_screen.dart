@@ -19,6 +19,7 @@ import 'package:narcis_nadzorniki/services/location_service.dart';
 import 'package:narcis_nadzorniki/services/place_search_service.dart';
 import 'package:narcis_nadzorniki/state/app_state.dart';
 import 'package:narcis_nadzorniki/widgets/basemap.dart';
+import 'package:narcis_nadzorniki/widgets/obmocja_picker.dart';
 import 'package:narcis_nadzorniki/widgets/obmocje_sheet.dart';
 import 'package:provider/provider.dart';
 
@@ -100,9 +101,12 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _showMotnje = true;
   bool _showObhodi = false;
   bool _showParcele = false;
-  bool _showObmocja = false;
+  // Active "Območja s statusom" sublayers; Natura 2000 on by default.
+  final Set<ZosKind> _activeZos = {ZosKind.n2k};
   // True while a tap's GetFeatureInfo identify is in flight.
   bool _identifying = false;
+  // Last Območja identify tap; drives the buffer circle on the map.
+  LatLng? _obmocjaTapPoint;
 
   bool _plusExpanded = false;
   // Location stamped at the moment the user declared intent (tapped "+"),
@@ -421,7 +425,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     onTap: (tapPosition, point) {
                       _center = point;
-                      if (_showObmocja) _identifyObmocja(point);
+                      if (_activeZos.isNotEmpty) _identifyObmocja(point);
                     },
                     onPositionChanged: (position, _) {
                       if (position.center != null) {
@@ -432,7 +436,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     ...basemapTileLayers(_basemapMode),
                     if (_showParcele) ...parceleOverlayTileLayers(),
-                    if (_showObmocja) ...obmocjaWmsLayers(),
+                    if (_activeZos.isNotEmpty) ...obmocjaWmsLayers(_activeZos),
+                    if (_activeZos.isNotEmpty && _obmocjaTapPoint != null)
+                      obmocjaBufferCircleLayer(
+                        _obmocjaTapPoint!,
+                        ObmocjaStore.bufferRadiusMeters,
+                      ),
                     if (_userLocation != null && _userAccuracy != null)
                       userAccuracyCircleLayer(
                         _userLocation!,
@@ -450,7 +459,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 showMotnje: _showMotnje,
                 showObhodi: _showObhodi,
                 showParcele: _showParcele,
-                showObmocja: _showObmocja,
+                showObmocja: _activeZos.isNotEmpty,
                 showLegacy: state.showLegacy,
                 onAvatarTap: () {
                   Navigator.of(context).push(
@@ -466,8 +475,17 @@ class _HomeScreenState extends State<HomeScreen> {
                     setState(() => _showObhodi = !_showObhodi),
                 onParceleToggle: () =>
                     setState(() => _showParcele = !_showParcele),
-                onObmocjaToggle: () =>
-                    setState(() => _showObmocja = !_showObmocja),
+                onObmocjaToggle: () => showObmocjaPicker(
+                  context,
+                  active: _activeZos,
+                  onChanged: (k, on) => setState(() {
+                    if (on) {
+                      _activeZos.add(k);
+                    } else {
+                      _activeZos.remove(k);
+                    }
+                  }),
+                ),
                 onLegacyToggle: () => state.setShowLegacy(!state.showLegacy),
               ),
               if (_identifying)
@@ -565,9 +583,12 @@ class _HomeScreenState extends State<HomeScreen> {
   /// on no area does nothing. A small indicator marks the in-flight query.
   Future<void> _identifyObmocja(LatLng point) async {
     if (_identifying) return;
-    setState(() => _identifying = true);
+    setState(() {
+      _identifying = true;
+      _obmocjaTapPoint = point;
+    });
     try {
-      final features = await _obmocjaStore.identify(point);
+      final features = await _obmocjaStore.identify(point, _activeZos);
       if (!mounted) return;
       if (features.isNotEmpty) showObmocjaSheet(context, features);
     } on ObmocjaException {

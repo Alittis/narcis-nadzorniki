@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:narcis_nadzorniki/data/obmocja_store.dart';
 
 enum BasemapMode { osm, satellite }
 
@@ -61,21 +62,27 @@ List<Widget> parceleOverlayTileLayers() {
 }
 
 // NarcIS production GeoServer (public WMS). The "Območja s statusom" layers
-// live in the SI.NARCIS workspace; Natura 2000 is rendered here with
-// GeoServer's own published style (STYLES empty). Tiles load per-viewport, so
-// first paint is instant and it scales to the larger ZOS layers when added.
+// live in the SI.NARCIS workspace, rendered with GeoServer's own published
+// styles (STYLES empty). Tiles load per-viewport — instant first paint, and it
+// scales to any sublayer because the server rasterises. Layer names + ordering
+// are in obmocja_store.dart (zosWmsLayers / zosOrder).
 const String _narcisOwsBase = 'https://narcis.gov.si/ows/ows?';
-const String _n2kLayer = 'SI.NARCIS:ZOS_N2K_PLG';
 
-/// Natura 2000 ("Območja s statusom") overlay as server-styled WMS tiles.
-/// Tap-to-identify is handled separately via GeoServer GetFeatureInfo
-/// (see `ObmocjaStore.identify`).
-List<Widget> obmocjaWmsLayers() {
+/// Protected-area ("Območja s statusom") overlay as server-styled WMS tiles for
+/// the [active] sublayers, stacked into one request (polygons under points,
+/// flagship layers under the rest). Tap-to-identify is handled separately via
+/// GeoServer GetFeatureInfo (see `ObmocjaStore.identify`).
+List<Widget> obmocjaWmsLayers(Set<ZosKind> active) {
+  final names = <String>[];
+  for (final k in zosOrder) {
+    if (active.contains(k)) names.addAll(zosWmsLayers[k]!);
+  }
+  if (names.isEmpty) return const [];
   return [
     TileLayer(
       wmsOptions: WMSTileLayerOptions(
         baseUrl: _narcisOwsBase,
-        layers: const [_n2kLayer],
+        layers: names,
         format: 'image/png',
         transparent: true,
         version: '1.3.0',
@@ -115,22 +122,29 @@ List<Widget> basemapTileLayers(BasemapMode mode) {
   }
 }
 
-/// Translucent halo whose radius equals the OS-reported horizontal
-/// accuracy in metres. Sized in metres (not pixels) so it grows/shrinks
-/// with zoom — same behaviour as Google Maps' blue accuracy circle.
-CircleLayer userAccuracyCircleLayer(LatLng point, double accuracyMeters) {
-  return CircleLayer(
-    circles: [
-      CircleMarker(
-        point: point,
-        radius: accuracyMeters,
-        useRadiusInMeter: true,
-        color: Colors.blueAccent.withValues(alpha: 0.15),
-        borderColor: Colors.blueAccent.withValues(alpha: 0.4),
-        borderStrokeWidth: 1,
-      ),
-    ],
+/// Translucent blue halo (radius in metres, so it scales with zoom). Shared
+/// style for the user-accuracy circle and the Območja identify buffer.
+CircleMarker _haloCircle(LatLng point, double radiusMeters) {
+  return CircleMarker(
+    point: point,
+    radius: radiusMeters,
+    useRadiusInMeter: true,
+    color: Colors.blueAccent.withValues(alpha: 0.15),
+    borderColor: Colors.blueAccent.withValues(alpha: 0.4),
+    borderStrokeWidth: 1,
   );
+}
+
+/// Halo whose radius equals the OS-reported horizontal accuracy in metres —
+/// same behaviour as Google Maps' blue accuracy circle.
+CircleLayer userAccuracyCircleLayer(LatLng point, double accuracyMeters) {
+  return CircleLayer(circles: [_haloCircle(point, accuracyMeters)]);
+}
+
+/// Same halo style, drawn at the last Območja tap to show the identify search
+/// radius (the GetFeatureInfo buffer). Radius from `ObmocjaStore.bufferRadiusMeters`.
+CircleLayer obmocjaBufferCircleLayer(LatLng point, double radiusMeters) {
+  return CircleLayer(circles: [_haloCircle(point, radiusMeters)]);
 }
 
 /// User's current GPS dot. Used by HomeScreen and LocationPickerScreen so

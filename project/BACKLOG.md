@@ -113,28 +113,53 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   decision drives whether this is a UI affordance over existing walks or a new record kind.
 - **Shipped:** —
 
-### TB-10 · Natura 2000 ("Območja") map overlay
+### TB-10 · "Območja s statusom" map overlay (5 sublayers)
 `✨ Enhancement` · `P2` · `Doing` · Maintainer-initiated · Updated: 2026-06-15
-- **Want:** Bring the `narcis-vibed` "Območja s statusom" layers to the field app, starting
-  with Natura 2000, as a toggleable map overlay with tap → list → detail.
+- **Want:** Bring the `narcis-vibed` "Območja s statusom" layers to the field app — all five
+  sublayers (Natura 2000, zavarovana območja, EPO, naravne vrednote, NV-jame) as toggleable map
+  overlays with tap → list → detail.
 - **Decisions:** Server-rendered **WMS tiles** from the production NarcIS GeoServer
-  (`narcis.gov.si/ows/ows`, layer `SI.NARCIS:ZOS_N2K_PLG`, the same GeoServer the APEX app uses),
-  with tap-to-identify via WMS GetFeatureInfo. Pivoted here from an initial client-side vector
-  approach (GeoJSON from the ORDS `vib/zos` module + `proj4dart`) after measuring that endpoint at
-  **~14–16 s TTFB per cold request** and recognising whole-layer vector won't scale to NV/NVJ. WMS
-  tiles load per-viewport (instant first paint) and scale to any layer. See ARCHITECTURE §10.2.
-- **Shipped (code):** [`obmocja_store.dart`](../lib/data/obmocja_store.dart) (`identify` →
-  GetFeatureInfo + `ObmocjeFeature`), `obmocjaWmsLayers()` in
-  [`basemap.dart`](../lib/widgets/basemap.dart), [`obmocje_sheet.dart`](../lib/widgets/obmocje_sheet.dart)
-  (list ⇄ detail), wired into [`home_screen.dart`](../lib/screens/home_screen.dart) (the "Območja"
-  chip toggles the tile layer instantly; a map tap runs identify). `proj4dart` removed. Unit tests
-  in `test/obmocja_store_test.dart` (GetFeatureInfo request shape + overlapping-feature parse) —
-  suite 39/39 green.
-- **Open before Done:** (1) on-device check on the A56 — tiles render with the official Natura
-  symbology, tap → list/detail works, responsiveness OK; (2) build + release. Follow-ups: add the
-  remaining ZOS layers (`EPO`/`NV`/`jame` — a few lines each now: another `TileLayer` + chip), and
-  a layer/legend picker once more than one is shown at once.
+  (`narcis.gov.si/ows/ows`, `SI.NARCIS` workspace `ZOS_*` layers — the same GeoServer the APEX app
+  uses), with tap-to-identify via WMS GetFeatureInfo. Pivoted here from an initial client-side
+  vector approach (GeoJSON from the ORDS `vib/zos` module + `proj4dart`) after measuring that
+  endpoint at **~14–16 s TTFB per cold request** and recognising whole-layer vector won't scale to
+  NV/NVJ. WMS tiles load per-viewport (instant) and scale to any sublayer. Per-sublayer **layer
+  picker**, N2k on by default. See ARCHITECTURE §10.2.
+- **Shipped (code):** [`obmocja_store.dart`](../lib/data/obmocja_store.dart) (`ZosKind`,
+  `zosWmsLayers`/`zosOrder`, `identify(point, activeSet)` → GetFeatureInfo, per-kind `ObmocjeFeature`),
+  `obmocjaWmsLayers(active)` in [`basemap.dart`](../lib/widgets/basemap.dart),
+  [`obmocja_picker.dart`](../lib/widgets/obmocja_picker.dart) (layer picker),
+  [`obmocje_sheet.dart`](../lib/widgets/obmocje_sheet.dart) (list ⇄ detail + per-kind presentation),
+  wired into [`home_screen.dart`](../lib/screens/home_screen.dart) (`_activeZos` set; "Območja" chip
+  opens the picker; a map tap identifies across active sublayers). `proj4dart` removed. Unit tests in
+  `test/obmocja_store_test.dart` (request shape + per-kind multi-sublayer parse) — suite 39/39 green.
+  Server-side verified: GetMap 200 for all five sublayers; GetFeatureInfo overlap across N2k/ZO/EPO/NV.
+- **Open before Done:** (1) on-device check on the A56 — N2k verified; confirm ZO/EPO/NV/jame tiles +
+  picker + tap across sublayers; (2) build + release. Follow-ups: an on-map legend, and tuning the
+  point-layer (jame/NV/EPO points) tap tolerance if needed.
 - **Discussion:** —
+- **Shipped:** —
+
+### TB-11 · Color own walks distinctly from teammates' on the map
+`✨ Enhancement` · `P3` · `Todo` (quick win) · Maintainer-initiated · Updated: 2026-06-15
+- **Problem:** On the home map the Obhodi layer draws every walk in the org — own and
+  teammates' — in the same blueGrey, so a supervisor can't tell at a glance which tracks
+  are their own.
+- **Want:** Render the logged-in user's own walks in a distinct color from teammates' walks.
+  (The active, in-progress walk already renders green — a separate state to keep alongside.)
+- **Context:** All walk polylines are built in `_buildPolylines`
+  ([`home_screen.dart`](../lib/screens/home_screen.dart), ~line 543). Today: historical org
+  walks → blueGrey (alpha 0.55, stroke 3) under the Obhodi toggle; the active recording walk →
+  green (alpha 0.85, stroke 5), always drawn. The own-vs-teammate predicate already exists:
+  `AppState.isWalkAuthoredByCurrentUser(walk)`
+  ([`app_state.dart`](../lib/state/app_state.dart), ~line 217), backed by the `createdBy` field
+  the walks GET-list returns (ARCHITECTURE §9.4) and the `Walk` model keeps
+  ([`walk.dart`](../lib/models/walk.dart)). So this is a per-walk color branch in
+  `_buildPolylines` keyed on that helper — no backend, sync, or model change.
+- **Discussion:** Choose the own-walk color so all three walk states stay distinguishable —
+  teammate (blueGrey), own historical (new color), active recording (green) — and clear of the
+  disturbance-marker palette (recent red, legacy purple, old blue). A small legend may be worth
+  adding once walks carry 2+ colors (mirrors the TB-10 legend follow-up).
 - **Shipped:** —
 
 ---
