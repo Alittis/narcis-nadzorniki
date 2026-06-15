@@ -34,6 +34,9 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // Default launcher label; release (Play) build keeps this. Non-release
+        // builds override it below so the side-by-side dev app is identifiable.
+        manifestPlaceholders["appLabel"] = "Terenska beležnica"
     }
 
     signingConfigs {
@@ -54,6 +57,20 @@ android {
             } else {
                 signingConfigs.getByName("debug")
             }
+        }
+        // Side-by-side dev install: non-release builds take a distinct
+        // applicationId (si.terenska.beleznica.dev) so a profile/debug build
+        // coexists with the Play (release) app on one device. The release build
+        // shipped to Play is untouched.
+        getByName("debug") {
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+            manifestPlaceholders["appLabel"] = "Beležnica dev"
+        }
+        getByName("profile") {
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+            manifestPlaceholders["appLabel"] = "Beležnica dev"
         }
     }
 }
