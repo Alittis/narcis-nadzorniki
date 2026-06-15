@@ -142,9 +142,12 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   — filled area, outline-only area (N2k-POV, NV-OP), ZO circle, NV triangle, jame cave glyph — matched
   on `tip`/`ZO_VRSTA`/`NV_POMEN`/`NV_STATUS` + geometry (`isPoint`). Palette captured from the layers'
   WMS GetLegendGraphic. `+4` symbol tests (`test/obmocje_sheet_test.dart`); suite 43/43 green.
-- **Open before Done:** (1) on-device check on the A56 — N2k verified; confirm ZO/EPO/NV/jame tiles +
-  picker + tap across sublayers; (2) build + release. Follow-ups: an on-map legend, and tuning the
-  point-layer (jame/NV/EPO points) tap tolerance if needed.
+- **Open before Done:** built into **v1.3.0+11** (signed release AAB archived at
+  `~/Releases/terenska-beleznica-1.3.0+11.aab`; suite 43/43; manifest clean). On-device on the A56
+  (dev profile build): layer picker, tap-to-identify and the SLD-faithful swatches — incl. the
+  corrected jame cave glyph — verified by the maintainer. **Remaining:** upload v1.3.0+11 to the Play
+  **Closed testing** track (manual, per PLAY_CLOSED_TEST.md Phase B) + roll out. Follow-ups: an on-map
+  legend, and tuning the point-layer (jame/NV/EPO points) tap tolerance if needed.
 - **Discussion:** —
 - **Shipped:** —
 
@@ -186,6 +189,5 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   blueGrey (alpha 0.55, stroke 3) underneath; the active recording track is unchanged (green).
   Per-walk split via `state.isWalkAuthoredByCurrentUser` in `_buildPolylines`
   ([`home_screen.dart`](../lib/screens/home_screen.dart)) — no backend/sync/model change.
-  ARCHITECTURE "Historical walks layer" note updated. `flutter analyze` clean. Committed with the
-  `TB-11:` prefix; reaches users in the next build. On-device glance on the A56 with mixed
-  own/teammate walks is still a nice-to-have.
+  ARCHITECTURE "Historical walks layer" note updated. `flutter analyze` clean. Committed (`73edf9a`);
+  ships in **v1.3.0+11**, the closed-test build.

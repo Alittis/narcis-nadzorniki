@@ -224,7 +224,23 @@ The app is intended for nature-protection wardens and authorised collaborators o
 This release is part of a closed test. Participation requires an invitation from the administrator and an existing NarcIS account with the appropriate authorization. For access or feedback, write to admin@alittis.com.
 ```
 
-### 3.3 Release notes — v1.2.3+10 (current)
+### 3.3 Release notes — v1.3.0+11 (current)
+
+**Slovene** (max 500 chars):
+```
+Različica 1.3.0 (build 11)
+• Nova plast „Območja s statusom": Natura 2000, zavarovana območja, ekološko pomembna območja, naravne vrednote in jame iz GeoServerja NarcIS. Izbirnik plasti in dotik na zemljevidu prikaže območja na izbrani točki (seznam + podrobnosti) v barvah in oblikah z zemljevida.
+• Lastni obhodi so na zemljevidu obarvani drugače kot obhodi sodelavcev.
+```
+
+**English** (max 500 chars):
+```
+Version 1.3.0 (build 11)
+• New "Protected areas" layer: Natura 2000, protected areas, ecologically important areas, natural values and caves from the NarcIS GeoServer. A layer picker plus tap-to-identify shows the areas at a point (list + details), using the same colours and shapes as the map.
+• Your own walk-arounds are now coloured differently from your colleagues' on the map.
+```
+
+### 3.3a Release notes — v1.2.3+10 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -240,7 +256,7 @@ Version 1.2.3 (build 10)
 • The LIFE Tršca project (no. 101114184) is co-funded by the European Union (LIFE programme) and the Slovenian Ministry of Natural Resources and Spatial Planning.
 ```
 
-### 3.3a Release notes — v1.2.0+7 (historical, superseded)
+### 3.3b Release notes — v1.2.0+7 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -256,7 +272,7 @@ Version 1.2.0 (build 7)
 • Password is not stored on the device: after the first login the app uses a revocable token that expires after 30 days of inactivity. Signing out also revokes it server-side.
 ```
 
-### 3.3b Release notes — v1.1.3+6 (historical, superseded)
+### 3.3c Release notes — v1.1.3+6 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -276,7 +292,7 @@ Version 1.1.3 (build 6)
 • Historical Notranjska Regional Park entries are now part of the regular Motnje layer.
 ```
 
-### 3.3c Release notes — v1.0.1+2 (historical, superseded)
+### 3.3d Release notes — v1.0.1+2 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
