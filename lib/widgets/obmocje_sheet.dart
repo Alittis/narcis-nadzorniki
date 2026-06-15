@@ -409,19 +409,20 @@ class _ZosSwatchPainter extends CustomPainter {
         canvas.drawPath(p, Paint()..color = c);
         canvas.drawPath(p, edge);
       case ZosShape.cave:
-        // Cave cross-section: a flat-topped red half-disc (the cavity, curving
-        // down) with the dark entrance dot resting on the rim — the GeoServer
-        // jame mark.
+        // Cave entrance: a red arch/dome rising from a flat base line, with the
+        // dark entrance dot resting on that base — the GeoServer jame mark.
+        // NB: addArc sweeps clockwise from +x, so (math.pi, math.pi) is the TOP
+        // half (arch); (0, math.pi) would be the bottom half (an upside-down bowl).
         final r = size.width / 2 - 1.5;
-        final lineY = size.height * 0.5;
-        final ctr = Offset(size.width / 2, lineY);
         final dotR = r * 0.22;
-        final cavity = Path()
-          ..addArc(Rect.fromCircle(center: ctr, radius: r), 0, math.pi)
+        final baseY = size.height / 2 + r / 2;
+        final ctr = Offset(size.width / 2, baseY);
+        final dome = Path()
+          ..addArc(Rect.fromCircle(center: ctr, radius: r), math.pi, math.pi)
           ..close();
-        canvas.drawPath(cavity, Paint()..color = c);
-        canvas.drawPath(cavity, edge);
-        canvas.drawCircle(Offset(size.width / 2, lineY - dotR), dotR,
+        canvas.drawPath(dome, Paint()..color = c);
+        canvas.drawPath(dome, edge);
+        canvas.drawCircle(Offset(size.width / 2, baseY - dotR), dotR,
             Paint()..color = const Color(0xFF0C000B));
     }
   }
