@@ -101,8 +101,8 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _showObhodi = false;
   bool _showParcele = false;
   bool _showObmocja = false;
-  // Guards against a second fetch while the first N2k load is in flight.
-  bool _obmocjaLoading = false;
+  // True while a tap's GetFeatureInfo identify is in flight.
+  bool _identifying = false;
 
   bool _plusExpanded = false;
   // Location stamped at the moment the user declared intent (tapped "+"),
@@ -421,12 +421,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     onTap: (tapPosition, point) {
                       _center = point;
-                      if (_showObmocja) {
-                        final hit = areaAtPoint(_obmocjaStore.areas, point);
-                        if (hit != null) {
-                          showObmocjeSheet(context, _obmocjaStore, hit);
-                        }
-                      }
+                      if (_showObmocja) _identifyObmocja(point);
                     },
                     onPositionChanged: (position, _) {
                       if (position.center != null) {
@@ -437,7 +432,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     ...basemapTileLayers(_basemapMode),
                     if (_showParcele) ...parceleOverlayTileLayers(),
-                    if (_showObmocja) ...obmocjaLayers(_obmocjaStore.areas),
+                    if (_showObmocja) ...obmocjaWmsLayers(),
                     if (_userLocation != null && _userAccuracy != null)
                       userAccuracyCircleLayer(
                         _userLocation!,
@@ -471,9 +466,40 @@ class _HomeScreenState extends State<HomeScreen> {
                     setState(() => _showObhodi = !_showObhodi),
                 onParceleToggle: () =>
                     setState(() => _showParcele = !_showParcele),
-                onObmocjaToggle: () => _toggleObmocja(state),
+                onObmocjaToggle: () =>
+                    setState(() => _showObmocja = !_showObmocja),
                 onLegacyToggle: () => state.setShowLegacy(!state.showLegacy),
               ),
+              if (_identifying)
+                Positioned(
+                  top: MediaQuery.of(context).padding.top + 96,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Material(
+                      elevation: 2,
+                      shape: const StadiumBorder(),
+                      color: Theme.of(context).colorScheme.surface,
+                      child: const Padding(
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: 14,
+                              height: 14,
+                              child:
+                                  CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            SizedBox(width: 8),
+                            Text('Poizvedujem …', style: TextStyle(fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               if (_plusExpanded)
                 Positioned.fill(
                   child: GestureDetector(
@@ -534,36 +560,20 @@ class _HomeScreenState extends State<HomeScreen> {
     return out;
   }
 
-  /// Lazy-loads the Natura 2000 overlay on first enable, then toggles it. The
-  /// fetch + reprojection runs once per session and is cached in the store, so
-  /// subsequent toggles are instant.
-  Future<void> _toggleObmocja(AppState state) async {
-    if (_showObmocja) {
-      setState(() => _showObmocja = false);
-      return;
-    }
-    if (_obmocjaStore.isLoaded) {
-      setState(() => _showObmocja = true);
-      return;
-    }
-    if (_obmocjaLoading) return;
-    if (!state.isOnline) {
-      _showSnack('Območja: ni povezave.');
-      return;
-    }
-    setState(() => _obmocjaLoading = true);
-    _showSnack('Nalagam Območja …');
+  /// Tap-to-identify: GetFeatureInfo for the Natura 2000 areas under the tapped
+  /// point. Opens the list/detail sheet when one or more areas are hit; a tap
+  /// on no area does nothing. A small indicator marks the in-flight query.
+  Future<void> _identifyObmocja(LatLng point) async {
+    if (_identifying) return;
+    setState(() => _identifying = true);
     try {
-      await _obmocjaStore.loadN2k();
+      final features = await _obmocjaStore.identify(point);
       if (!mounted) return;
-      setState(() {
-        _showObmocja = true;
-        _obmocjaLoading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _obmocjaLoading = false);
-      _showSnack('Območja: nalaganje ni uspelo.');
+      if (features.isNotEmpty) showObmocjaSheet(context, features);
+    } on ObmocjaException {
+      if (mounted) _showSnack('Območja: poizvedba ni uspela.');
+    } finally {
+      if (mounted) setState(() => _identifying = false);
     }
   }
 

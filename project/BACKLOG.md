@@ -116,21 +116,24 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 ### TB-10 · Natura 2000 ("Območja") map overlay
 `✨ Enhancement` · `P2` · `Doing` · Maintainer-initiated · Updated: 2026-06-15
 - **Want:** Bring the `narcis-vibed` "Območja s statusom" layers to the field app, starting
-  with Natura 2000, as a toggleable map overlay with tap-for-detail.
-- **Decisions:** Vector render (parity with vibed + interactivity), N2k first, tap-for-detail.
-  Source = `narcis.gov.si` ORDS direct (single-host), reprojected EPSG:3794→WGS84 client-side
-  via `proj4dart` — deliberately *not* the `narcis.alittis.com` `/api` cache, to avoid coupling
-  a Play-Store field app to the web deployment. See ARCHITECTURE §10.2.
-- **Shipped (code):** [`obmocja_store.dart`](../lib/data/obmocja_store.dart) (fetch + parse +
-  reproject + ray-cast hit-test), `obmocjaLayers()` in [`basemap.dart`](../lib/widgets/basemap.dart),
-  [`obmocje_sheet.dart`](../lib/widgets/obmocje_sheet.dart), wired into
-  [`home_screen.dart`](../lib/screens/home_screen.dart) (the previously-disabled "Območja" chip
-  is now live). `proj4dart` dependency added. Unit tests in `test/obmocja_store_test.dart`
-  (golden 3794→WGS84 vertex, envelope parse, caching, hit-test) — suite 41/41 green.
-- **Open before Done:** (1) on-device render + pan/zoom perf on the A56 — 356 dense
-  multipolygons is the heaviest the home map has drawn; (2) build + release. Follow-ups:
-  POV-hatch fidelity, and the remaining sublayers (`ZO`/`EPO`/`NV`/`NVJ`; `NV` 5.3k and `NVJ`
-  14.7k features need viewport-loading or clustering first).
+  with Natura 2000, as a toggleable map overlay with tap → list → detail.
+- **Decisions:** Server-rendered **WMS tiles** from the production NarcIS GeoServer
+  (`narcis.gov.si/ows/ows`, layer `SI.NARCIS:ZOS_N2K_PLG`, the same GeoServer the APEX app uses),
+  with tap-to-identify via WMS GetFeatureInfo. Pivoted here from an initial client-side vector
+  approach (GeoJSON from the ORDS `vib/zos` module + `proj4dart`) after measuring that endpoint at
+  **~14–16 s TTFB per cold request** and recognising whole-layer vector won't scale to NV/NVJ. WMS
+  tiles load per-viewport (instant first paint) and scale to any layer. See ARCHITECTURE §10.2.
+- **Shipped (code):** [`obmocja_store.dart`](../lib/data/obmocja_store.dart) (`identify` →
+  GetFeatureInfo + `ObmocjeFeature`), `obmocjaWmsLayers()` in
+  [`basemap.dart`](../lib/widgets/basemap.dart), [`obmocje_sheet.dart`](../lib/widgets/obmocje_sheet.dart)
+  (list ⇄ detail), wired into [`home_screen.dart`](../lib/screens/home_screen.dart) (the "Območja"
+  chip toggles the tile layer instantly; a map tap runs identify). `proj4dart` removed. Unit tests
+  in `test/obmocja_store_test.dart` (GetFeatureInfo request shape + overlapping-feature parse) —
+  suite 39/39 green.
+- **Open before Done:** (1) on-device check on the A56 — tiles render with the official Natura
+  symbology, tap → list/detail works, responsiveness OK; (2) build + release. Follow-ups: add the
+  remaining ZOS layers (`EPO`/`NV`/`jame` — a few lines each now: another `TileLayer` + chip), and
+  a layer/legend picker once more than one is shown at once.
 - **Discussion:** —
 - **Shipped:** —
 

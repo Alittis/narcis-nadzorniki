@@ -1,11 +1,8 @@
-// Unit tests for ObmocjaStore: ORDS envelope parsing, EPSG:3794 -> WGS84
-// reprojection, session caching, and the tap-to-identify point-in-polygon test.
-//
-// MockClient (package:http/testing.dart) feeds a canned ORDS envelope, so the
-// real narcis.gov.si endpoint is never touched. The reprojection golden value
-// is a real vertex captured from both the raw 3794 ORDS output and the
-// reprojected 4326 output of narcis-vibed (feature 215): the 3794 pair
-// (418417.671502, 118453.695236) maps to WGS84 (13.942885, 46.200951).
+// Unit tests for ObmocjaStore.identify — the WMS GetFeatureInfo "identify"
+// against the production NarcIS GeoServer. MockClient feeds a canned
+// GetFeatureInfo FeatureCollection (the real Cerknica response shape, where a
+// tap hits two overlapping Natura areas: an SPA/POV and an SAC/POO), so the
+// real GeoServer is never touched.
 
 import 'dart:convert';
 
@@ -15,118 +12,84 @@ import 'package:http/testing.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:narcis_nadzorniki/data/obmocja_store.dart';
 
-/// ORDS wraps a stringified FeatureCollection in `{items:[{geojson}]}`. This
-/// envelope carries one POO polygon whose first vertex is the golden 3794 pair.
-String _envelope() {
-  final fc = jsonEncode({
-    'type': 'FeatureCollection',
-    'features': [
-      {
-        'type': 'Feature',
-        'id': 215,
-        'properties': {
-          'IME_OBM': 'Ježevec',
-          'KODA_OBM': 'SI3000006',
-          'N2K_TIP_OBMOCJA': 'POO',
+String _gfi() => jsonEncode({
+      'type': 'FeatureCollection',
+      'features': [
+        {
+          'type': 'Feature',
+          'id': 'ZOS_N2K_PLG.1275',
+          'properties': {
+            'IME_OBM': 'Cerkniško jezero',
+            'KODA_OBM': 'SI5000015',
+            'N2K_TIP_OBMOCJA': 'POV',
+            'N2K_BIOGEO_REGION': 'celinska',
+            'OPIS': 'Presihajoče Cerkniško jezero …',
+            'POV_HA': 2620.5,
+            'DAT_ZAC': '2013-04-20T00:00:00Z',
+          },
         },
-        'geometry': {
-          'type': 'Polygon',
-          'coordinates': [
-            [
-              [418417.671502, 118453.695236],
-              [419000.0, 118453.695236],
-              [419000.0, 119000.0],
-              [418417.671502, 119000.0],
-              [418417.671502, 118453.695236],
-            ],
-          ],
+        {
+          'type': 'Feature',
+          'id': 'ZOS_N2K_PLG.1263',
+          'properties': {
+            'IME_OBM': 'Notranjski trikotnik',
+            'KODA_OBM': 'SI3000232',
+            'N2K_TIP_OBMOCJA': 'POO',
+            'N2K_BIOGEO_REGION': 'celinska',
+            'OPIS': 'Območje s podzemnim svetom …',
+            'POV_HA': 52000,
+            'DAT_ZAC': '2013-04-20T00:00:00Z',
+          },
         },
-      },
-    ],
-  });
-  return jsonEncode({
-    'items': [
-      {'geojson': fc},
-    ],
-  });
-}
+      ],
+    });
 
 void main() {
-  group('ObmocjaStore.loadN2k', () {
-    test('parses the ORDS envelope and reprojects 3794 -> WGS84', () async {
+  group('ObmocjaStore.identify', () {
+    test('issues a GetFeatureInfo and parses overlapping features', () async {
+      late Uri seen;
       final store = ObmocjaStore(
         client: MockClient((req) async {
-          expect(req.url.toString(), endsWith('/vib/zos/N2k'));
-          return http.Response.bytes(utf8.encode(_envelope()), 200);
+          seen = req.url;
+          return http.Response.bytes(utf8.encode(_gfi()), 200);
         }),
       );
 
-      final areas = await store.loadN2k();
+      final feats = await store.identify(const LatLng(45.77, 14.37));
 
-      expect(areas, hasLength(1));
-      final a = areas.single;
-      expect(a.id, 215);
-      expect(a.ime, 'Ježevec');
-      expect(a.koda, 'SI3000006');
-      expect(a.tip, 'POO');
-      expect(a.isPov, isFalse);
-      expect(a.parts, hasLength(1));
+      // Request shape.
+      expect(seen.queryParameters['REQUEST'], 'GetFeatureInfo');
+      expect(seen.queryParameters['QUERY_LAYERS'], 'SI.NARCIS:ZOS_N2K_PLG');
+      expect(seen.queryParameters['INFO_FORMAT'], 'application/json');
 
-      final first = a.parts.single.outer.first;
-      expect(first.latitude, closeTo(46.200951, 1e-4));
-      expect(first.longitude, closeTo(13.942885, 1e-4));
+      // Both overlapping areas, with attributes + designation parsed.
+      expect(feats, hasLength(2));
+      expect(feats[0].ime, 'Cerkniško jezero');
+      expect(feats[0].isPov, isTrue); // SI5… / POV
+      expect(feats[0].povrsinaHa, 2620.5);
+      expect(feats[0].datZac, '2013-04-20'); // ISO time trimmed
+      expect(feats[1].ime, 'Notranjski trikotnik');
+      expect(feats[1].isPov, isFalse); // SI3… / POO
     });
 
-    test('caches after first load — a second call hits no network', () async {
-      var calls = 0;
+    test('returns empty when the point is on no area', () async {
       final store = ObmocjaStore(
-        client: MockClient((req) async {
-          calls++;
-          return http.Response.bytes(utf8.encode(_envelope()), 200);
-        }),
+        client: MockClient((req) async => http.Response.bytes(
+              utf8.encode('{"type":"FeatureCollection","features":[]}'),
+              200,
+            )),
       );
-
-      final a1 = await store.loadN2k();
-      final a2 = await store.loadN2k();
-
-      expect(calls, 1);
-      expect(identical(a1, a2), isTrue);
-      expect(store.isLoaded, isTrue);
+      expect(await store.identify(const LatLng(46.0, 15.0)), isEmpty);
     });
 
-    test('non-200 throws ObmocjaException', () async {
+    test('throws ObmocjaException on a network/HTTP failure', () async {
       final store = ObmocjaStore(
         client: MockClient((req) async => http.Response('boom', 500)),
       );
-      expect(store.loadN2k(), throwsA(isA<ObmocjaException>()));
-    });
-  });
-
-  group('areaAtPoint', () {
-    final square = N2kArea(
-      id: 1,
-      ime: 'Sq',
-      koda: 'X',
-      tip: 'POO',
-      parts: [
-        N2kPart(
-          outer: [
-            const LatLng(46.0, 14.0),
-            const LatLng(46.0, 14.1),
-            const LatLng(46.1, 14.1),
-            const LatLng(46.1, 14.0),
-            const LatLng(46.0, 14.0),
-          ],
-        ),
-      ],
-    );
-
-    test('returns the area for an interior point', () {
-      expect(areaAtPoint([square], const LatLng(46.05, 14.05))?.id, 1);
-    });
-
-    test('returns null for an exterior point', () {
-      expect(areaAtPoint([square], const LatLng(45.5, 13.0)), isNull);
+      expect(
+        store.identify(const LatLng(46.0, 15.0)),
+        throwsA(isA<ObmocjaException>()),
+      );
     });
   });
 }
