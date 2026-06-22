@@ -41,7 +41,7 @@ class WalksListScreen extends StatelessWidget {
                 ),
                 title: Text(walk.name?.isNotEmpty == true
                     ? walk.name!
-                    : dateFormat.format(walk.startedAt)),
+                    : dateFormat.format(walk.startedAt.toLocal())),
                 subtitle: Text(_subtitle(walk, dateFormat)),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
@@ -62,7 +62,7 @@ class WalksListScreen extends StatelessWidget {
   }
 
   String _subtitle(Walk walk, DateFormat fmt) {
-    final start = fmt.format(walk.startedAt);
+    final start = fmt.format(walk.startedAt.toLocal());
     final mins = walk.duration.inMinutes;
     final pts = walk.displayPointCount;
     final parts = <String>[start, '$mins min', '$pts točk'];

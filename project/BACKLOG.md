@@ -198,7 +198,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-13 · Timestamps show in UTC, not local time, on synced records & walks
-`🐞 Bug` · `P1` · `Todo` · Reporter: Matjaž · Updated: 2026-06-22
+`🐞 Bug` · `P1` · `Doing` · Reporter: Matjaž · Updated: 2026-06-22
 - **Problem:** The time shown for a disturbance / walk is not always local — it can read ~1–2 h off
   (the UTC offset; CET = +1, CEST = +2). The *recording* is fine; the **display** is wrong for any
   record/walk that has come back from the server.
@@ -227,6 +227,23 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   [`legacy_detail_screen.dart:15`](../lib/screens/legacy_detail_screen.dart)), plus a round-trip test.
   Pure client change, no DB change. **Caveat:** do *not* blanket-`.toLocal()` the server `createdAt` — it's
   mislabeled (see TB-14), so converting it would double-offset.
+- **Implemented (2026-06-22, in source — pending commit + release build):** Added `.toLocal()` at the
+  display sites — `observedAt`/`startedAt`/`endedAt` only, never `createdAt` (TB-14 caveat respected). A
+  grep sweep found **six** sites, one more than the root-cause list above: the fifth file
+  [`walks_list_screen.dart`](../lib/screens/walks_list_screen.dart) formats `startedAt` in *two* places —
+  the title fallback (`:44`) **and** the `_subtitle` helper (`:65`); both fixed. Full set:
+  [`detail_screen.dart:428`](../lib/screens/detail_screen.dart),
+  [`record_list_screen.dart:43`](../lib/screens/record_list_screen.dart),
+  [`walk_detail_screen.dart`](../lib/screens/walk_detail_screen.dart) start/end (`:204`–`:205`) + linked
+  record (`:262`), [`walks_list_screen.dart`](../lib/screens/walks_list_screen.dart) `:44` + `:65`. The two
+  `form_screen.dart` `.format(...)` sites are correctly untouched — a `TimeOfDay` (`:405`) and the
+  user-entered working `_date` (`:662`), neither a server round-trip. Round-trip test added
+  ([`test/remote_api_test.dart`](../test/remote_api_test.dart), group `timestamp round-trip (TB-13)`):
+  pins that a `Z`-tagged `observedAt` parses to a UTC instant and that a local→UTC-wire→parse→`toLocal`
+  round-trip recovers the original wall-clock (TZ-independent — `toUtc`/`toLocal` are inverses).
+  `flutter analyze` clean (no new issues); suite **52/52** (was 50). ARCHITECTURE §9.3 wire-payload note
+  updated with the UTC-on-wire/local-in-UI invariant + the TB-14 caveat. (Display fix only — no widget-level
+  render assertion, which on a UTC CI machine couldn't distinguish the bug anyway.)
 - **Shipped:** —
 
 ### TB-14 · Server `createdAt` is stored in local time, mislabeled as UTC
