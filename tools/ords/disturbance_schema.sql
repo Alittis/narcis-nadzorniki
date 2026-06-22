@@ -117,7 +117,10 @@ BEGIN
         status_obravnave  VARCHAR2(30)   DEFAULT 'Odprto' NOT NULL,
         predlog_tipa      VARCHAR2(500)  NULL,
         ustvarjen_od      VARCHAR2(255)  NOT NULL,
-        ustvarjen         TIMESTAMP      DEFAULT SYSTIMESTAMP NOT NULL,
+        -- UTC wall-clock: SYSTIMESTAMP is the DB host's *local* zoned time;
+        -- storing it in this TZ-naive column kept local digits, which the GET
+        -- handler then mislabels 'Z' (TB-14). SYS_EXTRACT_UTC normalizes first.
+        ustvarjen         TIMESTAMP      DEFAULT SYS_EXTRACT_UTC(SYSTIMESTAMP) NOT NULL,
         spremenjen_od     VARCHAR2(255)  NULL,
         spremenjen        TIMESTAMP      NULL,
         CONSTRAINT pk_tb_motnje       PRIMARY KEY (motnja_id),
@@ -197,7 +200,7 @@ BEGIN
         vsebina        BLOB           NOT NULL,
         mime_type      VARCHAR2(80)   DEFAULT 'image/jpeg' NOT NULL,
         velikost       NUMBER         NOT NULL,
-        ustvarjen      TIMESTAMP      DEFAULT SYSTIMESTAMP NOT NULL,
+        ustvarjen      TIMESTAMP      DEFAULT SYS_EXTRACT_UTC(SYSTIMESTAMP) NOT NULL, -- UTC, see TB-14
         ustvarjen_od   VARCHAR2(255)  NOT NULL,
         CONSTRAINT pk_tb_motnje_foto       PRIMARY KEY (foto_id),
         CONSTRAINT fk_tb_motnje_foto_mot   FOREIGN KEY (motnja_id)
@@ -254,6 +257,37 @@ BEGIN
         CHECK (status_obravnave IN
                ('Odprto','V obravnavi','Zaključeno','Predano drugi službi'))
     ~';
+  END IF;
+END;
+/
+
+-- 8. TB-14: store server-default audit timestamps in UTC --------------------
+-- USTVARJEN defaulted to SYSTIMESTAMP (the DB host's LOCAL zoned time). On this
+-- TZ-naive TIMESTAMP column that retained the local wall-clock digits, while
+-- the GET handler serialises every timestamp as UTC ('...Z') — so createdAt
+-- read back +1/+2 h ahead of the true instant (TB-14). SYS_EXTRACT_UTC(
+-- SYSTIMESTAMP) stores the UTC wall-clock, matching the client-supplied columns
+-- the same serialiser already renders correctly. Idempotent: only ALTERs while
+-- the default still lacks SYS_EXTRACT_UTC. This changes the default for NEW rows
+-- only; existing rows are corrected by the run-once, opt-in companion script
+-- tools/ords/tb14_backfill_audit_ts_utc.sql (this block never touches data).
+DECLARE
+  l_def VARCHAR2(4000);
+BEGIN
+  SELECT data_default INTO l_def
+    FROM user_tab_columns
+   WHERE table_name = 'TB_MOTNJE' AND column_name = 'USTVARJEN';
+  IF INSTR(UPPER(l_def), 'EXTRACT') = 0 THEN
+    EXECUTE IMMEDIATE
+      'ALTER TABLE tb_motnje MODIFY (ustvarjen DEFAULT SYS_EXTRACT_UTC(SYSTIMESTAMP))';
+  END IF;
+
+  SELECT data_default INTO l_def
+    FROM user_tab_columns
+   WHERE table_name = 'TB_MOTNJE_FOTO' AND column_name = 'USTVARJEN';
+  IF INSTR(UPPER(l_def), 'EXTRACT') = 0 THEN
+    EXECUTE IMMEDIATE
+      'ALTER TABLE tb_motnje_foto MODIFY (ustvarjen DEFAULT SYS_EXTRACT_UTC(SYSTIMESTAMP))';
   END IF;
 END;
 /

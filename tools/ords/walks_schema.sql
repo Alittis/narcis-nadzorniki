@@ -50,7 +50,9 @@ BEGIN
         naziv          VARCHAR2(200)  NULL,
         opis           CLOB           NULL,
         ustvarjen_od   VARCHAR2(255)  NOT NULL,
-        ustvarjen      TIMESTAMP      DEFAULT SYSTIMESTAMP NOT NULL,
+        -- UTC wall-clock (TB-14): SYSTIMESTAMP stored local digits the GET
+        -- handler then mislabels 'Z'; SYS_EXTRACT_UTC normalizes to UTC first.
+        ustvarjen      TIMESTAMP      DEFAULT SYS_EXTRACT_UTC(SYSTIMESTAMP) NOT NULL,
         spremenjen_od  VARCHAR2(255)  NULL,
         spremenjen     TIMESTAMP      NULL,
         CONSTRAINT pk_tb_obhodi      PRIMARY KEY (obhod_id),
@@ -127,6 +129,26 @@ BEGIN
    WHERE table_name = 'TB_MOTNJE' AND index_name = 'IX_TB_MOTNJE_OBHOD';
   IF l_ix = 0 THEN
     EXECUTE IMMEDIATE 'CREATE INDEX ix_tb_motnje_obhod ON tb_motnje (obhod_id)';
+  END IF;
+END;
+/
+
+-- 4. TB-14: store TB_OBHODI.USTVARJEN default in UTC ------------------------
+-- Same fix as disturbance_schema.sql §8: SYSTIMESTAMP stored the DB host's
+-- LOCAL wall-clock into this TZ-naive column, which the GET handler then
+-- mislabels 'Z' (createdAt read back +1/+2 h ahead). SYS_EXTRACT_UTC(
+-- SYSTIMESTAMP) stores UTC. Idempotent: only ALTERs while the default still
+-- lacks SYS_EXTRACT_UTC. Changes the default for NEW rows only; existing rows
+-- are corrected by the run-once tools/ords/tb14_backfill_audit_ts_utc.sql.
+DECLARE
+  l_def VARCHAR2(4000);
+BEGIN
+  SELECT data_default INTO l_def
+    FROM user_tab_columns
+   WHERE table_name = 'TB_OBHODI' AND column_name = 'USTVARJEN';
+  IF INSTR(UPPER(l_def), 'EXTRACT') = 0 THEN
+    EXECUTE IMMEDIATE
+      'ALTER TABLE tb_obhodi MODIFY (ustvarjen DEFAULT SYS_EXTRACT_UTC(SYSTIMESTAMP))';
   END IF;
 END;
 /

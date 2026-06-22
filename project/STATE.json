@@ -317,7 +317,7 @@
     }
   },
   "disturbance_schema": {
-    "status": "deployed to Oracle 2026-04-26; smoke test 9/9 passed; OBHOD_ID column applied 2026-04-27 via walks_schema.sql ALTER and re-deployed disturbance_endpoints.sql (17/17 lifecycle probes passed). 2026-05-11: ZAKONSKA_PODLAGA VARCHAR2(200) NULL and STATUS_OBRAVNAVE VARCHAR2(30) DEFAULT 'Odprto' NOT NULL (CHECK to four workflow states) deployed via idempotent ALTER block at the end of disturbance_schema.sql; disturbance_endpoints.sql re-deployed in the same session; 17/17 smoke probes passed end-to-end including POST/PUT/GET round-trip of the new fields.",
+    "status": "deployed to Oracle 2026-04-26; smoke test 9/9 passed; OBHOD_ID column applied 2026-04-27 via walks_schema.sql ALTER and re-deployed disturbance_endpoints.sql (17/17 lifecycle probes passed). 2026-05-11: ZAKONSKA_PODLAGA VARCHAR2(200) NULL and STATUS_OBRAVNAVE VARCHAR2(30) DEFAULT 'Odprto' NOT NULL (CHECK to four workflow states) deployed via idempotent ALTER block at the end of disturbance_schema.sql; disturbance_endpoints.sql re-deployed in the same session; 17/17 smoke probes passed end-to-end including POST/PUT/GET round-trip of the new fields. 2026-06-22 (TB-14, DEPLOYED + VERIFIED ON PROD 2026-06-22): TB_MOTNJE.USTVARJEN and TB_MOTNJE_FOTO.USTVARJEN column DEFAULT changed SYSTIMESTAMP -> SYS_EXTRACT_UTC(SYSTIMESTAMP) (idempotent ALTER block §8) and the disturbances PUT handler's SPREMENJEN set the same, so server-stamped audit timestamps store honest UTC digits instead of DB-local wall-clock mislabeled 'Z'. Existing rows corrected by run-once tools/ords/tb14_backfill_audit_ts_utc.sql. Deployed via APEX SQL Workshop and verified read-only: all three USTVARJEN defaults now read SYS_EXTRACT_UTC(SYSTIMESTAMP); the 10 most-recent walks show createdAt-endedAt = 0 (was +2.00 h).",
     "deploy_order": [
       "tools/ords/disturbance_schema.sql",
       "tools/ords/disturbance_codebook_seed.sql",
@@ -359,7 +359,7 @@
     "codebook_fetch_endpoint_in_scope": false
   },
   "walks_schema": {
-    "status": "deployed and smoke-tested 2026-04-27; tables and ALTER applied; 14/14 walks lifecycle probes passed against production",
+    "status": "deployed and smoke-tested 2026-04-27; tables and ALTER applied; 14/14 walks lifecycle probes passed against production. 2026-06-22 (TB-14, DEPLOYED + VERIFIED ON PROD 2026-06-22): TB_OBHODI.USTVARJEN column DEFAULT changed SYSTIMESTAMP -> SYS_EXTRACT_UTC(SYSTIMESTAMP) (idempotent ALTER block §4) + walks PUT handler SPREMENJEN same, for honest-UTC audit timestamps. Existing rows corrected by run-once tools/ords/tb14_backfill_audit_ts_utc.sql. Deployed via APEX SQL Workshop and verified read-only: TB_OBHODI.USTVARJEN default now SYS_EXTRACT_UTC(SYSTIMESTAMP); recent walks show createdAt-endedAt = 0 (was +2 h).",
     "purpose": "Tracks walk-around (obhod) sessions: a continuous GPS path with linked disturbances. Walks themselves do not carry photos; photos still hang off TB_MOTNJE.",
     "deploy_files": [
       "tools/ords/walks_schema.sql",
