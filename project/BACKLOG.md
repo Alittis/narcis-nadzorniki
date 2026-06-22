@@ -102,7 +102,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   issues), suite 50/50. ARCHITECTURE §Walk-tick filter updated. Deferred (not in this scope): the
   per-walk "GPS was weak" indicator.
 - **Shipped:** Built into **v1.3.1+12** (2026-06-22, archived `~/Releases/terenska-beleznica-1.3.1+12.aab`);
-  pending upload to the Play Closed testing track. (Committed earlier as `d9aec82`.)
+  rolled out on the Play Closed testing track 2026-06-22 (v1.3.1+12). (Committed earlier as `d9aec82`.)
 
 ### TB-4 · Default disturbance location to the device's current position
 `✨ Enhancement` · `P2` · `Todo` (quick win) · Reporters: Tomaž, Matjaž · Updated: 2026-06-22
@@ -246,7 +246,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   updated with the UTC-on-wire/local-in-UI invariant + the TB-14 caveat. (Display fix only — no widget-level
   render assertion, which on a UTC CI machine couldn't distinguish the bug anyway.)
 - **Shipped:** Built into **v1.3.1+12** (2026-06-22, archived `~/Releases/terenska-beleznica-1.3.1+12.aab`);
-  pending upload to the Play Closed testing track. (Merged earlier as `c70a4da`, PR #4.)
+  rolled out on the Play Closed testing track 2026-06-22 (v1.3.1+12). (Merged earlier as `c70a4da`, PR #4.)
 
 ### TB-14 · Server `createdAt` is stored in local time, mislabeled as UTC
 `🐞 Bug` · `P2` · `Done` (deployed + verified on prod 2026-06-22) · Reporter: maintainer (discovered during TB-13, 2026-06-22) · Updated: 2026-06-22
