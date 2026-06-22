@@ -17,6 +17,7 @@ import 'package:narcis_nadzorniki/screens/profile_screen.dart';
 import 'package:narcis_nadzorniki/screens/type_selection_screen.dart';
 import 'package:narcis_nadzorniki/services/location_service.dart';
 import 'package:narcis_nadzorniki/services/place_search_service.dart';
+import 'package:narcis_nadzorniki/services/track_polish.dart';
 import 'package:narcis_nadzorniki/state/app_state.dart';
 import 'package:narcis_nadzorniki/widgets/basemap.dart';
 import 'package:narcis_nadzorniki/widgets/obmocja_picker.dart';
@@ -447,8 +448,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         _userLocation!,
                         _userAccuracy!,
                       ),
-                    if (_buildPolylines(state).isNotEmpty)
-                      PolylineLayer(polylines: _buildPolylines(state)),
+                    PolylineLayer(polylines: _buildPolylines(state)),
                     MarkerLayer(markers: _buildMarkers(state)),
                   ],
                 ),
@@ -558,18 +558,24 @@ class _HomeScreenState extends State<HomeScreen> {
       // user's own on top in a distinct orange, so they can pick out their own
       // tracks from the org's where paths overlap.
       for (final walk in walks.where((w) => !state.isWalkAuthoredByCurrentUser(w))) {
+        // polishTrack drops low-accuracy fixes + smooths the survivors (TB-3);
+        // a track can fall below 2 points once filtered, so guard before drawing.
+        final pts = polishTrack(walk.points);
+        if (pts.length < 2) continue;
         out.add(
           Polyline(
-            points: walk.points.map((p) => p.location).toList(),
+            points: pts,
             color: Colors.blueGrey.withValues(alpha: 0.55),
             strokeWidth: 3,
           ),
         );
       }
       for (final walk in walks.where((w) => state.isWalkAuthoredByCurrentUser(w))) {
+        final pts = polishTrack(walk.points);
+        if (pts.length < 2) continue;
         out.add(
           Polyline(
-            points: walk.points.map((p) => p.location).toList(),
+            points: pts,
             color: Colors.orange.withValues(alpha: 0.8),
             strokeWidth: 4,
           ),
@@ -578,14 +584,17 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     // Active walk (always rendered, regardless of Obhodi toggle, so the
     // user sees their path drawing while it records).
-    if (state.hasActiveWalk && state.activePoints.length >= 2) {
-      out.add(
-        Polyline(
-          points: state.activePoints.map((p) => p.location).toList(),
-          color: Colors.green.withValues(alpha: 0.85),
-          strokeWidth: 5,
-        ),
-      );
+    if (state.hasActiveWalk) {
+      final pts = polishTrack(state.activePoints);
+      if (pts.length >= 2) {
+        out.add(
+          Polyline(
+            points: pts,
+            color: Colors.green.withValues(alpha: 0.85),
+            strokeWidth: 5,
+          ),
+        );
+      }
     }
     return out;
   }

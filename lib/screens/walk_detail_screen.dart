@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
 import 'package:narcis_nadzorniki/models/walk.dart';
 import 'package:narcis_nadzorniki/screens/detail_screen.dart';
+import 'package:narcis_nadzorniki/services/track_polish.dart';
 import 'package:narcis_nadzorniki/state/app_state.dart';
 import 'package:narcis_nadzorniki/widgets/basemap.dart';
 import 'package:provider/provider.dart';
@@ -95,6 +96,9 @@ class _MapSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pts = walk.points;
+    // Filtered + smoothed track for drawing (TB-3); raw points still drive the
+    // centring + "not fetched yet" check below.
+    final track = polishTrack(pts);
     // Center the map on the path's midpoint when we have points; fall back
     // to the walk's start coordinate when the points haven't arrived yet
     // (the user opened the screen offline, or fetch is still in flight).
@@ -122,11 +126,11 @@ class _MapSection extends StatelessWidget {
             ),
             children: [
               ...basemapTileLayers(BasemapMode.osm),
-              if (pts.length >= 2)
+              if (track.length >= 2)
                 PolylineLayer(
                   polylines: [
                     Polyline(
-                      points: pts.map((p) => p.location).toList(),
+                      points: track,
                       color: Colors.green.withValues(alpha: 0.85),
                       strokeWidth: 5,
                     ),

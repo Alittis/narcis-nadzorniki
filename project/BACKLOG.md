@@ -41,17 +41,66 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-3 · Patrol path accuracy
-`🐞 Bug` · `P2` · `Blocked` (needs discussion) · Reporters: Tomaž, Matjaž · Updated: 2026-06-03
+`🐞 Bug` · `P2` · `Doing` · Reporters: Tomaž, Matjaž · Updated: 2026-06-22
 - **Problem:** Walk (obhod) track points scatter off the actual road/path even with good
-  GPS reception.
-- **Context:** Track points come from `Geolocator.getPositionStream` (5 m distance filter)
-  in [`home_screen.dart`](../lib/screens/home_screen.dart); each point stores its `accuracy`
-  and is POSTed once at walk end (`walks/` — points are write-once server-side). Levers are
-  client-side: drop low-accuracy points, smooth the polyline, or snap-to-road. Cannot fix
-  the underlying signal — partly device/physics-bound.
-- **Discussion:** Pin the achievable target before estimating — accuracy filtering +
-  polyline smoothing (in-app, cheap) vs. snap-to-road (needs a routing service, heavier).
-  How bad is "occasionally"? A sample bad track would help.
+  GPS reception. Sample bad track received 2026-06-22 (zigzag / V-dips off a forest road).
+- **Context:** The *recorded* track is captured in the background isolate
+  [`walk_task_handler.dart`](../lib/services/walk_task_handler.dart) (not `home_screen.dart`,
+  whose stream only drives the live user dot + halo). Each accepted fix is stored raw and
+  POSTed once at walk end (`walks/` — points are write-once server-side; the `NATANCNOST`
+  column keeps each point's accuracy). The home map draws the polyline by connecting raw
+  points 1:1 in `_buildPolylines` ([`home_screen.dart`](../lib/screens/home_screen.dart)) —
+  no smoothing or simplification.
+- **Root cause (2026-06-22):** Three things compound:
+  1. **Accuracy gate too lenient.** `_maxAccuracyMeters = 50` ([`walk_task_handler.dart:42`](../lib/services/walk_task_handler.dart))
+     accepts any fix with reported horizontal error ≤ 50 m. That gate was calibrated to reject
+     wifi/cell triangulation (ARCHITECTURE §Walk-tick filter), not to guarantee footpath-level
+     precision. Under forest canopy, 20–45 m *real GPS* fixes are routine — they pass the gate
+     and plot well off the path.
+  2. **"Good reception" ≠ good accuracy.** The reporter's "dober sprejem" reflects
+     satellites-in-view; `Position.accuracy` (the 68 % confidence radius, inflated by canopy
+     multipath) is what governs scatter. Per-point accuracy is recorded but only used to size
+     the dot halo, never to gate the recorded track.
+  3. **No smoothing/simplification.** Points are connected raw; with a 5 m `distanceFilter`
+     the lateral jitter is on the order of the step size, so the line weaves.
+  - **Nuance:** Some off-path excursions are *real* — the supervisor stepping off the road to
+    a disturbance (note the V-dips toward the red markers in the sample). Aggressive hard
+    filtering / snap-to-road would wrongly erase legitimate detours; prefer a relative accuracy
+    gate + gentle smoothing over a hard cliff.
+- **Empirical (2026-06-22, pulled via ORDS `GET /walks` + `/points`; 7 walks ≥30 pts, 3190 fixes):**
+  The problem is **bimodal**, which is exactly why users say "occasionally":
+  - **6 of 7 walks are clean** — median accuracy 4–8 m, p90 ≤ 10 m, ≈0 % of fixes over 15 m, ~0
+    positional jumps. No problem here.
+  - **1 walk was pathological** (branka, 2026-05-05, 2488 pts): median **24 m**, p90 **44 m**, max
+    pinned at the 50 m gate ceiling; **76 %** of fixes > 15 m, **48 %** > 25 m; ~400 implied teleports
+    (>2.5 m/s) and ~840 zig-zag reversals. The whole walk rode at the ceiling — a phone stuck on
+    coarse/fused location or a route under unbroken canopy, not random jitter. (The 5 m distanceFilter
+    also inflates the point count: noise keeps tripping the 5 m threshold while barely moving.)
+  - A **≈20 m gate cleanly separates the two populations**: clean walks lose ≈0 %, the bad walk loses
+    the majority. Teleport-segment endpoints skew worse (median 26 m) than calm ones (17 m), so scatter
+    tracks accuracy as expected.
+  - **Implication:** the 50 m gate is the main miss — calibrated to reject wifi/cell, not to guarantee
+    path precision, so it passed an entire ceiling-riding walk. Filter at **render time** (keep raw on
+    the server — points are write-once and the honest record matters), not at capture.
+- **Recommended approach (was option b, now data-backed):** render-time accuracy filter at ≈20 m +
+  gentle polyline smoothing/simplification on the survivors; raise capture to
+  `LocationAccuracy.bestForNavigation` (forces continuous GNSS — heads off the coarse-location case for
+  future walks); optionally a per-walk "GPS was weak" indicator so a ceiling-riding track isn't drawn as
+  authoritative. Not snap-to-road (heavy, external dep, and it would erase the real off-path detours to
+  disturbances). Diagnostic data + scripts in the session scratchpad (`narcis-walks/`).
+- **Implemented (2026-06-22, in source — pending commit + release build):** New pure helper
+  [`track_polish.dart`](../lib/services/track_polish.dart) (`polishTrack`): drops fixes > 20 m accuracy
+  (null-accuracy fixes kept), then a centred moving average (window 5) over the survivors. Wired into
+  both map views — `_buildPolylines` (active + historical) in
+  [`home_screen.dart`](../lib/screens/home_screen.dart) and the detail map in
+  [`walk_detail_screen.dart`](../lib/screens/walk_detail_screen.dart), each guarded so a track that
+  collapses below 2 points isn't drawn. Recording stream bumped to `LocationAccuracy.bestForNavigation`
+  ([`walk_task_handler.dart`](../lib/services/walk_task_handler.dart)). Raw points untouched (write-once,
+  so the change is tunable/reversible). Validated on real data: the 20 m cut keeps 100 % of the 6 clean
+  walks and 40 % (1001/2488) of the pathological one. 7 new unit tests
+  ([`test/track_polish_test.dart`](../test/track_polish_test.dart)); `flutter analyze` clean (no new
+  issues), suite 50/50. ARCHITECTURE §Walk-tick filter updated. Deferred (not in this scope): the
+  per-walk "GPS was weak" indicator.
 - **Shipped:** —
 
 ### TB-4 · Default disturbance location to the device's current position

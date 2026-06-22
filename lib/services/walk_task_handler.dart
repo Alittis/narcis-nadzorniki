@@ -77,9 +77,14 @@ class WalkTaskHandler extends TaskHandler {
   void onNotificationButtonPressed(String id) {}
 
   void _startStream(SendPort? sendPort) {
+    // bestForNavigation asks for the tightest continuous fix the platform can
+    // give while moving (on iOS it forces the navigation GNSS mode). On Android
+    // it still rides the fused provider, so it's a nudge, not a cure for a
+    // phone that drops to coarse/network location — the render-time accuracy
+    // filter (track_polish.dart) is what actually defends the drawn track (TB-3).
     _positionSub = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
+        accuracy: LocationAccuracy.bestForNavigation,
         distanceFilter: 5,
       ),
     ).listen(
