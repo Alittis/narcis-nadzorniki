@@ -247,7 +247,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-14 · Server `createdAt` is stored in local time, mislabeled as UTC
-`🐞 Bug` · `P2` · `Todo` (backend) · Reporter: maintainer (discovered during TB-13, 2026-06-22) · Updated: 2026-06-22
+`🐞 Bug` · `P2` · `Done` (deployed + verified on prod 2026-06-22) · Reporter: maintainer (discovered during TB-13, 2026-06-22) · Updated: 2026-06-22
 - **Problem:** The server-assigned `createdAt` audit timestamp is the server's **local** wall-clock
   (Europe/Ljubljana) but serialized with a trailing `Z` as if UTC — so it isn't a true instant.
 - **Evidence (confirmed 2026-06-22):** Across all 21 pulled walks, `createdAt` = `endedAt` + **exactly
@@ -267,7 +267,39 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   walk start-end), so no user-visible error today. But the stored audit time is wrong by the local offset
   and will mislead the moment anything trusts or displays it (and would double-offset if `.toLocal()`'d —
   see TB-13 caveat).
-- **Shipped:** —
+- **Root cause (confirmed in source 2026-06-22):** Three server-stamped columns default/assign from
+  `SYSTIMESTAMP` — `TB_MOTNJE.USTVARJEN` ([`disturbance_schema.sql:120`](../tools/ords/disturbance_schema.sql)),
+  `TB_OBHODI.USTVARJEN` ([`walks_schema.sql:53`](../tools/ords/walks_schema.sql)),
+  `TB_MOTNJE_FOTO.USTVARJEN` ([`disturbance_schema.sql:200`](../tools/ords/disturbance_schema.sql)) — and the
+  two PUT handlers set `SPREMENJEN = SYSTIMESTAMP` ([`disturbance_endpoints.sql:579`](../tools/ords/disturbance_endpoints.sql),
+  [`walks_endpoints.sql:427`](../tools/ords/walks_endpoints.sql)). `SYSTIMESTAMP` is the DB host's *zoned*
+  local time; assigning it to a TZ-naive `TIMESTAMP` keeps the **local wall-clock digits**. The GET
+  serializer (`TO_CHAR(SYS_EXTRACT_UTC(CAST(col AS TIMESTAMP WITH TIME ZONE)), '…"Z"')`) is **correct and
+  identical** for every timestamp — proven by `observedAt`/`startedAt`/`endedAt` round-tripping fine (TB-13)
+  — so the defect is the *stored digits*, not the serialization. Client-supplied columns land as UTC digits;
+  only the `SYSTIMESTAMP`-stamped ones land local. (The serializer's `CAST … AS TIMESTAMP WITH TIME ZONE`
+  assumes the ORDS session runs at UTC, which is precisely why the client-UTC columns are correct.)
+- **Implemented (2026-06-22, DEPLOY-READY — NOT YET DEPLOYED; manual APEX SQL Workshop deploy by maintainer):**
+  Fixed at the stored-value source so the data-at-rest is honest UTC (not a read-time patch). (1) **Schema
+  defaults** → `SYS_EXTRACT_UTC(SYSTIMESTAMP)`: CREATE-table defaults updated + idempotent re-run-safe ALTER
+  blocks appended — `disturbance_schema.sql` §8 (TB_MOTNJE + TB_MOTNJE_FOTO), `walks_schema.sql` §4
+  (TB_OBHODI), matching the 2026-05-11 ALTER-block precedent. (2) **PUT handlers** → `SPREMENJEN =
+  SYS_EXTRACT_UTC(SYSTIMESTAMP)` in both endpoint files (the sibling latent defect, fixed in the same pass).
+  (3) **Existing rows**: new run-once, opt-in [`tools/ords/tb14_backfill_audit_ts_utc.sql`](../tools/ords/tb14_backfill_audit_ts_utc.sql)
+  — `SYS_EXTRACT_UTC(FROM_TZ(col,'Europe/Ljubljana'))`, DST-aware (correct for both +1/+2), with read-only
+  pre-flight + verify queries that double as an "already-applied?" guard (walks `createdAt`≈`endedAt`).
+  The GET serializer is intentionally **unchanged** (storing UTC digits puts `createdAt` on the same basis
+  as the already-correct client columns; surgical). **Deploy order** (low-write window): backfill → re-deploy
+  the two schema files → re-deploy the two endpoint files; verify via the walks check + existing
+  `test_walks.sh`/`test_disturbances.sh`. ARCHITECTURE §9.3 caveat + STATE `disturbance_schema`/`walks_schema`
+  status updated. Possible future hardening (out of scope): switch the serializer's `CAST` to
+  `FROM_TZ(col,'UTC')` to drop the session-TZ assumption entirely.
+- **Shipped:** Deployed to ARSO prod via APEX SQL Workshop 2026-06-22 (maintainer-run), verified read-only the
+  same day. Q1: all three `USTVARJEN` defaults now read `SYS_EXTRACT_UTC(SYSTIMESTAMP)` (forward fix live).
+  Q2: the 10 most-recent walks show `createdAt − endedAt = 0` (0–1 s POST delay) — the exact inversion of the
+  `+2.00 h` that diagnosed the bug, confirming the backfill landed. Disturbance side covered by the same
+  default flip + identical `FROM_TZ` backfill transform. Source committed (PR pending). Spun off **TB-20**
+  (auth-token audit timestamps, same root cause but latent + security-critical — deferred, not folded in).
 
 ### TB-15 · Export a disturbances + walks report for a chosen date range
 `✨ Enhancement` · `P2` · `Blocked` (awaiting template) · Reporter: Matjaž · Updated: 2026-06-22
@@ -361,6 +393,27 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   top-most marker, so picking a *specific* one among overlapping points stays ambiguous; TB-6 (declutter
   toggle) / TB-18 (filter) address density. Pick a size that helps isolated markers without being over-grabby
   where points cluster.
+- **Shipped:** —
+
+### TB-20 · Auth-token audit timestamps stored local, mislabeled UTC (TB-14 sibling)
+`🐞 Bug` (latent, audit-only) · `P3` · `Triage` (backend) · Reporter: Claude (found during TB-14, 2026-06-22) · Updated: 2026-06-22
+- **Problem:** `TB_AUTH_TOKENS.CREATED_AT`/`EXPIRES_AT`/`LAST_USED_AT`/`REVOKED_AT` are stamped from
+  `SYSTIMESTAMP` into TZ-naive `TIMESTAMP` columns ([`auth_token_schema.sql:44`](../tools/ords/auth_token_schema.sql);
+  [`disturbance_auth_pkg.sql:157`](../tools/ords/disturbance_auth_pkg.sql)`-158`, `:296-297`, `:315`) — local
+  wall-clock digits, the same root cause as TB-14.
+- **Why it's NOT urgent (and not folded into TB-14):** These never cross the wire mislabeled. The client-facing
+  `expiresAt` in the login response is computed *separately and correctly* with `SYS_EXTRACT_UTC(SYSTIMESTAMP)`
+  ([`auth_login.sql:236`](../tools/ords/auth_login.sql)), so it's honest UTC. And the expiry gate
+  (`expires_at < SYSTIMESTAMP`, [`disturbance_auth_pkg.sql:247`](../tools/ords/disturbance_auth_pkg.sql)/`:289`)
+  compares two consistently-local values, so the 30-day sliding lifetime is correct; the server 401 is
+  authoritative regardless. Net: an internal audit-readability wart (an operator querying `tb_auth_tokens` sees
+  local times that look UTC), not a functional defect.
+- **Caveat for the fix:** NOT a one-liner like TB-14. The stored values **and every comparison site**
+  (`< SYSTIMESTAMP`) must move to UTC *together* — fixing only the stored side would shift expiry by the host
+  offset and could expire tokens early/late. Coordinated change across the security-critical `pkg_tb_auth`
+  + a backfill, then re-run the 7/7 token-lifecycle smoke test.
+- **Discussion:** Decide whether audit-readability justifies touching the auth package, or whether a code
+  comment ("stored local by design; expiry is offset-agnostic; wire `expiresAt` is UTC") suffices.
 - **Shipped:** —
 
 ---

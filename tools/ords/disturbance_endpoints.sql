@@ -576,7 +576,7 @@ BEGIN
          predlog_tipa     = l_proposed,
          obhod_id         = l_obhod_id,
          spremenjen_od    = l_ctx.email,
-         spremenjen       = SYSTIMESTAMP
+         spremenjen       = SYS_EXTRACT_UTC(SYSTIMESTAMP) -- UTC, see TB-14
    WHERE motnja_id = l_motnja_id;
 
   -- Replace junctions wholesale: simpler than diffing.

@@ -424,7 +424,7 @@ BEGIN
      SET naziv         = l_naziv,
          opis          = l_opis,
          spremenjen_od = l_ctx.email,
-         spremenjen    = SYSTIMESTAMP
+         spremenjen    = SYS_EXTRACT_UTC(SYSTIMESTAMP) -- UTC, see TB-14
    WHERE obhod_id = l_obhod_id;
 
   COMMIT;
