@@ -11,6 +11,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:intl/intl.dart';
 import 'package:narcis_nadzorniki/data/remote_api.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
@@ -319,6 +320,56 @@ void main() {
             .authHeaderValue,
         expected,
       );
+    });
+  });
+
+  // TB-13: synced times come back from the server Z-tagged (UTC). Display code
+  // must .toLocal() them or it renders the UTC wall-clock (off by the CET/CEST
+  // offset). These tests pin the parse-boundary contract that makes the
+  // display-site .toLocal() both necessary and correct, and that a full
+  // local -> wire -> parse -> toLocal round-trip recovers the original instant.
+  group('timestamp round-trip (TB-13)', () {
+    test('server Z-tagged observedAt parses to a UTC instant', () async {
+      final api = _api((_) async => http.Response.bytes(
+            utf8.encode(jsonEncode({
+              'records': [
+                {
+                  'id': 'rec-1',
+                  'latitude': 45.79,
+                  'longitude': 14.36,
+                  'locationAccuracy': 'Natančna',
+                  'observedAt': '2026-04-25T12:00:00.000Z',
+                  'actionTaken': 'Brez ukrepanja',
+                  'types': const [],
+                  'observers': const [],
+                },
+              ],
+            })),
+            200,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          ));
+
+      final rec = (await api.fetchRecords(_creds)).single;
+      expect(rec.observedAt.isUtc, isTrue);
+      expect(rec.observedAt, DateTime.utc(2026, 4, 25, 12, 0, 0));
+    });
+
+    test('local -> UTC wire -> parse -> toLocal recovers the wall-clock', () {
+      // A freshly created record holds a *local* DateTime; the client POSTs it
+      // as UTC (toUtc().toIso8601String(), remote_api.dart) and the server
+      // echoes that Z-tagged instant. Displaying it back must show the same
+      // wall-clock the warden entered — which is exactly what the display-site
+      // .toLocal() restores. TZ-independent: toUtc()/toLocal() are inverses.
+      final entered = DateTime(2026, 6, 22, 14, 30); // local
+      final wire = entered.toUtc().toIso8601String();
+      expect(wire, endsWith('Z'));
+
+      final parsed = DateTime.parse(wire);
+      expect(parsed.isUtc, isTrue);
+      expect(parsed.isAtSameMomentAs(entered), isTrue);
+
+      final fmt = DateFormat('dd.MM.yyyy HH:mm');
+      expect(fmt.format(parsed.toLocal()), fmt.format(entered));
     });
   });
 }

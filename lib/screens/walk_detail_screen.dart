@@ -201,8 +201,8 @@ class _MetaSection extends StatelessWidget {
             ),
           const SizedBox(height: 4),
           Text(
-            '${dateFormat.format(walk.startedAt)} → '
-            '${dateFormat.format(walk.endedAt)}',
+            '${dateFormat.format(walk.startedAt.toLocal())} → '
+            '${dateFormat.format(walk.endedAt.toLocal())}',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 4),
@@ -259,7 +259,7 @@ class _LinkedRecordsSection extends StatelessWidget {
                   ? 'Brez tipa'
                   : r.types.map((t) => t.typeName).join(', '),
             ),
-            subtitle: Text(dateFormat.format(r.observedAt)),
+            subtitle: Text(dateFormat.format(r.observedAt.toLocal())),
             trailing: const Icon(Icons.chevron_right),
             onTap: () {
               Navigator.of(context).push(

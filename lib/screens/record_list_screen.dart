@@ -40,7 +40,7 @@ class RecordListScreen extends StatelessWidget {
                   color: record.pendingSync ? Colors.orange : Colors.green,
                 ),
                 title: Text(typePreview),
-                subtitle: Text(dateFormat.format(record.observedAt)),
+                subtitle: Text(dateFormat.format(record.observedAt.toLocal())),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   Navigator.of(context).push(

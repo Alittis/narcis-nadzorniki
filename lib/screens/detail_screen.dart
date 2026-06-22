@@ -425,7 +425,7 @@ class _MetaStrip extends StatelessWidget {
       children: [
         _Pill(
           icon: Icons.calendar_today,
-          text: dateFmt.format(observedAt),
+          text: dateFmt.format(observedAt.toLocal()),
           tabular: true,
         ),
         _Pill(
