@@ -224,7 +224,23 @@ The app is intended for nature-protection wardens and authorised collaborators o
 This release is part of a closed test. Participation requires an invitation from the administrator and an existing NarcIS account with the appropriate authorization. For access or feedback, write to admin@alittis.com.
 ```
 
-### 3.3 Release notes — v1.3.0+11 (current)
+### 3.3 Release notes — v1.3.1+12 (current)
+
+**Slovene** (max 500 chars):
+```
+Različica 1.3.1 (build 12)
+• Časi pri zapisih in obhodih se zdaj prikazujejo v lokalnem času. Prej so bili pri vnosih, prenesenih s strežnika (npr. zapisi sodelavcev), lahko zamaknjeni za 1–2 uri.
+• Sledi obhodov so na zemljevidu natančnejše in bolj gladke: točke s slabim signalom GPS se samodejno izločijo, sled pa se zgladi, da manj „cikcaka".
+```
+
+**English** (max 500 chars):
+```
+Version 1.3.1 (build 12)
+• Times on records and walk-arounds now display in local time. Previously, items synced from the server (e.g. colleagues' records) could be off by 1–2 hours.
+• Walk-around tracks on the map are more accurate and smoother: points with a weak GPS signal are filtered out and the track is smoothed to reduce zig-zag.
+```
+
+### 3.3a Release notes — v1.3.0+11 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -240,7 +256,7 @@ Version 1.3.0 (build 11)
 • Your own walk-arounds are now coloured differently from your colleagues' on the map.
 ```
 
-### 3.3a Release notes — v1.2.3+10 (historical, superseded)
+### 3.3b Release notes — v1.2.3+10 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -256,7 +272,7 @@ Version 1.2.3 (build 10)
 • The LIFE Tršca project (no. 101114184) is co-funded by the European Union (LIFE programme) and the Slovenian Ministry of Natural Resources and Spatial Planning.
 ```
 
-### 3.3b Release notes — v1.2.0+7 (historical, superseded)
+### 3.3c Release notes — v1.2.0+7 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -272,7 +288,7 @@ Version 1.2.0 (build 7)
 • Password is not stored on the device: after the first login the app uses a revocable token that expires after 30 days of inactivity. Signing out also revokes it server-side.
 ```
 
-### 3.3c Release notes — v1.1.3+6 (historical, superseded)
+### 3.3d Release notes — v1.1.3+6 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -292,7 +308,7 @@ Version 1.1.3 (build 6)
 • Historical Notranjska Regional Park entries are now part of the regular Motnje layer.
 ```
 
-### 3.3d Release notes — v1.0.1+2 (historical, superseded)
+### 3.3e Release notes — v1.0.1+2 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
