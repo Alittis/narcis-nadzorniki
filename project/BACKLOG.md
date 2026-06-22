@@ -227,7 +227,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   [`legacy_detail_screen.dart:15`](../lib/screens/legacy_detail_screen.dart)), plus a round-trip test.
   Pure client change, no DB change. **Caveat:** do *not* blanket-`.toLocal()` the server `createdAt` — it's
   mislabeled (see TB-14), so converting it would double-offset.
-- **Implemented (2026-06-22, in source — pending commit + release build):** Added `.toLocal()` at the
+- **Implemented (2026-06-22, merged to `main` via PR #4, `c70a4da` — pending release build):** Added `.toLocal()` at the
   display sites — `observedAt`/`startedAt`/`endedAt` only, never `createdAt` (TB-14 caveat respected). A
   grep sweep found **six** sites, one more than the root-cause list above: the fifth file
   [`walks_list_screen.dart`](../lib/screens/walks_list_screen.dart) formats `startedAt` in *two* places —
