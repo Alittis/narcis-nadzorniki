@@ -96,9 +96,10 @@ class _MapSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pts = walk.points;
-    // Filtered + smoothed track for drawing (TB-3); raw points still drive the
-    // centring + "not fetched yet" check below.
-    final track = polishTrack(pts);
+    // Filtered + smoothed track for drawing, split at large gaps so a driven
+    // stretch or a GPS dropout isn't bridged by a straight line (TB-3, TB-22);
+    // raw points still drive the centring + "not fetched yet" check below.
+    final segments = polishTrackSegments(pts);
     // Center the map on the path's midpoint when we have points; fall back
     // to the walk's start coordinate when the points haven't arrived yet
     // (the user opened the screen offline, or fetch is still in flight).
@@ -126,14 +127,16 @@ class _MapSection extends StatelessWidget {
             ),
             children: [
               ...basemapTileLayers(BasemapMode.osm),
-              if (track.length >= 2)
+              if (segments.any((s) => s.length >= 2))
                 PolylineLayer(
                   polylines: [
-                    Polyline(
-                      points: track,
-                      color: Colors.green.withValues(alpha: 0.85),
-                      strokeWidth: 5,
-                    ),
+                    for (final segment in segments)
+                      if (segment.length >= 2)
+                        Polyline(
+                          points: segment,
+                          color: Colors.green.withValues(alpha: 0.85),
+                          strokeWidth: 5,
+                        ),
                   ],
                 ),
               if (linked.isNotEmpty)

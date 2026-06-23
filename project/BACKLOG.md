@@ -436,6 +436,32 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   180 km/h (looser teleport-only guard).
 - **Shipped:** — (pending commit + the next closed-testing build, will bump from v1.3.1+12)
 
+### TB-22 · Walk tracks draw straight "spike" lines across driven / dropped stretches
+`🐞 Bug` · `P1` · `Doing` (code complete, full suite 58/58 + `flutter analyze` clean 2026-06-23; pending commit + release build) · Reporter: field testers (via maintainer, screenshot) · Updated: 2026-06-23
+- **Problem:** On existing walks where the warden walked *and* drove, the track shows long dead-straight lines
+  shooting across the map (Cerknica screenshot, 2026-06-23). Each walk was drawn as a **single continuous
+  `Polyline`** through every stored point, so any gap between consecutive points renders as a straight bridge.
+  The gaps came from the old 8 m/s capture filter rejecting every driving fix (TB-21) and from GPS dropouts —
+  the bridged ends sit hundreds of metres to kilometres apart.
+- **Want:** Stop drawing the bridge lines. Existing walks can't be repaired at the source (raw points are
+  write-once on the server and the rejected fixes were never stored), so the remedy is render-time.
+- **Context:** Added `polishTrackSegments` to [`track_polish.dart`](../lib/services/track_polish.dart) —
+  accuracy-filters, then **splits into separate polylines wherever two consecutive kept fixes jump > 200 m**
+  (`kTrackGapSplitMeters`), then smooths each segment. Both render sites draw one `Polyline` per segment:
+  [`walk_detail_screen.dart`](../lib/screens/walk_detail_screen.dart),
+  [`home_screen.dart`](../lib/screens/home_screen.dart) `_buildPolylines` (teammate + own + active). Threshold
+  is **distance-based, not time-based**: a stationary stop emits no fixes (`distanceFilter` 5 m) but its
+  bracketing points are metres apart, so it stays one segment; a real drive samples at ~36 m steps even at
+  130 km/h, well under 200 m. The flat `polishTrack` is kept as a no-split wrapper for the existing tests.
+  Fixes both existing and future walks; with TB-21 also raising the capture cap, future walks capture the
+  driving fixes and follow the road instead of leaving a gap. 6 new unit tests
+  ([`track_polish_test.dart`](../test/track_polish_test.dart); full suite 58/58). Raw points + the TB-3
+  accuracy/smoothing pass unchanged. ARCHITECTURE §"render-time polish" updated.
+- **Discussion:** Chose gap-split with **no connector drawn** (honest holes) over a dashed bridge or
+  walk-vs-drive styling (maintainer, 2026-06-23). Styling driven segments distinctly is a possible follow-up
+  once field walks with captured driving exist.
+- **Shipped:** — (pending commit + the next closed-testing build, with TB-21)
+
 ---
 
 ## Done

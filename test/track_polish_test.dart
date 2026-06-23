@@ -1,5 +1,6 @@
-// Unit tests for polishTrack — the render-time accuracy filter + smoothing
-// applied to walk tracks before they're drawn (TB-3). Pure function, no I/O.
+// Unit tests for track_polish — the render-time accuracy filter + smoothing
+// (TB-3) and the gap-split into segments (TB-22) applied to walk tracks before
+// they're drawn. Pure functions, no I/O.
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:narcis_nadzorniki/models/walk.dart';
@@ -73,6 +74,66 @@ void main() {
     test('preserves point count for a clean track', () {
       final pts = [for (var i = 0; i < 10; i++) _p(0, i.toDouble(), acc: 5)];
       expect(polishTrack(pts).length, 10);
+    });
+  });
+
+  group('polishTrackSegments gap split', () {
+    test('keeps a contiguous track as a single segment', () {
+      final segs = polishTrackSegments(
+        [for (var i = 0; i < 5; i++) _p(0, i * 0.0001, acc: 5)], // ~11 m steps
+        smoothingWindow: 1,
+      );
+      expect(segs, hasLength(1));
+      expect(segs.first, hasLength(5));
+    });
+
+    test('splits where consecutive fixes jump more than the gap ceiling', () {
+      final segs = polishTrackSegments(
+        [
+          _p(0, 0, acc: 5),
+          _p(0, 0.0001, acc: 5), // ~11 m from prev — same segment
+          _p(0.02, 0.0001, acc: 5), // ~2.2 km jump — drove/dropout, new segment
+          _p(0.02, 0.0002, acc: 5), // ~11 m from prev — stays in segment 2
+        ],
+        smoothingWindow: 1,
+      );
+      expect(segs, hasLength(2));
+      expect(segs[0], hasLength(2));
+      expect(segs[1], hasLength(2));
+    });
+
+    test('a brief stop (tiny spatial gap) stays one segment', () {
+      // distanceFilter means a stationary warden emits no fixes; the points
+      // bracketing the stop are metres apart, so we must not split there.
+      final segs = polishTrackSegments(
+        [_p(0, 0, acc: 5), _p(0, 0.00002, acc: 5)], // ~2 m apart
+        smoothingWindow: 1,
+      );
+      expect(segs, hasLength(1));
+    });
+
+    test('honours a custom gap ceiling', () {
+      final input = [_p(0, 0, acc: 5), _p(0, 0.001, acc: 5)]; // ~111 m apart
+      expect(polishTrackSegments(input, smoothingWindow: 1), hasLength(1));
+      expect(
+        polishTrackSegments(input, smoothingWindow: 1, maxGapMeters: 50),
+        hasLength(2),
+      );
+    });
+
+    test('accuracy filter runs before the split', () {
+      // The middle fix is dropped for poor accuracy; its good neighbours are
+      // ~22 m apart, so they stay one segment (no phantom split from the drop).
+      final segs = polishTrackSegments(
+        [_p(0, 0, acc: 5), _p(0, 0.0001, acc: 90), _p(0, 0.0002, acc: 5)],
+        smoothingWindow: 1,
+      );
+      expect(segs, hasLength(1));
+      expect(segs.first, hasLength(2));
+    });
+
+    test('empty in, empty out', () {
+      expect(polishTrackSegments(const []), isEmpty);
     });
   });
 }

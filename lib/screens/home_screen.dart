@@ -558,38 +558,41 @@ class _HomeScreenState extends State<HomeScreen> {
       // user's own on top in a distinct orange, so they can pick out their own
       // tracks from the org's where paths overlap.
       for (final walk in walks.where((w) => !state.isWalkAuthoredByCurrentUser(w))) {
-        // polishTrack drops low-accuracy fixes + smooths the survivors (TB-3);
-        // a track can fall below 2 points once filtered, so guard before drawing.
-        final pts = polishTrack(walk.points);
-        if (pts.length < 2) continue;
-        out.add(
-          Polyline(
-            points: pts,
-            color: Colors.blueGrey.withValues(alpha: 0.55),
-            strokeWidth: 3,
-          ),
-        );
+        // polishTrackSegments drops low-accuracy fixes, splits at large gaps so
+        // driven stretches / dropouts aren't bridged, and smooths each segment
+        // (TB-3, TB-22). A segment can fall below 2 points, so guard per segment.
+        for (final segment in polishTrackSegments(walk.points)) {
+          if (segment.length < 2) continue;
+          out.add(
+            Polyline(
+              points: segment,
+              color: Colors.blueGrey.withValues(alpha: 0.55),
+              strokeWidth: 3,
+            ),
+          );
+        }
       }
       for (final walk in walks.where((w) => state.isWalkAuthoredByCurrentUser(w))) {
-        final pts = polishTrack(walk.points);
-        if (pts.length < 2) continue;
-        out.add(
-          Polyline(
-            points: pts,
-            color: Colors.orange.withValues(alpha: 0.8),
-            strokeWidth: 4,
-          ),
-        );
+        for (final segment in polishTrackSegments(walk.points)) {
+          if (segment.length < 2) continue;
+          out.add(
+            Polyline(
+              points: segment,
+              color: Colors.orange.withValues(alpha: 0.8),
+              strokeWidth: 4,
+            ),
+          );
+        }
       }
     }
     // Active walk (always rendered, regardless of Obhodi toggle, so the
     // user sees their path drawing while it records).
     if (state.hasActiveWalk) {
-      final pts = polishTrack(state.activePoints);
-      if (pts.length >= 2) {
+      for (final segment in polishTrackSegments(state.activePoints)) {
+        if (segment.length < 2) continue;
         out.add(
           Polyline(
-            points: pts,
+            points: segment,
             color: Colors.green.withValues(alpha: 0.85),
             strokeWidth: 5,
           ),
