@@ -438,7 +438,7 @@ Architecture:
 **Walk-tick filter (in the handler isolate).** OS position streams occasionally deliver bad fixes — most visibly cached "phantom" points right after a foreground resume. `WalkTaskHandler._onTick` rejects three classes before committing to the buffer:
 1. **Stale fix:** `position.timestamp` more than 30 s behind `DateTime.now()` — a cached value, not a fresh GPS read.
 2. **Poor accuracy:** `position.accuracy > 50 m` — wifi/cell triangulation, not the GPS chip; would distort the polyline.
-3. **Teleport:** implied speed from the previous accepted point > 8 m/s (~28 km/h, generous against running pace) — one of the two fixes is bogus; skip the new one and let the next clean fix re-anchor.
+3. **Teleport:** implied speed from the previous accepted point > 36 m/s (≈130 km/h) — one of the two fixes is bogus (a GPS hardware jump of hundreds of m/s); skip the new one and let the next clean fix re-anchor. This is a teleport guard, **not** a pace check: wardens sometimes do a walk-around by car, so the ceiling sits above any legal road speed (raised from 8 m/s in TB-21, 2026-06-23).
 
 All rejections are sent to the main isolate as `{type: 'log', message: 'reject: …'}` and surface as `[walk-svc] reject: …` debug prints; accepted ticks come through as `{type: 'tick', point: {…}}` and append to the polyline.
 

@@ -418,6 +418,24 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   comment ("stored local by design; expiry is offset-agnostic; wire `expiresAt` is UTC") suffices.
 - **Shipped:** —
 
+### TB-21 · Walk speed cap too low — drive-along walks get dropped
+`✨ Enhancement` · `P1` · `Doing` (code complete + `flutter analyze` clean 2026-06-23; pending commit + release build) · Reporter: field testers (via maintainer) · Updated: 2026-06-23
+- **Problem:** Wardens sometimes do a walk-around (obhod) by car, but the recorder's teleport filter rejected
+  any segment implying > 8 m/s (≈29 km/h) as a bogus fix — so legitimate car-driven points were silently
+  dropped (`reject: teleport` log) and the captured track came out sparse or broken.
+- **Want:** Raise the ceiling above any realistic road speed so car-driven walks record fully, while the gate
+  still catches genuine GPS teleports.
+- **Context:** Single threshold in the FGS recorder isolate — `WalkTaskHandler._maxSpeedMps`
+  ([`walk_task_handler.dart:43`](../lib/services/walk_task_handler.dart), applied at `:133`). The gate's real
+  job is catching GPS hardware teleports (instantaneous jumps of hundreds of m/s), **not** enforcing a walking
+  pace. Raised **8 → 36 m/s (≈130 km/h)**: covers every legal Slovenian road speed incl. highway, still far
+  below a teleport. Raw points remain the write-once honest record; the render-time accuracy polish (TB-3,
+  [`track_polish.dart`](../lib/services/track_polish.dart)) is untouched. No test exercises the FGS isolate.
+  ARCHITECTURE §"Walk-tick filter" updated.
+- **Discussion:** Ceiling chosen by maintainer (130 km/h) over 90 km/h (would clip highway segments) and
+  180 km/h (looser teleport-only guard).
+- **Shipped:** — (pending commit + the next closed-testing build, will bump from v1.3.1+12)
+
 ---
 
 ## Done

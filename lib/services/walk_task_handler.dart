@@ -35,12 +35,16 @@ void walkStartCallback() {
 class WalkTaskHandler extends TaskHandler {
   static const _activeFile = 'active_walk.json';
 
-  // Filter thresholds — same values as the previous in-main-isolate filter.
-  // OS-cached "phantom" fixes after a screen-off resume tend to fail on
-  // staleness (>30 s) or accuracy (>50 m); teleport catches the rare case
-  // where two real fixes are spaced wrongly by a hardware glitch.
+  // Filter thresholds. Staleness/accuracy carried over from the previous
+  // in-main-isolate filter: OS-cached "phantom" fixes after a screen-off
+  // resume tend to fail on staleness (>30 s) or accuracy (>50 m).
+  // The speed gate catches GPS hardware teleports (instantaneous jumps of
+  // hundreds of m/s) — it is NOT a walking-pace check. Wardens sometimes do
+  // a walk-around by car, so the ceiling sits above any legal road speed:
+  // 36 m/s ≈ 130 km/h keeps car-driven (incl. highway) walks while still
+  // dropping true teleports (TB-21, 2026-06-23).
   static const double _maxAccuracyMeters = 50;
-  static const double _maxSpeedMps = 8;
+  static const double _maxSpeedMps = 36; // ≈130 km/h — teleport guard, not a pace limit
   static const Duration _maxFixAge = Duration(seconds: 30);
 
   StreamSubscription<Position>? _positionSub;
