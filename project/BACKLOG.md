@@ -176,7 +176,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-12 · Search the disturbance-type codebook
-`✨ Enhancement` · `P2` · `Todo` · Reporter: Matjaž · Updated: 2026-06-22
+`✨ Enhancement` · `P2` · `Doing` (code complete, full suite 71/71 + `flutter analyze` clean 2026-06-23; pending commit + release build) · Reporter: Matjaž · Updated: 2026-06-23
 - **Problem:** Picking a disturbance type means scrolling 19 collapsible groups and expanding the
   right one to reach its types — **172 types** in all. Without already knowing which group a type
   lives under, finding it is slow, and it's done on every disturbance entry.
@@ -196,7 +196,27 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   type name at minimum, optionally group name / code / `note`. Recommend matching type + group name,
   **accent- and case-insensitive** (so "sneman" finds "Snemanje", and č/š/ž fold) since that's how
   the wardens will type.
-- **Shipped:** —
+- **Decisions (2026-06-23, maintainer):** **(1) layout** — the search box is an *addition above* the
+  existing coloured group cards, not a replacement: an empty box keeps the grouped/collapsible browse
+  view unchanged; typing swaps to a flat results list (each row labelled with its group name, since
+  type codes restart per group). **(2) match fields** — type name **+ group name**, accent- and
+  case-insensitive; a group-name match pulls in all of that group's types (so "kopal" surfaces the
+  whole Kopalci group). Note matching was *not* included. Also asked: make the **Končaj** button more
+  prominent.
+- **Implemented (2026-06-23, in source — pending commit + release build):** New pure helper
+  [`disturbance_type_search.dart`](../lib/data/disturbance_type_search.dart) — `foldForSearch` (lower-case
+  + strip č/ć/š/ž/đ) and `searchDisturbanceTypes` (returns `(group, type)` matches in codebook order,
+  empty query → no matches). Wired into [`type_selection_screen.dart`](../lib/screens/type_selection_screen.dart):
+  a persistent search `TextField` (search icon + clear button) above the list; empty query → the existing
+  grouped `ExpansionTile` browse view, non-empty → a flat `CheckboxListTile` list (title `'code. name'`,
+  group name as a colour-coded subtitle) or a "Ni zadetkov" message; the shared `_selected` map preserves
+  selections across browse↔search and across queries. `Končaj` promoted from a flat `TextButton` to an
+  AppBar `FilledButton.icon` showing the live selection count (`Končaj (N)`). Selection key/builder
+  factored into `_selectionKey`/`_selectionFor` shared by both views (no model/backend change). 9 unit
+  tests ([`disturbance_type_search_test.dart`](../test/disturbance_type_search_test.dart)) + 4 widget tests
+  ([`type_selection_screen_test.dart`](../test/type_selection_screen_test.dart), browse↔search swap, no-match
+  message, count badge); `flutter analyze` clean (no new issues), full suite **71/71** (was 58).
+- **Shipped:** — (pending commit + the next closed-testing build, with TB-21 / TB-22)
 
 ### TB-13 · Timestamps show in UTC, not local time, on synced records & walks
 `🐞 Bug` · `P1` · `Done` (shipped 1.3.1+12) · Reporter: Matjaž · Updated: 2026-06-22
