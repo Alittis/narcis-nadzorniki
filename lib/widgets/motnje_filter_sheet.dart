@@ -59,7 +59,9 @@ class _MotnjeFilterSheet extends StatefulWidget {
 class _MotnjeFilterSheetState extends State<_MotnjeFilterSheet> {
   late Set<AgeBucket> _buckets;
   late Set<String> _authors; // 0 or 1 element (single-select UI)
+  late Set<String> _groups; // group codes; empty = all categories
   late final List<String> _authorKeys;
+  late final List<(String, String)> _presentGroups; // (code, name), present only
   DateTime? _startMonth;
   late final int _monthCount;
   late RangeValues _months;
@@ -69,7 +71,9 @@ class _MotnjeFilterSheetState extends State<_MotnjeFilterSheet> {
     super.initState();
     _buckets = {...widget.initial.ageBuckets};
     _authors = {...widget.initial.authors};
+    _groups = {...widget.initial.groups};
     _authorKeys = authorsIn(widget.records, widget.currentUserEmail);
+    _presentGroups = groupsIn(widget.records);
 
     final span = observedSpan(widget.records);
     if (span == null) {
@@ -106,6 +110,7 @@ class _MotnjeFilterSheetState extends State<_MotnjeFilterSheet> {
   MotnjeFilter get _current => MotnjeFilter(
         ageBuckets: _buckets,
         authors: _authors,
+        groups: _groups,
         from: _dateActive ? _monthAt(_months.start.round()) : null,
         to: _dateActive ? _monthEnd(_months.end.round()) : null,
       );
@@ -116,6 +121,7 @@ class _MotnjeFilterSheetState extends State<_MotnjeFilterSheet> {
     setState(() {
       _buckets = {...allAgeBuckets};
       _authors = {};
+      _groups = {};
       _months = RangeValues(0, _monthCount.toDouble());
     });
     _emit();
@@ -128,6 +134,23 @@ class _MotnjeFilterSheetState extends State<_MotnjeFilterSheet> {
 
   void _selectAuthor(String? key) {
     setState(() => _authors = key == null ? {} : {key});
+    _emit();
+  }
+
+  void _toggleGroup(String code, bool on) {
+    setState(() {
+      final present = [for (final g in _presentGroups) g.$1];
+      var next = _groups.isEmpty ? {...present} : {..._groups};
+      if (on) {
+        next.add(code);
+      } else {
+        next.remove(code);
+      }
+      // Everything selected == no restriction (inactive); unchecking the last
+      // one likewise collapses back to "all" so the layer is never emptied here.
+      if (next.length == present.length) next = <String>{};
+      _groups = next;
+    });
     _emit();
   }
 
@@ -191,6 +214,10 @@ class _MotnjeFilterSheetState extends State<_MotnjeFilterSheet> {
                       _authorLabel(key, widget.currentUserEmail),
                       selectedAuthor,
                     ),
+                ],
+                if (_presentGroups.length > 1) ...[
+                  const Divider(height: 8),
+                  _categorySection(),
                 ],
                 if (_monthCount > 0) ...[
                   const Divider(height: 8),
@@ -259,6 +286,40 @@ class _MotnjeFilterSheetState extends State<_MotnjeFilterSheet> {
       ),
       title: Text(label),
       onTap: () => _selectAuthor(key),
+    );
+  }
+
+  Widget _categorySection() {
+    final summary =
+        _groups.isEmpty ? 'Vse kategorije' : '${_groups.length} izbranih';
+    return ExpansionTile(
+      tilePadding: const EdgeInsets.symmetric(horizontal: 20),
+      childrenPadding: EdgeInsets.zero,
+      shape: const Border(),
+      collapsedShape: const Border(),
+      title: const Text('Kategorija',
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+      subtitle: Text(summary, style: Theme.of(context).textTheme.bodySmall),
+      children: [
+        CheckboxListTile(
+          dense: true,
+          controlAffinity: ListTileControlAffinity.trailing,
+          value: _groups.isEmpty,
+          onChanged: (_) {
+            setState(() => _groups = <String>{});
+            _emit();
+          },
+          title: const Text('Vse kategorije'),
+        ),
+        for (final g in _presentGroups)
+          CheckboxListTile(
+            dense: true,
+            controlAffinity: ListTileControlAffinity.trailing,
+            value: _groups.isEmpty || _groups.contains(g.$1),
+            onChanged: (v) => _toggleGroup(g.$1, v ?? false),
+            title: Text(g.$2),
+          ),
+      ],
     );
   }
 }

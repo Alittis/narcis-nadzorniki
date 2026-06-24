@@ -166,9 +166,10 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   ([`disturbance_filter_test.dart`](../test/disturbance_filter_test.dart)) + 4 widget tests
   ([`motnje_filter_sheet_test.dart`](../test/motnje_filter_sheet_test.dart)); `flutter analyze` clean (10
   pre-existing info lints, no new); full suite **91/91** (was 71). ARCHITECTURE §10.3 added.
-- **Deferred:** disturbance-**type/category** filter (the last TB-18 dimension) — fold into the same sheet
-  next. The date-slider/age-bucket temporal overlap is handled by AND + the live count (both default to
-  "all" = no-op).
+- **Update (2026-06-24):** the disturbance-**category** dimension (the last TB-18 piece) is now also built
+  into the sheet — multi-select over the groups present in the data, OR-within-dimension — closing TB-18.
+  The date-slider/age-bucket temporal overlap is handled by AND + the live count (both default to "all" =
+  no-op).
 - **Shipped:** —
 
 ### TB-8 · Pause / resume an active patrol
@@ -406,16 +407,19 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-18 · Filter map entries by year / reporter / category
-`✨ Enhancement` · `P2` · `Todo` (largely absorbed by TB-6 2026-06-24; only disturbance-type/category remains) · Reporters: Tomaž, Rudi · Updated: 2026-06-24
+`✨ Enhancement` · `P2` · `Doing` (in source — pending commit + release build; delivered via TB-6's filter) · Reporters: Tomaž, Rudi · Updated: 2026-06-24
 - **Problem:** Beyond the on/off toggle (TB-6), wardens want to narrow what's on the map to quickly reach
   the entries they care about — not just declutter.
 - **Want:** Filter historical entries by **year**, **reporter**, and **disturbance category**.
-- **Status (2026-06-24):** **Year** (date-range slider) and **reporter** (author single-select) are now
+- **Implemented (2026-06-24, in source — pending commit + release build):** All three dimensions are now
   delivered by TB-6's Motnje filter ([`motnje_filter_sheet.dart`](../lib/widgets/motnje_filter_sheet.dart) /
-  [`disturbance_filter.dart`](../lib/data/disturbance_filter.dart)). What remains here is the
-  **disturbance-type/category** dimension: add a type/group multi-select to the existing
-  `showMotnjeFilterSheet` and extend `MotnjeFilter` with a predicate over `record.types`. Much smaller now
-  that the sheet + predicate scaffolding exists.
+  [`disturbance_filter.dart`](../lib/data/disturbance_filter.dart)): **year** = the date-range slider,
+  **reporter** = author single-select, **category** = a multi-select over the disturbance groups present in
+  the data (`MotnjeFilter.groups` matched against `record.types[].groupCode`; `groupsIn` derives the option
+  list so only present categories show; OR-within-dimension). Filtered at the **group** granularity, not the
+  172 individual types — group is the useful filter granularity; per-type pick is the TB-12 search flow.
+  5 unit tests (category + `groupsIn`) + 1 widget test added; full suite **97/97**; `flutter analyze` clean.
+  ARCHITECTURE §10.3 updated.
 - **Context:** A filter UI (chip row / bottom sheet) + a predicate over `state.records` (and the legacy
   set) feeding the same map layers [`home_screen.dart`](../lib/screens/home_screen.dart) already builds.
   Larger than TB-6's toggle — needs the filter surface + state + applying the predicate to the markers.

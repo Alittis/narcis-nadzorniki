@@ -1,15 +1,28 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:narcis_nadzorniki/data/disturbance_filter.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
+import 'package:narcis_nadzorniki/models/disturbance_type.dart';
 
-Disturbance _rec({required DateTime observedAt, String? createdBy}) {
+SelectedDisturbanceType _type(String groupCode, String groupName) =>
+    SelectedDisturbanceType(
+      groupCode: groupCode,
+      groupName: groupName,
+      typeCode: 'a',
+      typeName: 'x',
+    );
+
+Disturbance _rec({
+  required DateTime observedAt,
+  String? createdBy,
+  List<SelectedDisturbanceType> types = const [],
+}) {
   return Disturbance(
     id: 'id-${observedAt.microsecondsSinceEpoch}-${createdBy ?? 'me'}',
     latitude: 45.79,
     longitude: 14.36,
     locationAccuracy: 'Natančna',
     observedAt: observedAt,
-    types: const [],
+    types: types,
     description: '',
     photos: const [],
     observers: const [],
@@ -130,6 +143,51 @@ void main() {
           _rec(observedAt: DateTime(2025, 2, 1), createdBy: 'x@gov.si');
       expect(f.matches(wrongAuthor, now: now, currentUserEmail: 'me@gov.si'),
           isFalse);
+    });
+  });
+
+  group('category (group) dimension', () {
+    final rec1 = _rec(observedAt: now, types: [_type('1', 'Sprehajalci')]);
+    final rec4 = _rec(observedAt: now, types: [_type('4', 'Vožnja v naravi')]);
+    final recMulti = _rec(
+      observedAt: now,
+      types: [_type('1', 'Sprehajalci'), _type('4', 'Vožnja v naravi')],
+    );
+    test('empty groups means any category', () {
+      const f = MotnjeFilter.unfiltered();
+      expect(f.matches(rec1, now: now), isTrue);
+      expect(f.matches(rec4, now: now), isTrue);
+    });
+    test('a selected group includes only records with a type in it', () {
+      const f = MotnjeFilter(groups: {'1'});
+      expect(f.isActive, isTrue);
+      expect(f.matches(rec1, now: now), isTrue);
+      expect(f.matches(rec4, now: now), isFalse);
+      expect(f.matches(recMulti, now: now), isTrue); // any type in group → match
+    });
+    test('multiple selected groups OR within the dimension', () {
+      const f = MotnjeFilter(groups: {'1', '4'});
+      expect(f.matches(rec1, now: now), isTrue);
+      expect(f.matches(rec4, now: now), isTrue);
+      expect(
+        f.matches(_rec(observedAt: now, types: [_type('2', 'Kopalci')]),
+            now: now),
+        isFalse,
+      );
+    });
+  });
+
+  group('groupsIn', () {
+    test('distinct present (code,name) pairs, ordered by numeric code', () {
+      final records = [
+        _rec(observedAt: now, types: [_type('10', 'Deset')]),
+        _rec(observedAt: now, types: [_type('2', 'Dve'), _type('1', 'Ena')]),
+        _rec(observedAt: now, types: [_type('2', 'Dve')]),
+      ];
+      expect(groupsIn(records), [('1', 'Ena'), ('2', 'Dve'), ('10', 'Deset')]);
+    });
+    test('empty when no records', () {
+      expect(groupsIn(const []), isEmpty);
     });
   });
 

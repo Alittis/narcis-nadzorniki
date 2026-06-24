@@ -28,6 +28,7 @@ class MotnjeFilter {
   const MotnjeFilter({
     this.ageBuckets = allAgeBuckets,
     this.authors = const {},
+    this.groups = const {},
     this.from,
     this.to,
   });
@@ -40,6 +41,10 @@ class MotnjeFilter {
   /// Lower-cased author emails to show; empty means "any author".
   final Set<String> authors;
 
+  /// Disturbance group (category) codes to show; empty means "any category".
+  /// A record matches when any of its selected types is in one of these groups.
+  final Set<String> groups;
+
   /// Inclusive lower / upper bounds on `observedAt`; null = unbounded on that
   /// side. A null pair means no date window.
   final DateTime? from;
@@ -50,6 +55,7 @@ class MotnjeFilter {
   bool get isActive =>
       ageBuckets.length < allAgeBuckets.length ||
       authors.isNotEmpty ||
+      groups.isNotEmpty ||
       from != null ||
       to != null;
 
@@ -67,6 +73,10 @@ class MotnjeFilter {
     if (authors.isNotEmpty) {
       final key = authorKey(record, currentUserEmail);
       if (key == null || !authors.contains(key)) return false;
+    }
+    if (groups.isNotEmpty &&
+        !record.types.any((t) => groups.contains(t.groupCode))) {
+      return false;
     }
     final at = record.observedAt;
     if (from != null && at.isBefore(from!)) return false;
@@ -109,4 +119,24 @@ List<String> authorsIn(List<Disturbance> records, String? currentUserEmail) {
     if (r.observedAt.isAfter(max)) max = r.observedAt;
   }
   return (min, max);
+}
+
+/// Distinct (groupCode, groupName) pairs across all records' selected types,
+/// ordered by numeric group code (matching the codebook order). Drives the
+/// category filter's option list — only categories actually present are shown.
+List<(String code, String name)> groupsIn(List<Disturbance> records) {
+  final byCode = <String, String>{};
+  for (final r in records) {
+    for (final t in r.types) {
+      byCode.putIfAbsent(t.groupCode, () => t.groupName);
+    }
+  }
+  final entries = byCode.entries.toList()
+    ..sort((a, b) {
+      final ai = int.tryParse(a.key);
+      final bi = int.tryParse(b.key);
+      if (ai != null && bi != null) return ai.compareTo(bi);
+      return a.key.compareTo(b.key);
+    });
+  return [for (final e in entries) (e.key, e.value)];
 }

@@ -2,16 +2,29 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:narcis_nadzorniki/data/disturbance_filter.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
+import 'package:narcis_nadzorniki/models/disturbance_type.dart';
 import 'package:narcis_nadzorniki/widgets/motnje_filter_sheet.dart';
 
-Disturbance _rec({required DateTime observedAt, String? createdBy}) {
+SelectedDisturbanceType _type(String groupCode, String groupName) =>
+    SelectedDisturbanceType(
+      groupCode: groupCode,
+      groupName: groupName,
+      typeCode: 'a',
+      typeName: 'x',
+    );
+
+Disturbance _rec({
+  required DateTime observedAt,
+  String? createdBy,
+  List<SelectedDisturbanceType> types = const [],
+}) {
   return Disturbance(
     id: 'id-${observedAt.microsecondsSinceEpoch}-${createdBy ?? 'me'}',
     latitude: 45.79,
     longitude: 14.36,
     locationAccuracy: 'Natančna',
     observedAt: observedAt,
-    types: const [],
+    types: types,
     description: '',
     photos: const [],
     observers: const [],
@@ -113,5 +126,32 @@ void main() {
 
     expect(find.text('Avtor'), findsNothing);
     expect(find.text('Starost'), findsOneWidget);
+  });
+
+  testWidgets('category section narrows by group when >1 category present',
+      (tester) async {
+    final emitted = <MotnjeFilter>[];
+    final recs = [
+      _rec(
+        observedAt: now.subtract(const Duration(days: 5)),
+        createdBy: 'me@gov.si',
+        types: [_type('1', 'Sprehajalci')],
+      ),
+      _rec(
+        observedAt: now.subtract(const Duration(days: 9)),
+        createdBy: 'me@gov.si',
+        types: [_type('4', 'Vožnja')],
+      ),
+    ];
+    await _open(tester, records: recs, onChanged: emitted.add);
+
+    expect(find.text('Kategorija'), findsOneWidget);
+    await tester.tap(find.text('Kategorija')); // expand the section
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Vožnja')); // uncheck → narrows to the rest
+    await tester.pump();
+
+    expect(emitted.last.groups, {'1'});
+    expect(emitted.last.isActive, isTrue);
   });
 }
