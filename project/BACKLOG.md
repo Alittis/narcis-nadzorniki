@@ -533,6 +533,27 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** Built into **v1.4.0+13** (2026-06-23, archived `~/Releases/terenska-beleznica-1.4.0+13.aab`,
   signed with the upload key); committed `d5ff149`. Rolled out on the Play Closed testing track 2026-06-24 (confirmed installing + working).
 
+### TB-23 · Remove the vestigial `showLegacy` legacy-overlay layer (dead code)
+`🔧 Chore` · `P3` · `Triage` · Reporter: Claude (found during TB-6, 2026-06-24)
+- **Problem:** The bundled-legacy overlay is **dead code**. The "Zgodovina" chip was removed 2026-05-22
+  (commit `1430a5a`) when its 703 records were migrated into `TB_MOTNJE`, and the comment in
+  [`home_screen.dart`](../lib/screens/home_screen.dart) flagged full removal as a follow-up. `showLegacy`
+  defaults `false` and **no UI enables it**, so the layer never renders; the `showLegacy`/`onLegacyToggle`
+  params are still plumbed through `_TopChrome` but unused.
+- **Want:** Remove the layer end-to-end — `AppState._showLegacy`/`showLegacy`/`setShowLegacy`, the
+  `_TopChrome` `showLegacy`/`onLegacyToggle` params + wiring, the legacy branch in `_buildMarkers`,
+  `LegacyRecordMarker` ([`basemap.dart`](../lib/widgets/basemap.dart)),
+  [`legacy_detail_screen.dart`](../lib/screens/legacy_detail_screen.dart),
+  [`legacy_records.dart`](../lib/data/legacy_records.dart) /
+  [`legacy_disturbance.dart`](../lib/models/legacy_disturbance.dart), and the bundled
+  `assets/legacy/notranjski_park_2025.json` (drop from `pubspec.yaml`) — trimming ~408 KB.
+- **Context:** Surfaced while building TB-6 (the age filter now declutters the migrated, aged-🔵 records the
+  legacy layer used to show). ARCHITECTURE §10.3/§11 note the vestigial status. Pure client deletion — no
+  backend/DB change.
+- **Discussion:** **Verify the 703 legacy records are all present in `TB_MOTNJE`** for the relevant org(s)
+  before dropping the asset; if any are missing, that's a data-migration gap to close first.
+- **Shipped:** —
+
 ---
 
 ## Done
