@@ -136,7 +136,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-6 · Filter the Motnje layer — age / author / observed-date window
-`✨ Enhancement` · `P2` · `Doing` (built into v1.5.0+14 2026-06-24, archived — pending upload + rollout) · Reporters: Tomaž, Rudi · Updated: 2026-06-24
+`✨ Enhancement` · `P2` · `Done` (shipped v1.5.0+14; rolled out on the Play Closed testing track 2026-06-24) · Reporters: Tomaž, Rudi · Updated: 2026-06-24
 - **Problem:** In places there are so many points they obscure the map and hurt readability; wardens want
   to narrow the Motnje layer to the entries they care about.
 - **Want (clarified 2026-06-24, maintainer):** Not a plain on/off — a **filter on the Motnje layer**,
@@ -175,7 +175,8 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   **Prikaži na zemljevidu** master switch at the top; the chip stays highlighted while the layer is shown.
   `_TopChrome` lost the `filterActive`/`onFilterTap` params (`onMotnjeToggle` → `onMotnjeTap`); the sheet
   gained `showMotnje`/`onShowChanged` + a master-switch widget test (suite **98/98**).
-- **Shipped:** —
+- **Shipped:** Built into **v1.5.0+14** (2026-06-24, archived `~/Releases/terenska-beleznica-1.5.0+14.aab`,
+  signed with the upload key); rolled out on the Play Closed testing track 2026-06-24.
 
 ### TB-8 · Pause / resume an active patrol
 `✨ Enhancement` · `P2` · `Todo` · Reporter: Damjan Intihar · Updated: 2026-06-03
@@ -412,7 +413,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-18 · Filter map entries by year / reporter / category
-`✨ Enhancement` · `P2` · `Doing` (built into v1.5.0+14 2026-06-24, archived — pending upload + rollout; delivered via TB-6's filter) · Reporters: Tomaž, Rudi · Updated: 2026-06-24
+`✨ Enhancement` · `P2` · `Done` (shipped v1.5.0+14; rolled out on the Play Closed testing track 2026-06-24; delivered via TB-6's filter) · Reporters: Tomaž, Rudi · Updated: 2026-06-24
 - **Problem:** Beyond the on/off toggle (TB-6), wardens want to narrow what's on the map to quickly reach
   the entries they care about — not just declutter.
 - **Want:** Filter historical entries by **year**, **reporter**, and **disturbance category**.
@@ -432,10 +433,11 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   Could share a date predicate with TB-15's report export.
 - **Discussion:** Split from TB-6 on 2026-06-22; **re-merged 2026-06-24** — TB-6 now owns the filter UI
   (bottom sheet, AND-composed) and this item is scoped down to the type/category dimension.
-- **Shipped:** —
+- **Shipped:** Built into **v1.5.0+14** (2026-06-24, archived `~/Releases/terenska-beleznica-1.5.0+14.aab`,
+  signed with the upload key); rolled out on the Play Closed testing track 2026-06-24 — delivered via TB-6's filter.
 
 ### TB-19 · Enlarge the tap target for disturbance markers on the map
-`🐞 Bug` (usability) · `P2` · `Doing` (built into v1.5.0+14 2026-06-24, archived — pending upload + rollout) · Reporter: maintainer · Updated: 2026-06-24
+`🐞 Bug` (usability) · `P2` · `Done` (shipped v1.5.0+14; rolled out on the Play Closed testing track 2026-06-24) · Reporter: maintainer · Updated: 2026-06-24
 - **Problem:** Selecting a disturbance marker on the map is hard — the touch area is small, so it takes
   several attempts to hit one.
 - **Context:** In `_buildMarkers` ([`home_screen.dart:622`](../lib/screens/home_screen.dart)) each record is a
@@ -469,7 +471,8 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   flutter_map `Marker` property set inside the private `_buildMarkers` (depends on widget state + a live map),
   with no pure-function seam — a HomeScreen widget test would need network tiles for marginal value (same call
   as TB-13's display-only fix).
-- **Shipped:** —
+- **Shipped:** Built into **v1.5.0+14** (2026-06-24, archived `~/Releases/terenska-beleznica-1.5.0+14.aab`,
+  signed with the upload key); rolled out on the Play Closed testing track 2026-06-24.
 
 ### TB-20 · Auth-token audit timestamps stored local, mislabeled UTC (TB-14 sibling)
 `🐞 Bug` (latent, audit-only) · `P3` · `Triage` (backend) · Reporter: Claude (found during TB-14, 2026-06-22) · Updated: 2026-06-22
