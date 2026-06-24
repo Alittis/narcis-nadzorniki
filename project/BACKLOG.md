@@ -136,7 +136,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-6 · Filter the Motnje layer — age / author / observed-date window
-`✨ Enhancement` · `P2` · `Doing` (in source — pending commit + release build) · Reporters: Tomaž, Rudi · Updated: 2026-06-24
+`✨ Enhancement` · `P2` · `Doing` (built into v1.5.0+14 2026-06-24, archived — pending upload + rollout) · Reporters: Tomaž, Rudi · Updated: 2026-06-24
 - **Problem:** In places there are so many points they obscure the map and hurt readability; wardens want
   to narrow the Motnje layer to the entries they care about.
 - **Want (clarified 2026-06-24, maintainer):** Not a plain on/off — a **filter on the Motnje layer**,
@@ -412,7 +412,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-18 · Filter map entries by year / reporter / category
-`✨ Enhancement` · `P2` · `Doing` (in source — pending commit + release build; delivered via TB-6's filter) · Reporters: Tomaž, Rudi · Updated: 2026-06-24
+`✨ Enhancement` · `P2` · `Doing` (built into v1.5.0+14 2026-06-24, archived — pending upload + rollout; delivered via TB-6's filter) · Reporters: Tomaž, Rudi · Updated: 2026-06-24
 - **Problem:** Beyond the on/off toggle (TB-6), wardens want to narrow what's on the map to quickly reach
   the entries they care about — not just declutter.
 - **Want:** Filter historical entries by **year**, **reporter**, and **disturbance category**.
@@ -435,7 +435,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-19 · Enlarge the tap target for disturbance markers on the map
-`🐞 Bug` (usability) · `P2` · `Doing` (in source — pending commit + release build) · Reporter: maintainer · Updated: 2026-06-24
+`🐞 Bug` (usability) · `P2` · `Doing` (built into v1.5.0+14 2026-06-24, archived — pending upload + rollout) · Reporter: maintainer · Updated: 2026-06-24
 - **Problem:** Selecting a disturbance marker on the map is hard — the touch area is small, so it takes
   several attempts to hit one.
 - **Context:** In `_buildMarkers` ([`home_screen.dart:622`](../lib/screens/home_screen.dart)) each record is a
