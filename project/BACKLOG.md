@@ -170,6 +170,11 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   into the sheet — multi-select over the groups present in the data, OR-within-dimension — closing TB-18.
   The date-slider/age-bucket temporal overlap is handled by AND + the live count (both default to "all" =
   no-op).
+- **UX revision (2026-06-24, maintainer):** dropped the separate "Filter" pill — the **Motnje chip now opens
+  the sheet directly** (same chip→sheet pattern as Območja). The layer show/hide moved into the sheet as a
+  **Prikaži na zemljevidu** master switch at the top; the chip stays highlighted while the layer is shown.
+  `_TopChrome` lost the `filterActive`/`onFilterTap` params (`onMotnjeToggle` → `onMotnjeTap`); the sheet
+  gained `showMotnje`/`onShowChanged` + a master-switch widget test (suite **98/98**).
 - **Shipped:** —
 
 ### TB-8 · Pause / resume an active patrol

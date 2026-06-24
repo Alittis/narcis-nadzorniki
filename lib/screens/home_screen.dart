@@ -474,11 +474,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 onSearchTap: _openSearch,
                 onSyncTap: state.isSyncing ? null : state.syncAll,
                 onBasemapChanged: (m) => setState(() => _basemapMode = m),
-                onMotnjeToggle: () =>
-                    setState(() => _showMotnje = !_showMotnje),
-                filterActive: _motnjeFilter.isActive,
-                onFilterTap: () => showMotnjeFilterSheet(
+                onMotnjeTap: () => showMotnjeFilterSheet(
                   context,
+                  showMotnje: _showMotnje,
+                  onShowChanged: (v) => setState(() => _showMotnje = v),
                   filter: _motnjeFilter,
                   records: state.records,
                   currentUserEmail: state.currentUser,
@@ -708,9 +707,7 @@ class _TopChrome extends StatelessWidget {
     required this.onSearchTap,
     required this.onSyncTap,
     required this.onBasemapChanged,
-    required this.onMotnjeToggle,
-    required this.filterActive,
-    required this.onFilterTap,
+    required this.onMotnjeTap,
     required this.onObhodiToggle,
     required this.onParceleToggle,
     required this.onObmocjaToggle,
@@ -720,8 +717,6 @@ class _TopChrome extends StatelessWidget {
   final AppState state;
   final BasemapMode basemapMode;
   final bool showMotnje;
-  final bool filterActive;
-  final VoidCallback onFilterTap;
   final bool showObhodi;
   final bool showParcele;
   final bool showObmocja;
@@ -730,7 +725,7 @@ class _TopChrome extends StatelessWidget {
   final VoidCallback onSearchTap;
   final VoidCallback? onSyncTap;
   final ValueChanged<BasemapMode> onBasemapChanged;
-  final VoidCallback onMotnjeToggle;
+  final VoidCallback onMotnjeTap;
   final VoidCallback onObhodiToggle;
   final VoidCallback onParceleToggle;
   final VoidCallback onObmocjaToggle;
@@ -787,14 +782,7 @@ class _TopChrome extends StatelessWidget {
                     label: 'Motnje',
                     selected: showMotnje,
                     enabled: true,
-                    onTap: onMotnjeToggle,
-                  ),
-                  _LayerChip(
-                    icon: Icons.filter_list,
-                    label: 'Filter',
-                    selected: filterActive,
-                    enabled: showMotnje,
-                    onTap: onFilterTap,
+                    onTap: onMotnjeTap,
                   ),
                   _LayerChip(
                     icon: Icons.directions_walk,

@@ -153,10 +153,17 @@ void main() {
       observedAt: now,
       types: [_type('1', 'Sprehajalci'), _type('4', 'Vožnja v naravi')],
     );
-    test('empty groups means any category', () {
+    test('null groups (unfiltered) means any category', () {
       const f = MotnjeFilter.unfiltered();
+      expect(f.isActive, isFalse);
       expect(f.matches(rec1, now: now), isTrue);
       expect(f.matches(rec4, now: now), isTrue);
+    });
+    test('an empty (non-null) group set shows none', () {
+      const f = MotnjeFilter(groups: {});
+      expect(f.isActive, isTrue);
+      expect(f.matches(rec1, now: now), isFalse);
+      expect(f.matches(rec4, now: now), isFalse);
     });
     test('a selected group includes only records with a type in it', () {
       const f = MotnjeFilter(groups: {'1'});

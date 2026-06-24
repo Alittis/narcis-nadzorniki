@@ -28,7 +28,7 @@ class MotnjeFilter {
   const MotnjeFilter({
     this.ageBuckets = allAgeBuckets,
     this.authors = const {},
-    this.groups = const {},
+    this.groups,
     this.from,
     this.to,
   });
@@ -41,9 +41,12 @@ class MotnjeFilter {
   /// Lower-cased author emails to show; empty means "any author".
   final Set<String> authors;
 
-  /// Disturbance group (category) codes to show; empty means "any category".
-  /// A record matches when any of its selected types is in one of these groups.
-  final Set<String> groups;
+  /// Disturbance group (category) codes to show. **null** = any category (no
+  /// restriction); a set restricts to those groups (a record matches when any
+  /// of its types is in one); an **empty** set shows none. (Nullable so the
+  /// picker's "Vse kategorije" can toggle all-on ↔ all-off, which an
+  /// empty-means-any scheme couldn't express.)
+  final Set<String>? groups;
 
   /// Inclusive lower / upper bounds on `observedAt`; null = unbounded on that
   /// side. A null pair means no date window.
@@ -55,7 +58,7 @@ class MotnjeFilter {
   bool get isActive =>
       ageBuckets.length < allAgeBuckets.length ||
       authors.isNotEmpty ||
-      groups.isNotEmpty ||
+      groups != null ||
       from != null ||
       to != null;
 
@@ -74,8 +77,8 @@ class MotnjeFilter {
       final key = authorKey(record, currentUserEmail);
       if (key == null || !authors.contains(key)) return false;
     }
-    if (groups.isNotEmpty &&
-        !record.types.any((t) => groups.contains(t.groupCode))) {
+    if (groups != null &&
+        !record.types.any((t) => groups!.contains(t.groupCode))) {
       return false;
     }
     final at = record.observedAt;

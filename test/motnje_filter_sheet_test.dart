@@ -42,6 +42,8 @@ Future<void> _open(
   required void Function(MotnjeFilter) onChanged,
   String? me = 'me@gov.si',
   MotnjeFilter initial = const MotnjeFilter.unfiltered(),
+  bool showMotnje = true,
+  void Function(bool)? onShowChanged,
 }) async {
   await tester.pumpWidget(MaterialApp(
     home: Scaffold(
@@ -49,6 +51,8 @@ Future<void> _open(
         builder: (context) => ElevatedButton(
           onPressed: () => showMotnjeFilterSheet(
             context,
+            showMotnje: showMotnje,
+            onShowChanged: onShowChanged ?? (_) {},
             filter: initial,
             records: records,
             currentUserEmail: me,
@@ -148,10 +152,29 @@ void main() {
     expect(find.text('Kategorija'), findsOneWidget);
     await tester.tap(find.text('Kategorija')); // expand the section
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Vožnja')); // may sit below the fold
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Vožnja')); // uncheck → narrows to the rest
     await tester.pump();
 
     expect(emitted.last.groups, {'1'});
     expect(emitted.last.isActive, isTrue);
+  });
+
+  testWidgets('master switch toggles layer visibility via onShowChanged',
+      (tester) async {
+    bool? shown;
+    await _open(
+      tester,
+      records: sampleRecords(),
+      onChanged: (_) {},
+      showMotnje: true,
+      onShowChanged: (v) => shown = v,
+    );
+
+    await tester.tap(find.text('Prikaži na zemljevidu'));
+    await tester.pump();
+
+    expect(shown, isFalse);
   });
 }
