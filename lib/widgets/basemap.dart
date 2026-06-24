@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:narcis_nadzorniki/data/disturbance_filter.dart';
 import 'package:narcis_nadzorniki/data/obmocja_store.dart';
 
 enum BasemapMode { osm, satellite }
@@ -171,13 +172,18 @@ Marker userLocationMarker(LatLng point) {
   );
 }
 
-/// Age-based fill colour for a disturbance marker.
-/// red ≤ 31 days · orange ≤ 365 days · blue older.
+/// Age-based fill colour for a disturbance marker, keyed off the same
+/// [AgeBucket] thresholds the Motnje age filter uses (TB-6) so the map legend
+/// and the filter always agree. red = recent · orange = mid · blue = old.
 Color recordMarkerColorForAge(DateTime observedAt) {
-  final age = DateTime.now().difference(observedAt).inDays;
-  if (age <= 31) return Colors.red;
-  if (age <= 365) return Colors.orange;
-  return Colors.blue;
+  switch (ageBucketOf(observedAt)) {
+    case AgeBucket.recent:
+      return Colors.red;
+    case AgeBucket.mid:
+      return Colors.orange;
+    case AgeBucket.old:
+      return Colors.blue;
+  }
 }
 
 /// Tap-target diameter for record markers on the home map. The visible disc is

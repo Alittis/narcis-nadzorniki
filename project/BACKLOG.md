@@ -135,17 +135,40 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   removing the fine-tune.
 - **Shipped:** —
 
-### TB-6 · Show/hide historical entries on the map (visibility toggle)
-`✨ Enhancement` · `P2` (quick win) · `Todo` · Reporters: Tomaž, Rudi · Updated: 2026-06-22
-- **Problem:** In places there are so many historical points that they obscure the map and hurt
-  readability.
-- **Want:** A show/hide toggle for historical-entry points, so the map can be decluttered on demand.
-- **Context:** The home map already layers the org's `Motnje` records and the bundled legacy set
-  (`assets/legacy/notranjski_park_2025.json`, 703 rows) and has a chip-toggle pattern (basemap, Parcele,
-  Obhodi) to copy — see [`home_screen.dart`](../lib/screens/home_screen.dart). This is the cheap,
-  high-daily-value half; ship it first.
-- **Discussion:** Split on 2026-06-22 from the original combined feedback (toggle + filter); the
-  year/reporter/category filtering moved to TB-18 (larger build).
+### TB-6 · Filter the Motnje layer — age / author / observed-date window
+`✨ Enhancement` · `P2` · `Doing` (in source — pending commit + release build) · Reporters: Tomaž, Rudi · Updated: 2026-06-24
+- **Problem:** In places there are so many points they obscure the map and hurt readability; wardens want
+  to narrow the Motnje layer to the entries they care about.
+- **Want (clarified 2026-06-24, maintainer):** Not a plain on/off — a **filter on the Motnje layer**,
+  opened like the Območja picker, choosing which disturbance markers show by **(1) age/colour** (the
+  red/orange/blue buckets), **(2) author**, and **(3) a two-sided date-range slider**. This **supersedes the
+  original "visibility toggle" framing** and **merges most of TB-18** (its year→date and reporter→author
+  dimensions); only TB-18's **disturbance-type/category** dimension is left out of this pass.
+- **Note on "historical":** the 703 Notranjski legacy records were migrated into `TB_MOTNJE` on 2026-05-22
+  (the old "Zgodovina" chip removed then), so they now render as ordinary aged-🔵 Motnje markers — i.e. the
+  "historical clutter" the reporters meant. Hiding the 🔵 *Starejše* bucket declutters them directly. (The
+  `showLegacy`/`legacyRecords` layer is now vestigial dead code — separate cleanup, not part of this.)
+- **Implemented (2026-06-24, in source — pending commit + release build):** New pure helper
+  [`disturbance_filter.dart`](../lib/data/disturbance_filter.dart) — `AgeBucket`/`ageBucketOf` (≤31 d recent,
+  ≤365 d mid, older old), `MotnjeFilter` (age buckets ∩ authors ∩ inclusive observed-date window,
+  AND-composed; `isActive`, `matches`) + `authorsIn`/`observedSpan`. The marker colour
+  ([`basemap.dart`](../lib/widgets/basemap.dart) `recordMarkerColorForAge`) now derives from the **same**
+  `ageBucketOf`, so the legend and the filter can't drift. New
+  [`motnje_filter_sheet.dart`](../lib/widgets/motnje_filter_sheet.dart) `showMotnjeFilterSheet` — a bottom
+  sheet (mirrors the Območja picker; live-pushes each change so the map redraws behind it) with age
+  checkboxes (colour-dotted), single-select author rows (Vsi / "(jaz)" / colleague — single-select sidesteps
+  the empty=all-vs-none ambiguity; the model is a `Set` so it can grow to multi later), a month-granularity
+  `RangeSlider` (emits on drag-end), a live "Prikazanih: N od M" count, and Ponastavi. Wired into
+  [`home_screen.dart`](../lib/screens/home_screen.dart): a **separate "Filter" chip** (funnel icon,
+  `selected` when `isActive`, enabled only while Motnje is shown — the Motnje chip keeps its one-tap on/off,
+  maintainer's pick) opens the sheet; `_buildMarkers` skips records failing `_motnjeFilter.matches`.
+  Widget-local, not persisted (matches the other toggles); no model/backend/deps change. 16 unit tests
+  ([`disturbance_filter_test.dart`](../test/disturbance_filter_test.dart)) + 4 widget tests
+  ([`motnje_filter_sheet_test.dart`](../test/motnje_filter_sheet_test.dart)); `flutter analyze` clean (10
+  pre-existing info lints, no new); full suite **91/91** (was 71). ARCHITECTURE §10.3 added.
+- **Deferred:** disturbance-**type/category** filter (the last TB-18 dimension) — fold into the same sheet
+  next. The date-slider/age-bucket temporal overlap is handled by AND + the live count (both default to
+  "all" = no-op).
 - **Shipped:** —
 
 ### TB-8 · Pause / resume an active patrol
@@ -383,17 +406,23 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-18 · Filter map entries by year / reporter / category
-`✨ Enhancement` · `P2` · `Todo` · Reporters: Tomaž, Rudi · Updated: 2026-06-22
+`✨ Enhancement` · `P2` · `Todo` (largely absorbed by TB-6 2026-06-24; only disturbance-type/category remains) · Reporters: Tomaž, Rudi · Updated: 2026-06-24
 - **Problem:** Beyond the on/off toggle (TB-6), wardens want to narrow what's on the map to quickly reach
   the entries they care about — not just declutter.
 - **Want:** Filter historical entries by **year**, **reporter**, and **disturbance category**.
+- **Status (2026-06-24):** **Year** (date-range slider) and **reporter** (author single-select) are now
+  delivered by TB-6's Motnje filter ([`motnje_filter_sheet.dart`](../lib/widgets/motnje_filter_sheet.dart) /
+  [`disturbance_filter.dart`](../lib/data/disturbance_filter.dart)). What remains here is the
+  **disturbance-type/category** dimension: add a type/group multi-select to the existing
+  `showMotnjeFilterSheet` and extend `MotnjeFilter` with a predicate over `record.types`. Much smaller now
+  that the sheet + predicate scaffolding exists.
 - **Context:** A filter UI (chip row / bottom sheet) + a predicate over `state.records` (and the legacy
   set) feeding the same map layers [`home_screen.dart`](../lib/screens/home_screen.dart) already builds.
   Larger than TB-6's toggle — needs the filter surface + state + applying the predicate to the markers.
   Reporter/category come from record fields (`createdBy`, `types`); year from `observedAt` (local — TB-13).
   Could share a date predicate with TB-15's report export.
-- **Discussion:** Split from TB-6 on 2026-06-22. Decide filter UX (bottom sheet vs chip row) and whether
-  filters compose (AND across year + reporter + category).
+- **Discussion:** Split from TB-6 on 2026-06-22; **re-merged 2026-06-24** — TB-6 now owns the filter UI
+  (bottom sheet, AND-composed) and this item is scoped down to the type/category dimension.
 - **Shipped:** —
 
 ### TB-19 · Enlarge the tap target for disturbance markers on the map

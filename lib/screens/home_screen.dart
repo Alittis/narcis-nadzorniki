@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:narcis_nadzorniki/data/disturbance_filter.dart';
 import 'package:narcis_nadzorniki/data/map_view_store.dart';
 import 'package:narcis_nadzorniki/data/obmocja_store.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
@@ -20,6 +21,7 @@ import 'package:narcis_nadzorniki/services/place_search_service.dart';
 import 'package:narcis_nadzorniki/services/track_polish.dart';
 import 'package:narcis_nadzorniki/state/app_state.dart';
 import 'package:narcis_nadzorniki/widgets/basemap.dart';
+import 'package:narcis_nadzorniki/widgets/motnje_filter_sheet.dart';
 import 'package:narcis_nadzorniki/widgets/obmocja_picker.dart';
 import 'package:narcis_nadzorniki/widgets/obmocje_sheet.dart';
 import 'package:provider/provider.dart';
@@ -100,6 +102,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   AppMode _activeMode = AppMode.motnje;
   bool _showMotnje = true;
+  // Motnje-layer visibility filter (age / author / observed-date window, TB-6).
+  // Widget-local and not persisted, matching the other layer toggles.
+  MotnjeFilter _motnjeFilter = const MotnjeFilter.unfiltered();
   bool _showObhodi = false;
   bool _showParcele = false;
   // Active "Območja s statusom" sublayers; Natura 2000 on by default.
@@ -471,6 +476,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 onBasemapChanged: (m) => setState(() => _basemapMode = m),
                 onMotnjeToggle: () =>
                     setState(() => _showMotnje = !_showMotnje),
+                filterActive: _motnjeFilter.isActive,
+                onFilterTap: () => showMotnjeFilterSheet(
+                  context,
+                  filter: _motnjeFilter,
+                  records: state.records,
+                  currentUserEmail: state.currentUser,
+                  onChanged: (f) => setState(() => _motnjeFilter = f),
+                ),
                 onObhodiToggle: () =>
                     setState(() => _showObhodi = !_showObhodi),
                 onParceleToggle: () =>
@@ -645,9 +658,14 @@ class _HomeScreenState extends State<HomeScreen> {
       // Color encodes age (red ≤31d, orange ≤365d, blue older); shape encodes
       // authorship (own = filled disc, teammate = ring). White halo keeps
       // both legible against any basemap.
+      final now = DateTime.now();
       final sorted = [...state.records]
         ..sort((a, b) => a.observedAt.compareTo(b.observedAt));
       for (final record in sorted) {
+        if (!_motnjeFilter.matches(record,
+            now: now, currentUserEmail: state.currentUser)) {
+          continue;
+        }
         markers.add(
           Marker(
             point: LatLng(record.latitude, record.longitude),
@@ -691,6 +709,8 @@ class _TopChrome extends StatelessWidget {
     required this.onSyncTap,
     required this.onBasemapChanged,
     required this.onMotnjeToggle,
+    required this.filterActive,
+    required this.onFilterTap,
     required this.onObhodiToggle,
     required this.onParceleToggle,
     required this.onObmocjaToggle,
@@ -700,6 +720,8 @@ class _TopChrome extends StatelessWidget {
   final AppState state;
   final BasemapMode basemapMode;
   final bool showMotnje;
+  final bool filterActive;
+  final VoidCallback onFilterTap;
   final bool showObhodi;
   final bool showParcele;
   final bool showObmocja;
@@ -766,6 +788,13 @@ class _TopChrome extends StatelessWidget {
                     selected: showMotnje,
                     enabled: true,
                     onTap: onMotnjeToggle,
+                  ),
+                  _LayerChip(
+                    icon: Icons.filter_list,
+                    label: 'Filter',
+                    selected: filterActive,
+                    enabled: showMotnje,
+                    onTap: onFilterTap,
                   ),
                   _LayerChip(
                     icon: Icons.directions_walk,
