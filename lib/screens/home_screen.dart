@@ -629,8 +629,8 @@ class _HomeScreenState extends State<HomeScreen> {
         markers.add(
           Marker(
             point: LatLng(record.latitude, record.longitude),
-            width: 22,
-            height: 22,
+            width: kRecordMarkerTapDiameter,
+            height: kRecordMarkerTapDiameter,
             child: GestureDetector(
               onTap: () => _openLegacyDetail(record),
               child: const LegacyRecordMarker(),
@@ -651,8 +651,8 @@ class _HomeScreenState extends State<HomeScreen> {
         markers.add(
           Marker(
             point: LatLng(record.latitude, record.longitude),
-            width: 32,
-            height: 32,
+            width: kRecordMarkerTapDiameter,
+            height: kRecordMarkerTapDiameter,
             child: GestureDetector(
               onTap: () {
                 Navigator.of(context).push(

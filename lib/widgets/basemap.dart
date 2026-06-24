@@ -180,6 +180,14 @@ Color recordMarkerColorForAge(DateTime observedAt) {
   return Colors.blue;
 }
 
+/// Tap-target diameter for record markers on the home map. The visible disc is
+/// far smaller — [RecordMarker]/[LegacyRecordMarker] `Center` an ~11–18 px dot,
+/// so the rest of this box is invisible tappable margin, making an isolated
+/// marker easy to hit (TB-19). 44 matches the walk-detail map and sits just
+/// under Material's 48 dp minimum: deliberately not larger, to limit how much
+/// overlapping hit-boxes steal each other's taps in dense clusters.
+const double kRecordMarkerTapDiameter = 44;
+
 /// Disturbance-record marker. Filled disc = own record, ring = teammate's.
 /// White halo + drop-shadow keep it legible on any basemap.
 class RecordMarker extends StatelessWidget {

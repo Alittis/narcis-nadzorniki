@@ -397,7 +397,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-19 · Enlarge the tap target for disturbance markers on the map
-`🐞 Bug` (usability) · `P2` · `Todo` · Reporter: maintainer · Updated: 2026-06-22
+`🐞 Bug` (usability) · `P2` · `Doing` (in source — pending commit + release build) · Reporter: maintainer · Updated: 2026-06-24
 - **Problem:** Selecting a disturbance marker on the map is hard — the touch area is small, so it takes
   several attempts to hit one.
 - **Context:** In `_buildMarkers` ([`home_screen.dart:622`](../lib/screens/home_screen.dart)) each record is a
@@ -416,6 +416,21 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   top-most marker, so picking a *specific* one among overlapping points stays ambiguous; TB-6 (declutter
   toggle) / TB-18 (filter) address density. Pick a size that helps isolated markers without being over-grabby
   where points cluster.
+- **Implemented (2026-06-24, in source — pending commit + release build):** Both home-map record-marker
+  hit-boxes grown to a shared, documented constant `kRecordMarkerTapDiameter = 44`
+  ([`basemap.dart`](../lib/widgets/basemap.dart)) — disturbances **32→44**, legacy **22→44** in `_buildMarkers`
+  ([`home_screen.dart`](../lib/screens/home_screen.dart)). Because `RecordMarker`/`LegacyRecordMarker` `Center`
+  a fixed ~18 px / ~11 px disc, the extra box is invisible tappable margin: the visible dots are **unchanged**,
+  the hit area grows. **44** matches the walk-detail map ([`walk_detail_screen.dart:151`](../lib/screens/walk_detail_screen.dart))
+  and sits just under Material's 48 dp minimum — chosen over 48 to limit how much overlapping hit-boxes steal
+  each other's taps in dense clusters (the density caveat above; declutter/filter stay deferred to TB-6/TB-18).
+  Disturbances are added after legacy in `_buildMarkers`, so they draw on top and still win the tap in an
+  overlap (live record over historical). Pure client UI change — no model/backend/deps, no ARCHITECTURE/STATE
+  impact (walk-detail's literal `44` left untouched; value now matches). `flutter analyze` clean (10
+  pre-existing info lints, no new); full suite **71/71**. No automated test added: the box size is a
+  flutter_map `Marker` property set inside the private `_buildMarkers` (depends on widget state + a live map),
+  with no pure-function seam — a HomeScreen widget test would need network tiles for marginal value (same call
+  as TB-13's display-only fix).
 - **Shipped:** —
 
 ### TB-20 · Auth-token audit timestamps stored local, mislabeled UTC (TB-14 sibling)
