@@ -176,7 +176,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-12 · Search the disturbance-type codebook
-`✨ Enhancement` · `P2` · `Doing` (committed `9f461a7`; built into v1.4.0+13 2026-06-23, archived — pending upload + rollout) · Reporter: Matjaž · Updated: 2026-06-23
+`✨ Enhancement` · `P2` · `Done` (shipped v1.4.0+13; rolled out on the Play Closed testing track, confirmed working 2026-06-24) · Reporter: Matjaž · Updated: 2026-06-24
 - **Problem:** Picking a disturbance type means scrolling 19 collapsible groups and expanding the
   right one to reach its types — **172 types** in all. Without already knowing which group a type
   lives under, finding it is slow, and it's done on every disturbance entry.
@@ -217,7 +217,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   ([`type_selection_screen_test.dart`](../test/type_selection_screen_test.dart), browse↔search swap, no-match
   message, count badge); `flutter analyze` clean (no new issues), full suite **71/71** (was 58).
 - **Shipped:** Built into **v1.4.0+13** (2026-06-23, archived `~/Releases/terenska-beleznica-1.4.0+13.aab`,
-  signed with the upload key); committed `9f461a7`. Pending upload + rollout to the Play Closed testing track.
+  signed with the upload key); committed `9f461a7`. Rolled out on the Play Closed testing track 2026-06-24 (confirmed installing + working).
 
 ### TB-13 · Timestamps show in UTC, not local time, on synced records & walks
 `🐞 Bug` · `P1` · `Done` (shipped 1.3.1+12) · Reporter: Matjaž · Updated: 2026-06-22
@@ -440,7 +440,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-21 · Walk speed cap too low — drive-along walks get dropped
-`✨ Enhancement` · `P1` · `Doing` (committed `9a9fee3`; built into v1.4.0+13 2026-06-23, archived — pending upload + rollout) · Reporter: field testers (via maintainer) · Updated: 2026-06-23
+`✨ Enhancement` · `P1` · `Done` (shipped v1.4.0+13; rolled out on the Play Closed testing track, confirmed working 2026-06-24) · Reporter: field testers (via maintainer) · Updated: 2026-06-24
 - **Problem:** Wardens sometimes do a walk-around (obhod) by car, but the recorder's teleport filter rejected
   any segment implying > 8 m/s (≈29 km/h) as a bogus fix — so legitimate car-driven points were silently
   dropped (`reject: teleport` log) and the captured track came out sparse or broken.
@@ -456,10 +456,10 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Discussion:** Ceiling chosen by maintainer (130 km/h) over 90 km/h (would clip highway segments) and
   180 km/h (looser teleport-only guard).
 - **Shipped:** Built into **v1.4.0+13** (2026-06-23, archived `~/Releases/terenska-beleznica-1.4.0+13.aab`,
-  signed with the upload key); committed `9a9fee3`. Pending upload + rollout to the Play Closed testing track.
+  signed with the upload key); committed `9a9fee3`. Rolled out on the Play Closed testing track 2026-06-24 (confirmed installing + working).
 
 ### TB-22 · Walk tracks draw straight "spike" lines across driven / dropped stretches
-`🐞 Bug` · `P1` · `Doing` (committed `d5ff149`; built into v1.4.0+13 2026-06-23, archived — pending upload + rollout) · Reporter: field testers (via maintainer, screenshot) · Updated: 2026-06-23
+`🐞 Bug` · `P1` · `Done` (shipped v1.4.0+13; rolled out on the Play Closed testing track, confirmed working 2026-06-24) · Reporter: field testers (via maintainer, screenshot) · Updated: 2026-06-24
 - **Problem:** On existing walks where the warden walked *and* drove, the track shows long dead-straight lines
   shooting across the map (Cerknica screenshot, 2026-06-23). Each walk was drawn as a **single continuous
   `Polyline`** through every stored point, so any gap between consecutive points renders as a straight bridge.
@@ -483,7 +483,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   walk-vs-drive styling (maintainer, 2026-06-23). Styling driven segments distinctly is a possible follow-up
   once field walks with captured driving exist.
 - **Shipped:** Built into **v1.4.0+13** (2026-06-23, archived `~/Releases/terenska-beleznica-1.4.0+13.aab`,
-  signed with the upload key); committed `d5ff149`. Pending upload + rollout to the Play Closed testing track.
+  signed with the upload key); committed `d5ff149`. Rolled out on the Play Closed testing track 2026-06-24 (confirmed installing + working).
 
 ---
 
