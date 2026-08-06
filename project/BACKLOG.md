@@ -562,6 +562,33 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   before dropping the asset; if any are missing, that's a data-migration gap to close first.
 - **Shipped:** —
 
+### TB-24 · Pre-upload AAB check misses the signer certificate
+`🔧 Chore` · `P2` · `Done` · Updated: 2026-08-06
+- **Problem:** `DEPLOYMENT.md` §3.2 sanity-checked the AAB only with `unzip` + `strings` over the
+  binary `base/manifest/AndroidManifest.xml` — applicationId, absent permissions, the four
+  `required="false"` hardware features. That says nothing about **who signed it**. Release signing
+  reads its passwords from the gitignored `android/key.properties` (§3.1), and if that file is
+  missing the release build does not fail: it falls back to debug signing and yields an AAB that
+  builds clean and is rejected on upload. Nothing in the documented check would catch it.
+- **Want:** The signer verification in §3.2, plus an honest note on what the AAB genuinely cannot
+  confirm, so a future release does not record a check it never performed.
+- **Context:** `keytool -printcert -jarfile <aab>` prints Owner and the SHA-256 to compare against
+  `android_release.upload_cert_sha256` in `STATE.json`. Verified 2026-08-06 against the archived
+  `~/Releases/terenska-beleznica-1.5.0+14.aab`: `25:F1:C4:…:E6:A2`, matching `STATE.json` exactly.
+  Also settled empirically, because both directions were previously assumed wrong: `versionName`
+  *is* readable from the AAB (the binary string pool is **UTF-8**, so plain `strings` finds
+  `1.5.0`; macOS `strings` has no `-e` flag and needs none), while **`versionCode` is not** — it is
+  an integer attribute, not a pooled string, and `apkanalyzer manifest print` refuses an `.aab`
+  while `bundletool` is absent on this workstation. The build number comes from the plain-XML
+  merged manifest under `build/app/intermediates/packaged_manifests/release/`, which survives
+  until `flutter clean` (the June 1.5.0+14 copies were still on disk and carried
+  `android:versionCode="14"`). Note the path is `build/app/…`, not `android/app/build/…`, because
+  `android/build.gradle.kts` redirects the Gradle build directory to the repo root.
+- **Discussion:** —
+- **Shipped:** Docs only, no app change — `DEPLOYMENT.md` §3.2. The same verified procedure is
+  carried by the global `flutter-release` skill (`~/.claude/skills/flutter-release/SKILL.md` §3),
+  which was corrected in the same pass: it had the merged-manifest path as `android/app/build/…`.
+
 ---
 
 ## Done

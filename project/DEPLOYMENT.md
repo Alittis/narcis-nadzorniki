@@ -63,6 +63,18 @@ strings /tmp/aab/base/manifest/AndroidManifest.xml | \
 ```
 Expected: `si.terenska.beleznica` present; `com.example` and `BACKGROUND_LOCATION` absent; all four `android.hardware.camera*` / `android.hardware.location*` feature names present (declared `required="false"` in source).
 
+**Confirm the signer, too — this is the check that catches a silently mis-signed build.** Release signing reads its passwords from the gitignored `android/key.properties` (§3.1); if that file is missing, the release build does **not** fail — it falls back to debug signing and produces an AAB that builds clean and is rejected on upload.
+```bash
+keytool -printcert -jarfile build/app/outputs/bundle/release/app-release.aab | grep -E 'Owner|SHA256'
+```
+Expected: `Owner: CN=Terenska beleznica, OU=Alittis, O=Alittis, L=Ljubljana, ST=Slovenia, C=SI` and a `SHA256` fingerprint equal to `android_release.upload_cert_sha256` in `STATE.json` (`25:F1:C4:…:E6:A2`). A debug-signed artifact shows `CN=Android Debug` instead. Verified `2026-08-06` against the v1.5.0+14 build output at the path above and its archived copy `~/Releases/terenska-beleznica-1.5.0+14.aab` — both print the fingerprint recorded in `STATE.json`.
+
+**What the AAB cannot tell you: `versionCode`.** `versionName` sits in the binary manifest's **UTF-8** string pool, which is why the plain `strings` pass above finds `1.5.0` (macOS `strings` has no `-e` flag and does not need one). `versionCode` is an *integer* attribute rather than a pooled string, so no `strings` / `grep` / `python3` pass over the AAB will ever show it — and `apkanalyzer manifest print` refuses an `.aab` outright, while `bundletool` is not installed on this workstation. Read the build number from the plain-XML *packaged* manifest the build leaves behind instead (distinct from the binary one inside the AAB; it survives until `flutter clean`):
+```bash
+grep -rhoE 'android:version(Code|Name)="[^"]*"' build/app/intermediates/packaged_manifests/release/ | sort -u
+```
+Expected: `android:versionCode="<B>"` and `android:versionName="<X.Y.Z>"` matching `pubspec.yaml`. Note the path is `build/app/intermediates/…` (not `android/app/build/…`) because `android/build.gradle.kts` redirects the Gradle build directory to the repo root. If the build tree has been cleaned, `pubspec.yaml` is the only remaining source and Play's monotonic-`versionCode` rejection is the backstop.
+
 Upload the AAB to **Google Play Console → Internal testing → Create new release**, attach the testers list, and roll out. Play App Signing re-signs with the app-signing key automatically.
 
 ### 3.3 Closed testing — store-listing copy, App Content, tester onboarding
