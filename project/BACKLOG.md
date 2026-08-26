@@ -644,3 +644,30 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   `d5a41b3` → `b139558` → `773e43f` → `477b7d2` → `3209a2b` (release `104784a`). Shipped in **v1.3.0+11**,
   rolled out live on the Play **Closed testing** track 2026-06-15. See ARCHITECTURE §10.2. Follow-ups
   (separate): on-map legend; tune point-layer (jame/NV/EPO) tap tolerance.
+
+### TB-25 · TB_MOTNJE gained three columns this repo does not create — record that, and who owns the status
+`🔧 Chore` · `P3` · `Done` · Updated: 2026-08-26
+
+- **Context:** narcis-vibed **NV-220** taught its Terenska beležnica backoffice to record a case-review
+  decision — `STATUS_OBRAVNAVE` plus a new internal note and audit stamp — against the live `TB_MOTNJE`
+  rows this app writes. That needed three new columns: `OPOMBA_URADNA`, `OBRAVNAVAL`, `OBRAVNAVANO`.
+- **Where the migration lives, and why not here:** in that repo, `ords/vibed_trsca_ddl.sql`, because the
+  web review surface is the **only** writer of those three columns. But
+  [`tools/ords/disturbance_schema.sql`](../tools/ords/disturbance_schema.sql) is the authority on this
+  table's shape, so without a note it would quietly misdescribe production — and a clean rebuild from it
+  would drop three columns the web module SELECTs and UPDATEs, whose absence surfaces only as an opaque
+  HTTP 555 on that module's first request.
+- **Done (2026-08-26, commit `dea297d`):** a comment block in the schema header naming the three columns,
+  their owner and the rebuild dependency. **Comment only** — no schema change, no behaviour change, no
+  release.
+- **The other half: `STATUS_OBRAVNAVE` is now owned by the web.** This app still *displays* it and still
+  sets an initial value on **create**, but it never updates an existing row — `AppState.updateRecord` and
+  `AppState.deleteRecord` have **no callers**, the create `POST` is skip-if-exists rather than an upsert,
+  and `FormScreen` is create-only. So the two writers cannot collide and **no release was needed** for
+  NV-220. ⚠️ If an edit path is ever wired up here, `PUT /disturbances/:id` needs a **precondition**
+  first — today it is a full-record replacement with none, which would silently overwrite a reviewer's
+  decision.
+- **Open question for the product owner (not a blocker):** the create form still offers the full status
+  dropdown, so an inspector can file a record already marked *Zaključeno*. Now that case handling is a
+  back-office act, that may be worth removing — a one-line change in `remote_api.dart` plus the dropdown,
+  on this app's own release cycle.
