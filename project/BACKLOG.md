@@ -671,3 +671,71 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   dropdown, so an inspector can file a record already marked *Zaključeno*. Now that case handling is a
   back-office act, that may be worth removing — a one-line change in `remote_api.dart` plus the dropdown,
   on this app's own release cycle.
+
+### TB-26 · Show the back-office obravnava on the phone — a warden sees the verdict but not the reasoning
+`✨ Enhancement` · `P2` · `Todo` · Updated: 2026-08-26
+
+- **Problem.** Since narcis-vibed **NV-220** (live 2026-08-26) the web backoffice records a case
+  review against `TB_MOTNJE`: `STATUS_OBRAVNAVE`, plus `OPOMBA_URADNA` (an official note),
+  `OBRAVNAVAL` (who) and `OBRAVNAVANO` (when). This app shows the **status** and nothing else, so a
+  warden watches their own disturbance flip to *Zaključeno* with no idea who closed it, when, or
+  why. They get the verdict without the reasoning, which is the weaker half of a review loop.
+- **⚠️ IT IS A TWO-PART CHANGE — the data does not even reach the phone today.** The list handler in
+  [`tools/ords/disturbance_endpoints.sql`](../tools/ords/disturbance_endpoints.sql) selects an
+  explicit column list that ends at `status_obravnave` (line ~124-125), so the three review columns
+  never leave Oracle for this client. Widening that `SELECT` + its `APEX_JSON` writes is step one;
+  `RemoteDisturbance`/`Disturbance` + the detail UI is step two. Contrast **TB-27**, which is
+  client-only.
+- **Scoped in two halves deliberately, because only one of them is obvious:**
+  1. **Status + who + when** — uncontroversial, and closes most of the loop. `OBRAVNAVAL` is an
+     e-mail and `OBRAVNAVANO` an ISO-8601 UTC instant (same shape as `ustvarjen`, so
+     `fmtDateTime`-equivalent handling already exists). Read-only on the phone: the web owns these
+     columns and this app must not write them (see TB-25).
+  2. **`OPOMBA_URADNA` itself** — ❓ **a product decision, not a technical one.** narcis-vibed's
+     manual currently states *"Opomba je interna: prijavitelj motnje je ne vidi"*, but that sentence
+     was **copied by analogy from the hornet module, where the reporter is a member of the public**.
+     Here the reporter is your own field inspector, and "internal" plausibly includes them. Against
+     showing it: the note may carry candid judgements about that inspector's own report, which is a
+     different thing from a case summary. **Decide this before building half 2**; half 1 can ship
+     without it.
+- **If half 2 is approved, narcis-vibed must change in the same breath** — its manual sentence
+  becomes false the moment the phone renders the note, and that repo's NV-48 rule makes the manual
+  part of the deliverable.
+- **Needs a release** (ORDS re-publish for step one, then a Flutter build) — this app's own cycle.
+- **History is NOT available and will not be.** Only the latest review is stored; there is no log of
+  prior statuses or notes (narcis-vibed, decided 2026-08-26: *"leave it this way for now"*). So the
+  phone can show *"last reviewed by X on Y"* and never *"what it said before"*.
+
+### TB-27 · Colour the map dots by status obravnave, not age — restore parity with the web
+`✨ Enhancement` · `P2` · `Todo` · Updated: 2026-08-26
+
+- **Wanted (user, 2026-08-26):** match narcis-vibed **NV-221**, which moved the web's disturbance
+  dots from age-colouring to **status obravnave** colouring.
+- **Why this is a restoration, not a divergence.** narcis-vibed **NV-81** originally coloured its
+  dots by age *specifically for parity with this app* (red ≤31 d / orange ≤365 / blue older).
+  NV-221 reversed that on the user's request and **accepted the loss of parity as its stated cost**.
+  Doing the same here makes that cost temporary: the two apps agree again, at status instead of age.
+- **⚠️ CLIENT-ONLY — no ORDS change needed.** Unlike TB-26, the data is already here: the list
+  handler returns `status_obravnave` and `Disturbance.caseStatus` already holds it. One marker-colour
+  expression is the core of it, at
+  [`lib/screens/home_screen.dart`](../lib/screens/home_screen.dart) ~line 657, whose own comment
+  states the current rule (*"Color encodes age … shape encodes authorship"*).
+- **Reuse the web's exact palette** so the two apps cannot disagree about what *Zaključeno* looks
+  like — `STATUS_COLORS` in narcis-vibed `web/src/lib/trsca/format.ts`: amber `#d97706` Odprto ·
+  blue `#0a84ff` V obravnavi · green `#1b7a1b` Zaključeno · gray `#8e8e93` Predano drugi službi.
+- **Keep unchanged, deliberately:** shape = authorship (own = filled disc, teammate = ring); the
+  white halo (it is what makes any fill legible on any basemap — measured on the web side); and the
+  **youngest-renders-on-top sort** (`sorted` by `observedAt` ascending, since `flutter_map` draws in
+  list order) — a stacking rule worth keeping whatever the fill encodes, and leaving it alone means
+  this change cannot shift the draw order. `ageBucketOf` and the **Starost** filter both stay.
+- **⚠️ THE REAL SCOPE QUESTION, and it is not the colour.** The filter sheet offers **Starost ·
+  Avtor · Obdobje** and has **no Status dimension at all** — NV-81 called the status facet a
+  "deliberate web-only review facet". So after this change the colour would encode something the
+  warden can neither filter by nor look up. Either add a **Status** section to
+  [`motnje_filter_sheet.dart`](../lib/widgets/motnje_filter_sheet.dart) (which the web treats as its
+  legend), or ship the standing *on-map legend* follow-up first. Colour without a key is worse than
+  the age colouring it replaces.
+- Also note `lib/data/disturbance_filter.dart:4` claims the age thresholds *"match the legend the
+  warden sees"* — check what that legend actually is and update the comment, or it will describe a
+  legend that no longer means age.
+- **Needs a Flutter release.** Pairs naturally with TB-26 in one build.
