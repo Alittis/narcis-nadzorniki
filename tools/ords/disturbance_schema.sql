@@ -23,6 +23,21 @@
 -- NARCIS_UPORABNIKI.ORGANIZACIJA column (single org per user). The client
 -- never sends ORG_ID; the handler stamps it.
 --
+-- ⚠️ TB_MOTNJE HAS THREE COLUMNS THIS FILE DOES NOT CREATE, and they are not an
+-- oversight. OPOMBA_URADNA, OBRAVNAVAL and OBRAVNAVANO are the web backoffice's
+-- case-review fields (narcis-vibed NV-220): the Terenska beležnica review surface at
+-- narcis.alittis.com is their ONLY writer, so their migration lives with that writer
+-- in narcis-vibed/ords/vibed_trsca_ddl.sql rather than here. This app never reads or
+-- writes them, and every handler below names its columns explicitly, so they are
+-- invisible to it rather than silently overwritten.
+--   → A clean rebuild from this file must be followed by that script, or the web
+--     module's next request fails with ORDS-25001 / HTTP 555 naming the column.
+--   → STATUS_OBRAVNAVE is now OWNED BY THE WEB (NV-220). This app still displays it
+--     and still sets an initial value on create, but nothing here updates an existing
+--     row — AppState.updateRecord/deleteRecord have no callers and the create POST is
+--     skip-if-exists — so the two writers cannot collide. Wiring up an edit path in
+--     this app later means giving its PUT a precondition first; see NV-220.
+--
 -- Idempotent: each CREATE is wrapped in a guard so the script can be re-run.
 --   Drop the tables manually if you want a clean rebuild:
 --     DROP TABLE TB_MOTNJE_FOTO          PURGE;
