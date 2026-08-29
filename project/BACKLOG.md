@@ -589,6 +589,75 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   carried by the global `flutter-release` skill (`~/.claude/skills/flutter-release/SKILL.md` §3),
   which was corrected in the same pass: it had the merged-manifest path as `android/app/build/…`.
 
+### TB-28 · Login says "wrong credentials" when the real problem is a missing TERENSKA-BELEZNICA authorization
+`✨ Enhancement` · `P1` · `Todo` · Maintainer-initiated · Updated: 2026-08-29
+
+- **Problem:** Registration in NarcIS is **not enough** to use Terenska beležnica. The account
+  must additionally hold the `TERENSKA-BELEZNICA` function authorization, granted by an
+  administrator. Nothing in the app says so. A registered user who types their **correct**
+  password but lacks the function gets HTTP 401 with
+  `{"authenticated":false,"message":"Neveljavni podatki za prijavo."}` — **byte-identical** to
+  what a typo'd password produces ([`auth_login.sql:216`](../tools/ords/auth_login.sql) exits at
+  `has_function_false`, and the single message is written unconditionally at line 301). The client
+  renders that string verbatim ([`auth_service.dart:222`](../lib/services/auth_service.dart) →
+  [`login_screen.dart:45`](../lib/screens/login_screen.dart) → the red banner), so the only
+  conclusion available to the user is *"I mistyped my password"*. They retype it, fail again, and
+  the actual remedy — **ask your organisation's administrator to assign you the function** — is
+  reachable nowhere in the app.
+- **Want:** The user is told, at the moment it happens, that their account is valid but not yet
+  authorized for this app, and who to contact.
+- **⚠️ The single message is DELIBERATE, not an oversight — do not "fix" it by differentiating
+  every branch.** *"Server logic (single 401 message for all failure modes — no enumeration)"*
+  ([`auth_login.sql:24`](../tools/ords/auth_login.sql)), restated in ARCHITECTURE §9.1 (line 66)
+  and OPERATIONS §7 (*"no enumeration leak between 'no creds', 'bad password', 'not authorized'"*).
+  Steps 1–3 must keep the generic message.
+- **Why this one branch can nevertheless be split safely.** The function check is **step 4**, and
+  it runs only *after* `pkg_narcis_uporabniki.preveri_geslo` returned true — the caller has already
+  proven they know the password for that account. Telling **them** "this account is not authorized
+  for Terenska beležnica" discloses nothing that an attacker without the password could reach; the
+  properties worth protecting (*does this email exist?*, *is this password right?*) are untouched
+  as long as only the `has_function_false` branch gets its own message. State this in the change
+  itself, because three separate documents say "no enumeration" and a future reader will otherwise
+  read the split as a regression.
+- **Two halves — the cheap one is client-only and can ship first:**
+  1. **Static hint on the login screen (no backend change, no ORDS re-publish).** One line under
+     the error banner in [`login_screen.dart`](../lib/screens/login_screen.dart), shown on any
+     failed online login: registration in NarcIS is not sufficient, the `TERENSKA-BELEZNICA`
+     right is needed, here is who grants it. Imprecise — it also shows to someone who genuinely
+     mistyped — but it costs one Flutter build and removes the dead end.
+  2. **A distinct server message (needs an ORDS re-publish).** Give the `has_function_false` exit
+     its own `message` (and ideally a stable machine-readable `reason`, e.g. `"not_authorized"`, so
+     the client can style it as guidance rather than as an error) while every earlier step keeps
+     `Neveljavni podatki za prijavo.`. The client already passes `body['message']` straight
+     through, so half 2 improves the text with **no client release** — but a `reason` key would
+     need one.
+- **Decide who the user should be told to contact — this is the open question, and the repo
+  currently answers it two different ways.** Both closed-test invite templates in
+  `PLAY_CLOSED_TEST.md` (§ Slovenian ~line 517, English ~line 577) say to write to
+  `admin@alittis.com`, i.e. the *app publisher*, who arranges the right. That is correct **for the
+  closed test**, where Alittis provisions testers by hand. At production scale the addressee is the
+  **organisation's own administrator** (ARSO / the relevant park; the store listing gives
+  `narcis.arso@gov.si` as the field-data controller). Whatever wording lands in the app must name
+  whichever is true at ship time — and if that is the org admin, **the two invite templates
+  contradict it and must be updated in the same pass.**
+- **The revocation case gets the same benefit.** A user whose function is *withdrawn* keeps working
+  offline until the 14-day window lapses (OPERATIONS §9) and then meets this identical, misleading
+  401. Wording should cover "not assigned yet" and "no longer assigned" without promising to
+  distinguish them.
+- **Not affected:** the offline branches in `AuthService._tryOffline` have their own distinct
+  messages, and first-time login is always online (OPERATIONS §9), so an unauthorized user always
+  reaches the server path. Only the online 401 needs the hint.
+- **Today's only way to tell the two apart is operator-side and expiring:** the login handler logs
+  `step_reached = 'has_function_false'` to `narcis_auth_debug`, so someone with DB access can
+  diagnose a specific report ([`diagnose_auth.sql`](../tools/ords/diagnose_auth.sql) STEP 3b does
+  it per user). That instrumentation is **scheduled for removal** (ARCHITECTURE §8 cleanup
+  checklist, step 2/4) — if it is dropped before this ships, the last remaining way to distinguish
+  the two failures disappears with it.
+- **Discussion:** Contact addressee, per the bullet above — publisher (`admin@alittis.com`, today's
+  closed-test answer) vs. the organisation's administrator (the production answer). Half 1 cannot
+  ship until this is settled, since the whole point is naming someone.
+- **Shipped:** —
+
 ---
 
 ## Done
