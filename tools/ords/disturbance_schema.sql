@@ -27,11 +27,17 @@
 -- oversight. OPOMBA_URADNA, OBRAVNAVAL and OBRAVNAVANO are the web backoffice's
 -- case-review fields (narcis-vibed NV-220): the Terenska beležnica review surface at
 -- narcis.alittis.com is their ONLY writer, so their migration lives with that writer
--- in narcis-vibed/ords/vibed_trsca_ddl.sql rather than here. This app never reads or
--- writes them, and every handler below names its columns explicitly, so they are
--- invisible to it rather than silently overwritten.
+-- in narcis-vibed/ords/vibed_trsca_ddl.sql rather than here. This app never WRITES
+-- them — every handler below names its columns explicitly, so a review decision
+-- cannot be silently overwritten from the phone.
+--   ⚠️ SINCE TB-26 THIS APP DOES READ TWO OF THEM. The GET list handler in
+--     disturbance_endpoints.sql SELECTs OBRAVNAVAL and OBRAVNAVANO to show the
+--     warden who closed their record and when. OPOMBA_URADNA stays unread (TB-26
+--     half 2 is an open product decision). So the rebuild dependency below now
+--     cuts BOTH ways.
 --   → A clean rebuild from this file must be followed by that script, or the web
---     module's next request fails with ORDS-25001 / HTTP 555 naming the column.
+--     module's next request fails with ORDS-25001 / HTTP 555 naming the column —
+--     and this app's own GET /disturbances/ fails with ORA-00904 on OBRAVNAVAL.
 --   → STATUS_OBRAVNAVE is now OWNED BY THE WEB (NV-220). This app still displays it
 --     and still sets an initial value on create, but nothing here updates an existing
 --     row — AppState.updateRecord/deleteRecord have no callers and the create POST is

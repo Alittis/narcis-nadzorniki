@@ -15,6 +15,7 @@ Disturbance _rec({
   required DateTime observedAt,
   String? createdBy,
   List<SelectedDisturbanceType> types = const [],
+  String caseStatus = 'Odprto',
 }) {
   return Disturbance(
     id: 'id-${observedAt.microsecondsSinceEpoch}-${createdBy ?? 'me'}',
@@ -27,7 +28,7 @@ Disturbance _rec({
     photos: const [],
     observers: const [],
     actionTaken: 'Brez ukrepa',
-    caseStatus: 'Odprto',
+    caseStatus: caseStatus,
     pendingSync: false,
     createdAt: observedAt,
     createdBy: createdBy,
@@ -223,6 +224,75 @@ void main() {
       ]);
       expect(span!.$1, DateTime(2025, 3, 10));
       expect(span.$2, DateTime(2026, 1, 5));
+    });
+  });
+
+  group('status dimension (TB-27)', () {
+    test('default filter shows every status and stays inactive', () {
+      const f = MotnjeFilter.unfiltered();
+      expect(f.isActive, isFalse);
+      for (final status in allCaseStatuses) {
+        expect(f.matches(_rec(observedAt: now, caseStatus: status), now: now),
+            isTrue,
+            reason: status);
+      }
+    });
+
+    test('unticking a status hides only that status, and marks active', () {
+      final f = MotnjeFilter(
+        statuses: {...allCaseStatuses}..remove('Zaključeno'),
+      );
+      expect(f.isActive, isTrue);
+      expect(
+          f.matches(_rec(observedAt: now, caseStatus: 'Zaključeno'), now: now),
+          isFalse);
+      expect(f.matches(_rec(observedAt: now, caseStatus: 'Odprto'), now: now),
+          isTrue);
+    });
+
+    test('empty status set hides everything, like an empty age set', () {
+      const f = MotnjeFilter(statuses: {});
+      expect(f.matches(_rec(observedAt: now, caseStatus: 'Odprto'), now: now),
+          isFalse);
+    });
+
+    test('a status this build does not know is never hidden', () {
+      // If the back office grows a fifth state, records carrying it must keep
+      // drawing (in gray) rather than silently vanishing off the map.
+      final f = MotnjeFilter(statuses: {...allCaseStatuses}..remove('Odprto'));
+      expect(
+          f.matches(_rec(observedAt: now, caseStatus: 'V mediaciji'), now: now),
+          isTrue);
+    });
+
+    test('composes with AND against the age dimension', () {
+      final f = MotnjeFilter(
+        ageBuckets: const {AgeBucket.recent},
+        statuses: const {'Odprto'},
+      );
+      expect(
+          f.matches(_rec(observedAt: daysAgo(2), caseStatus: 'Odprto'),
+              now: now),
+          isTrue);
+      // right status, wrong age
+      expect(
+          f.matches(_rec(observedAt: daysAgo(400), caseStatus: 'Odprto'),
+              now: now),
+          isFalse);
+      // right age, wrong status
+      expect(
+          f.matches(_rec(observedAt: daysAgo(2), caseStatus: 'Zaključeno'),
+              now: now),
+          isFalse);
+    });
+
+    test('the four states match the DB CHECK vocabulary, in display order', () {
+      expect(allCaseStatuses.toList(), [
+        'Odprto',
+        'V obravnavi',
+        'Zaključeno',
+        'Predano drugi službi',
+      ]);
     });
   });
 }

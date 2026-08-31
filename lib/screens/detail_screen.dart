@@ -125,6 +125,8 @@ class _DetailScreenState extends State<DetailScreen> {
                       legalBasis: live.legalBasis,
                       caseStatus: live.caseStatus,
                       observers: live.observers,
+                      reviewedBy: live.reviewedBy,
+                      reviewedAt: live.reviewedAt,
                     ),
                   ],
                 ),
@@ -447,12 +449,16 @@ class _FooterRow extends StatelessWidget {
     required this.legalBasis,
     required this.caseStatus,
     required this.observers,
+    required this.reviewedBy,
+    required this.reviewedAt,
   });
 
   final String actionTaken;
   final String? legalBasis;
   final String caseStatus;
   final List<String> observers;
+  final String? reviewedBy;
+  final DateTime? reviewedAt;
 
   @override
   Widget build(BuildContext context) {
@@ -464,6 +470,17 @@ class _FooterRow extends StatelessWidget {
         if (legalBasis != null && legalBasis!.isNotEmpty)
           _Pill(icon: Icons.menu_book_outlined, text: legalBasis!),
         _Pill(icon: Icons.flag_outlined, text: caseStatus),
+        // Who took that decision and when (TB-26). Two pills rather than one so
+        // Wrap can break between a long e-mail and the date. Absent until the
+        // back office has actually reviewed the record.
+        if (reviewedBy != null && reviewedBy!.isNotEmpty)
+          _Pill(icon: Icons.how_to_reg_outlined, text: reviewedBy!),
+        if (reviewedAt != null)
+          _Pill(
+            icon: Icons.event_available_outlined,
+            text: DateFormat('dd.MM.yyyy HH:mm').format(reviewedAt!.toLocal()),
+            tabular: true,
+          ),
         if (observers.isNotEmpty)
           _Pill(icon: Icons.group_outlined, text: observers.join(', ')),
       ],

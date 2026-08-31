@@ -1,8 +1,10 @@
 import 'package:narcis_nadzorniki/models/disturbance.dart';
 
-/// How old a disturbance is, bucketed for the home-map marker colour and the
-/// Motnje age filter (TB-6). Thresholds match the legend the warden sees:
+/// How old a disturbance is, bucketed for the Motnje age filter (TB-6). The
+/// filter sheet's own colour swatches are the legend for these thresholds:
 /// [AgeBucket.recent] → red, [AgeBucket.mid] → orange, [AgeBucket.old] → blue.
+/// Since TB-27 the map marker colour encodes **status obravnave**, not age —
+/// these three colours now live only in the Starost filter rows.
 enum AgeBucket { recent, mid, old }
 
 const Set<AgeBucket> allAgeBuckets = {
@@ -20,13 +22,26 @@ AgeBucket ageBucketOf(DateTime observedAt, {DateTime? now}) {
   return AgeBucket.old;
 }
 
-/// Visibility filter for the home-map Motnje layer (TB-6). Three independent
-/// dimensions composed with AND — age bucket, author, and an observed-date
-/// window. [MotnjeFilter.unfiltered] shows everything. Immutable: the picker
-/// sheet emits a fresh instance on every change.
+/// The four review states `TB_MOTNJE.STATUS_OBRAVNAVE` allows (DB CHECK
+/// `ck_tb_motnje_stat`, mirrored by the create form's dropdown). Insertion
+/// order is display order — open → in progress → closed → handed off — and
+/// `Set` literals preserve it, so the filter sheet iterates this directly.
+const Set<String> allCaseStatuses = {
+  'Odprto',
+  'V obravnavi',
+  'Zaključeno',
+  'Predano drugi službi',
+};
+
+/// Visibility filter for the home-map Motnje layer (TB-6). Five independent
+/// dimensions composed with AND — age bucket, case status (TB-27), author,
+/// category (TB-18) and an observed-date window. [MotnjeFilter.unfiltered]
+/// shows everything. Immutable: the picker sheet emits a fresh instance on
+/// every change.
 class MotnjeFilter {
   const MotnjeFilter({
     this.ageBuckets = allAgeBuckets,
+    this.statuses = allCaseStatuses,
     this.authors = const {},
     this.groups,
     this.from,
@@ -37,6 +52,10 @@ class MotnjeFilter {
 
   /// Age buckets to show. Empty shows none (unchecking all hides the layer).
   final Set<AgeBucket> ageBuckets;
+
+  /// Case-review states to show (TB-27) — the dimension the marker colour now
+  /// encodes. Empty shows none, same rule as [ageBuckets].
+  final Set<String> statuses;
 
   /// Lower-cased author emails to show; empty means "any author".
   final Set<String> authors;
@@ -57,6 +76,7 @@ class MotnjeFilter {
   /// Filter chip's active state.
   bool get isActive =>
       ageBuckets.length < allAgeBuckets.length ||
+      statuses.length < allCaseStatuses.length ||
       authors.isNotEmpty ||
       groups != null ||
       from != null ||
@@ -71,6 +91,14 @@ class MotnjeFilter {
     String? currentUserEmail,
   }) {
     if (!ageBuckets.contains(ageBucketOf(record.observedAt, now: now))) {
+      return false;
+    }
+    // A status outside [allCaseStatuses] — one added server-side after this
+    // build ships — is never hidden by this dimension. It still draws, in the
+    // web's unknown-status gray; silently vanishing off the map would be a far
+    // worse way to learn the vocabulary grew.
+    if (allCaseStatuses.contains(record.caseStatus) &&
+        !statuses.contains(record.caseStatus)) {
       return false;
     }
     if (authors.isNotEmpty) {

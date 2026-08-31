@@ -20,6 +20,8 @@ class Disturbance {
     this.proposedType,
     this.createdBy,
     this.obhodId,
+    this.reviewedBy,
+    this.reviewedAt,
   });
 
   final String id;
@@ -48,6 +50,13 @@ class Disturbance {
   // Walk-around (obhod) the record was captured during. Stamped in
   // `AppState.addRecord` when a walk is active; null otherwise.
   final String? obhodId;
+  // Who took the case decision, and when (TB-26). Read-only on the phone: the
+  // web backoffice is the sole writer (narcis-vibed NV-220) and `_payload` in
+  // remote_api.dart deliberately omits both, so they can never round-trip into
+  // a write. Null until a record has actually been reviewed. `reviewedAt`
+  // arrives as UTC, like every other instant here -- `.toLocal()` to display.
+  final String? reviewedBy;
+  final DateTime? reviewedAt;
 
   bool get hasPendingPhotoUploads => photos.any((p) => p.pendingUpload);
 
@@ -68,6 +77,8 @@ class Disturbance {
     String? proposedType,
     String? createdBy,
     String? obhodId,
+    String? reviewedBy,
+    DateTime? reviewedAt,
   }) {
     return Disturbance(
       id: id,
@@ -87,6 +98,8 @@ class Disturbance {
       proposedType: proposedType ?? this.proposedType,
       createdBy: createdBy ?? this.createdBy,
       obhodId: obhodId ?? this.obhodId,
+      reviewedBy: reviewedBy ?? this.reviewedBy,
+      reviewedAt: reviewedAt ?? this.reviewedAt,
     );
   }
 
@@ -108,6 +121,8 @@ class Disturbance {
         'proposedType': proposedType,
         'createdBy': createdBy,
         'obhodId': obhodId,
+        'reviewedBy': reviewedBy,
+        'reviewedAt': reviewedAt?.toIso8601String(),
       };
 
   factory Disturbance.fromJson(Map<String, dynamic> json) {
@@ -134,6 +149,12 @@ class Disturbance {
       proposedType: json['proposedType'] as String?,
       createdBy: json['createdBy'] as String?,
       obhodId: json['obhodId'] as String?,
+      // Absent on records cached before TB-26, and on any record the back
+      // office has not reviewed yet -- both read as null.
+      reviewedBy: json['reviewedBy'] as String?,
+      reviewedAt: json['reviewedAt'] != null
+          ? DateTime.parse(json['reviewedAt'] as String)
+          : null,
     );
   }
 

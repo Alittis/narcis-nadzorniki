@@ -70,6 +70,8 @@ class RemoteDisturbance {
     required this.createdAt,
     required this.createdBy,
     required this.obhodId,
+    required this.reviewedBy,
+    required this.reviewedAt,
     required this.photos,
   });
 
@@ -88,6 +90,9 @@ class RemoteDisturbance {
   final DateTime createdAt;
   final String? createdBy;
   final String? obhodId;
+  // Case review, web-owned and read-only here (TB-26); see Disturbance.
+  final String? reviewedBy;
+  final DateTime? reviewedAt;
   final List<DisturbancePhoto> photos;
 
   /// Convert into a local-store-shaped record. Photos are returned without a
@@ -111,6 +116,8 @@ class RemoteDisturbance {
       proposedType: proposedType,
       createdBy: createdBy,
       obhodId: obhodId,
+      reviewedBy: reviewedBy,
+      reviewedAt: reviewedAt,
     );
   }
 
@@ -142,6 +149,12 @@ class RemoteDisturbance {
       // so a record with no walk link arrives without an `obhodId` key at
       // all - read it as nullable and treat absent === null.
       obhodId: json['obhodId'] as String?,
+      // Same NULL-key elision as legalBasis/obhodId above: an unreviewed record
+      // arrives with neither key. Absent === not yet reviewed.
+      reviewedBy: json['reviewedBy'] as String?,
+      reviewedAt: json['reviewedAt'] != null
+          ? DateTime.parse(json['reviewedAt'] as String)
+          : null,
       photos: (json['photos'] as List<dynamic>? ?? const [])
           .map((e) => _readPhoto(e as Map<String, dynamic>))
           .toList(),

@@ -172,9 +172,36 @@ Marker userLocationMarker(LatLng point) {
   );
 }
 
-/// Age-based fill colour for a disturbance marker, keyed off the same
-/// [AgeBucket] thresholds the Motnje age filter uses (TB-6) so the map legend
-/// and the filter always agree. red = recent · orange = mid · blue = old.
+/// Fill colour for a disturbance marker, keyed off the case-review status
+/// (TB-27) — the encoding the map has used since v1.6.0, replacing age.
+///
+/// The hex values are deliberately IDENTICAL to the web backoffice's
+/// `STATUS_COLORS` (narcis-vibed `web/src/lib/trsca/format.ts`), gray fallback
+/// included: the two apps must not disagree about what *Zaključeno* looks like.
+/// Change them here only in lockstep with that file.
+///
+/// Total by construction — an unrecognised status (one added server-side after
+/// this build) draws gray rather than throwing or vanishing, matching the web's
+/// `STATUS_COLORS[status] ?? "#8e8e93"`.
+Color recordMarkerColorForStatus(String caseStatus) {
+  switch (caseStatus) {
+    case 'Odprto':
+      return const Color(0xFFD97706); // amber — needs attention
+    case 'V obravnavi':
+      return const Color(0xFF0A84FF); // blue — in progress
+    case 'Zaključeno':
+      return const Color(0xFF1B7A1B); // green — done
+    case 'Predano drugi službi':
+    default:
+      return const Color(0xFF8E8E93); // gray — handed off / unknown
+  }
+}
+
+/// Age-based fill colour, keyed off the same [AgeBucket] thresholds the Motnje
+/// age filter uses (TB-6). Since TB-27 this no longer colours the map — it is
+/// the swatch source for the sheet's **Starost** rows, which is what keeps
+/// those swatches and [ageBucketOf] from drifting apart.
+/// red = recent · orange = mid · blue = old.
 Color recordMarkerColorForAge(DateTime observedAt) {
   switch (ageBucketOf(observedAt)) {
     case AgeBucket.recent:

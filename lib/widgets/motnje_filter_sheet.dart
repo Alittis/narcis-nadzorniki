@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:narcis_nadzorniki/data/disturbance_filter.dart';
 import 'package:narcis_nadzorniki/data/disturbance_group_colors.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
+import 'package:narcis_nadzorniki/widgets/basemap.dart';
 
 String _authorLabel(String key, String? me) {
   final local = key.contains('@') ? key.split('@').first : key;
@@ -65,6 +66,7 @@ class _MotnjeFilterSheet extends StatefulWidget {
 class _MotnjeFilterSheetState extends State<_MotnjeFilterSheet> {
   late bool _show;
   late Set<AgeBucket> _buckets;
+  late Set<String> _statuses;
   late Set<String> _authors; // 0 or 1 element (single-select UI)
   late Set<String> _groups; // explicit selected group codes (subset of present)
   late final List<String> _authorKeys;
@@ -78,6 +80,7 @@ class _MotnjeFilterSheetState extends State<_MotnjeFilterSheet> {
     super.initState();
     _show = widget.showMotnje;
     _buckets = {...widget.initial.ageBuckets};
+    _statuses = {...widget.initial.statuses};
     _authors = {...widget.initial.authors};
     _authorKeys = authorsIn(widget.records, widget.currentUserEmail);
     _presentGroups = groupsIn(widget.records);
@@ -126,6 +129,7 @@ class _MotnjeFilterSheetState extends State<_MotnjeFilterSheet> {
 
   MotnjeFilter get _current => MotnjeFilter(
         ageBuckets: _buckets,
+        statuses: _statuses,
         authors: _authors,
         groups: _groupsForFilter,
         from: _dateActive ? _dayAt(_days.start.round()) : null,
@@ -137,6 +141,7 @@ class _MotnjeFilterSheetState extends State<_MotnjeFilterSheet> {
   void _reset() {
     setState(() {
       _buckets = {...allAgeBuckets};
+      _statuses = {...allCaseStatuses};
       _authors = {};
       _groups = {for (final g in _presentGroups) g.$1};
       _days = RangeValues(0, _dayCount.toDouble());
@@ -146,6 +151,11 @@ class _MotnjeFilterSheetState extends State<_MotnjeFilterSheet> {
 
   void _toggleBucket(AgeBucket b, bool on) {
     setState(() => on ? _buckets.add(b) : _buckets.remove(b));
+    _emit();
+  }
+
+  void _toggleStatus(String status, bool on) {
+    setState(() => on ? _statuses.add(status) : _statuses.remove(status));
     _emit();
   }
 
@@ -171,6 +181,7 @@ class _MotnjeFilterSheetState extends State<_MotnjeFilterSheet> {
   List<int> _dayCounts() {
     final f = MotnjeFilter(
       ageBuckets: _buckets,
+      statuses: _statuses,
       authors: _authors,
       groups: _groupsForFilter,
     );
@@ -247,6 +258,13 @@ class _MotnjeFilterSheetState extends State<_MotnjeFilterSheet> {
                 _bucketRow(AgeBucket.recent, Colors.red, 'Zadnji mesec'),
                 _bucketRow(AgeBucket.mid, Colors.orange, 'Zadnje leto'),
                 _bucketRow(AgeBucket.old, Colors.blue, 'Starejše'),
+                const Divider(height: 8),
+                // Doubles as the map legend (TB-27): these swatches are the only
+                // place the warden can learn what a dot's colour means, so the
+                // section is NOT hidden when the records happen to share one
+                // status — unlike Avtor/Kategorija, which are choice lists.
+                _sectionLabel('Status obravnave'),
+                for (final status in allCaseStatuses) _statusRow(status),
                 if (_authorKeys.length > 1) ...[
                   const Divider(height: 8),
                   _sectionLabel('Avtor'),
@@ -329,6 +347,26 @@ class _MotnjeFilterSheetState extends State<_MotnjeFilterSheet> {
         decoration: BoxDecoration(shape: BoxShape.circle, color: color),
       ),
       title: Text(label),
+    );
+  }
+
+  Widget _statusRow(String status) {
+    return CheckboxListTile(
+      dense: true,
+      controlAffinity: ListTileControlAffinity.trailing,
+      value: _statuses.contains(status),
+      onChanged: (v) => _toggleStatus(status, v ?? false),
+      // Swatch straight from the map's own colour function, so the legend
+      // cannot drift from what the dots actually draw.
+      secondary: Container(
+        width: 16,
+        height: 16,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: recordMarkerColorForStatus(status),
+        ),
+      ),
+      title: Text(status),
     );
   }
 

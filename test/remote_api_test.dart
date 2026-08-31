@@ -372,6 +372,105 @@ void main() {
       expect(fmt.format(parsed.toLocal()), fmt.format(entered));
     });
   });
+
+  group('case review fields (TB-26)', () {
+    Future<RemoteDisturbance> fetchOne(Map<String, dynamic> extra) async {
+      final api = _api((_) async => http.Response.bytes(
+            utf8.encode(jsonEncode({
+              'records': [
+                {
+                  'id': 'rec-1',
+                  'latitude': 45.79,
+                  'longitude': 14.36,
+                  'locationAccuracy': 'Natančna',
+                  'observedAt': '2026-08-20T09:00:00.000Z',
+                  'createdAt': '2026-08-20T09:01:00.000Z',
+                  'description': 'd',
+                  'actionTaken': 'Brez ukrepanja',
+                  'caseStatus': 'Zaključeno',
+                  'types': const [],
+                  'observers': const [],
+                  'photos': const [],
+                  ...extra,
+                },
+              ],
+            })),
+            200,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          ));
+      final result = await api.fetchRecords(_creds);
+      return result.single;
+    }
+
+    test('reviewedBy / reviewedAt parse, and reviewedAt is a UTC instant',
+        () async {
+      final r = await fetchOne({
+        'reviewedBy': 'referent@gov.si',
+        'reviewedAt': '2026-08-26T14:30:00.000Z',
+      });
+      expect(r.reviewedBy, 'referent@gov.si');
+      expect(r.reviewedAt!.isUtc, isTrue);
+      expect(r.reviewedAt, DateTime.utc(2026, 8, 26, 14, 30));
+      // and survives the hop into the local-store shape the UI reads
+      expect(r.toLocal().reviewedBy, 'referent@gov.si');
+      expect(r.toLocal().reviewedAt, DateTime.utc(2026, 8, 26, 14, 30));
+    });
+
+    test('an unreviewed record omits both keys entirely -> null', () async {
+      // APEX_JSON elides NULL-valued keys, so these arrive absent, not null.
+      final r = await fetchOne(const {});
+      expect(r.reviewedBy, isNull);
+      expect(r.reviewedAt, isNull);
+      expect(r.toLocal().reviewedBy, isNull);
+      expect(r.toLocal().reviewedAt, isNull);
+    });
+
+    test('the review fields NEVER go back on the wire in a write', () async {
+      // The web backoffice is their sole writer (narcis-vibed NV-220). If they
+      // ever appear in _payload, this app could clobber a reviewer's decision.
+      late http.Request captured;
+      final api = _api((req) async {
+        captured = req;
+        return http.Response('{"ok":true}', req.method == 'POST' ? 201 : 200);
+      });
+      final reviewed = _sample().copyWith(
+        caseStatus: 'Zaključeno',
+        reviewedBy: 'referent@gov.si',
+        reviewedAt: DateTime.utc(2026, 8, 26, 14, 30),
+      );
+      expect(reviewed.reviewedBy, isNotNull); // guard: the fixture is reviewed
+
+      await api.createRecord(reviewed, _creds);
+      final post = jsonDecode(captured.body) as Map<String, dynamic>;
+      expect(post.containsKey('reviewedBy'), isFalse);
+      expect(post.containsKey('reviewedAt'), isFalse);
+
+      await api.updateRecord(reviewed, _creds);
+      final put = jsonDecode(captured.body) as Map<String, dynamic>;
+      expect(put.containsKey('reviewedBy'), isFalse);
+      expect(put.containsKey('reviewedAt'), isFalse);
+    });
+
+    test('local-store JSON round-trips both fields', () {
+      final before = _sample().copyWith(
+        reviewedBy: 'referent@gov.si',
+        reviewedAt: DateTime.utc(2026, 8, 26, 14, 30),
+      );
+      final after = Disturbance.fromJson(
+          jsonDecode(jsonEncode(before.toJson())) as Map<String, dynamic>);
+      expect(after.reviewedBy, 'referent@gov.si');
+      expect(after.reviewedAt, DateTime.utc(2026, 8, 26, 14, 30));
+    });
+
+    test('a record cached before TB-26 rehydrates with nulls', () {
+      final legacy = _sample().toJson()
+        ..remove('reviewedBy')
+        ..remove('reviewedAt');
+      final after = Disturbance.fromJson(legacy);
+      expect(after.reviewedBy, isNull);
+      expect(after.reviewedAt, isNull);
+    });
+  });
 }
 
 /// Local stand-in for dart:io's SocketException so we don't depend on

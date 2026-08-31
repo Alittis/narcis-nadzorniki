@@ -94,6 +94,8 @@ void main() {
 
     // Two distinct authors → the Avtor section renders (me + ana).
     expect(find.text('Avtor'), findsOneWidget);
+    await tester.ensureVisible(find.text('ana'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('ana'));
     await tester.pump();
 
@@ -150,6 +152,8 @@ void main() {
     await _open(tester, records: recs, onChanged: emitted.add);
 
     expect(find.text('Kategorija'), findsOneWidget);
+    await tester.ensureVisible(find.text('Kategorija'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Kategorija')); // expand the section
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Vožnja')); // may sit below the fold
@@ -176,5 +180,46 @@ void main() {
     await tester.pump();
 
     expect(shown, isFalse);
+  });
+
+  testWidgets('the Status section renders the map legend and narrows on tap',
+      (tester) async {
+    final emitted = <MotnjeFilter>[];
+    await _open(tester, records: sampleRecords(), onChanged: emitted.add);
+
+    // TB-27: this section is the only key the warden has to the dot colours, so
+    // all four states render even though every sample record is 'Odprto'.
+    expect(find.text('Status obravnave'), findsOneWidget);
+    for (final status in allCaseStatuses) {
+      expect(find.text(status), findsOneWidget, reason: status);
+    }
+
+    await tester.ensureVisible(find.text('Zaključeno'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Zaključeno'));
+    await tester.pump();
+
+    expect(emitted.last.statuses, isNot(contains('Zaključeno')));
+    expect(emitted.last.statuses, contains('Odprto'));
+    expect(emitted.last.isActive, isTrue);
+  });
+
+  testWidgets('Ponastavi restores every status', (tester) async {
+    final emitted = <MotnjeFilter>[];
+    await _open(tester, records: sampleRecords(), onChanged: emitted.add);
+
+    await tester.ensureVisible(find.text('Odprto'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Odprto'));
+    await tester.pump();
+    expect(emitted.last.isActive, isTrue);
+
+    await tester.ensureVisible(find.text('Ponastavi'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ponastavi'));
+    await tester.pump();
+
+    expect(emitted.last.statuses, allCaseStatuses);
+    expect(emitted.last.isActive, isFalse);
   });
 }

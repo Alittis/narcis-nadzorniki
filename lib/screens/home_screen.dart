@@ -654,7 +654,11 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_showMotnje) {
       // Sort by observedAt ascending so the youngest records end up last in
       // the list and render on top — flutter_map draws markers in list order.
-      // Color encodes age (red ≤31d, orange ≤365d, blue older); shape encodes
+      // Deliberately unchanged by TB-27: a stacking rule worth keeping whatever
+      // the fill encodes, and leaving it alone means the recolour cannot shift
+      // the draw order.
+      // Color encodes status obravnave (TB-27, sharing the web's palette — the
+      // filter sheet's Status swatches are its legend); shape encodes
       // authorship (own = filled disc, teammate = ring). White halo keeps
       // both legible against any basemap.
       final now = DateTime.now();
@@ -679,7 +683,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
               },
               child: RecordMarker(
-                color: recordMarkerColorForAge(record.observedAt),
+                color: recordMarkerColorForStatus(record.caseStatus),
                 isMine: state.isAuthoredByCurrentUser(record),
               ),
             ),

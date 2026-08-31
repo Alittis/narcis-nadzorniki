@@ -123,7 +123,8 @@ BEGIN
   FOR rec IN (
     SELECT motnja_id, geo_sirina, geo_dolzina, natancnost_lok,
            cas_opazovanja, opis, ukrepanje, zakonska_podlaga, status_obravnave,
-           predlog_tipa, ustvarjen, ustvarjen_od, obhod_id
+           predlog_tipa, ustvarjen, ustvarjen_od, obhod_id,
+           obravnaval, obravnavano
       FROM tb_motnje
      WHERE org_id = l_ctx.org_id
      ORDER BY cas_opazovanja DESC, ustvarjen DESC
@@ -146,6 +147,18 @@ BEGIN
     APEX_JSON.write('caseStatus',   rec.status_obravnave);
     APEX_JSON.write('proposedType', rec.predlog_tipa);
     APEX_JSON.write('obhodId',      rec.obhod_id);
+
+    -- Case review (TB-26 half 1): read-only here. The web backoffice is the only
+    -- writer of these columns (narcis-vibed NV-220); see the TB_MOTNJE header note
+    -- in disturbance_schema.sql. OPOMBA_URADNA is deliberately NOT selected --
+    -- whether the warden sees the reviewer's note is an open product decision
+    -- (TB-26 half 2), so it must not cross the wire until that is taken.
+    -- OBRAVNAVANO is TZ-naive holding UTC (same convention as USTVARJEN post-TB-14),
+    -- so it takes the identical serializer as createdAt above.
+    APEX_JSON.write('reviewedBy',   rec.obravnaval);
+    APEX_JSON.write('reviewedAt',
+      TO_CHAR(SYS_EXTRACT_UTC(CAST(rec.obravnavano AS TIMESTAMP WITH TIME ZONE)),
+              'YYYY-MM-DD"T"HH24:MI:SS.FF3"Z"'));
 
     APEX_JSON.open_array('types');
     FOR t IN (
