@@ -57,6 +57,7 @@ BODY=$(mktemp)
 trap 'rm -f "$BODY"' EXIT
 
 printf '\nGET %s\n\n' "$BASE"
+CREDS_KEEP="$CREDS_B64"
 CODE=$(curl -s -o "$BODY" -w '%{http_code}' -H "X-Narcis-Auth: Basic $CREDS_B64" "$BASE")
 unset PASSWORD CREDS_B64
 
@@ -124,16 +125,62 @@ else:
     if bad_ts == 0:
         ok('every reviewedAt is a well-formed Z-tagged UTC instant')
 
-print()
-print('  \033[1mEYEBALL THIS, it is the one thing no script can settle:\033[0m')
-print('  open the same record in the web backoffice and compare "shows on phone"')
-print('  against the obravnavano time it displays. They must be the SAME')
-print('  wall-clock. A 1 h or 2 h gap means OBRAVNAVANO is not stored UTC after')
-print('  all and the serializer double-shifts — roll back and re-open TB-26.')
-
 sys.exit(1 if fails else 0)
 PY
 PY_STATUS=$?
+
+#-------------------------------------------------------------------------------
+# 5. The timezone proof -- TB-14's own diagnostic, reused.
+#
+# Comparing reviewedAt against the backoffice compares two RENDERINGS: if both
+# apply the same wrong conversion, it looks right. This compares a SERVER-stamped
+# instant against a CLIENT-supplied one on the same row, which is ground truth.
+#
+# TB_OBHODI.USTVARJEN is stamped SYS_EXTRACT_UTC(SYSTIMESTAMP) and read back
+# through the IDENTICAL serializer as reviewedAt; endedAt is sent by the phone as
+# true UTC. So createdAt - endedAt must be ~0 (just the POST delay). TB-14
+# diagnosed the original bug as exactly +2.00 h here, and verified the fix at 0.
+#
+# OBRAVNAVANO is stamped and read the same way (narcis-vibed's DDL says so
+# outright), so a 0 here means reviewedAt is honest UTC as well.
+#-------------------------------------------------------------------------------
+printf '\n  ---- timezone proof (TB-14 method, walks endpoint) ----\n'
+WBODY=$(mktemp)
+trap 'rm -f "$BODY" "$WBODY"' EXIT
+WALKS_URL="${BASE%disturbances/}walks/"
+WCODE=$(curl -s -o "$WBODY" -w '%{http_code}' -H "X-Narcis-Auth: Basic $CREDS_KEEP" "$WALKS_URL")
+unset CREDS_KEEP
+
+if [ "$WCODE" != "200" ]; then
+  bad "walks GET returned HTTP $WCODE - could not run the timezone proof"
+  TZ_STATUS=1
+else
+  python3 - "$WBODY" <<'PY2'
+import json, sys, datetime
+doc = json.load(open(sys.argv[1], encoding='utf-8'))
+walks = doc['walks'] if isinstance(doc, dict) else doc
+rows = [w for w in walks if w.get('endedAt') and w.get('createdAt')][:10]
+if not rows:
+    print('  \033[33mNOTE\033[0m  no completed walks to measure against')
+    sys.exit(0)
+def p(t):
+    return datetime.datetime.fromisoformat(t.replace('Z', '+00:00'))
+deltas = [(p(w['createdAt']) - p(w['endedAt'])).total_seconds() for w in rows]
+worst = max(abs(d) for d in deltas)
+print('        %d recent walks, createdAt - endedAt:' % len(rows))
+print('        min %+.1fs   max %+.1fs' % (min(deltas), max(deltas)))
+if worst < 120:
+    print('  \033[32mPASS\033[0m  server-stamped instants are honest UTC')
+    print('        (a timezone shift would show here as ~3600s or ~7200s).')
+    print('        reviewedAt rides the same stamp+serializer path, so it is honest too.')
+    sys.exit(0)
+print('  \033[31mFAIL\033[0m  %.0fs offset - that is ~%.1f h, a timezone shift.' % (worst, worst / 3600))
+print('        reviewedAt is therefore ALSO shifted. Roll back and re-open TB-26.')
+sys.exit(1)
+PY2
+  TZ_STATUS=$?
+fi
+if [ "$TZ_STATUS" -eq 0 ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); fi
 
 printf '\n%d passed, %d failed (plus the python checks above: exit %d)\n' "$PASS" "$FAIL" "$PY_STATUS"
 [ "$FAIL" -eq 0 ] && [ "$PY_STATUS" -eq 0 ] && exit 0
