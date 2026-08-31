@@ -39,9 +39,7 @@ class WalksListScreen extends StatelessWidget {
                       : Icons.directions_walk,
                   color: walk.pendingSync ? Colors.orange : Colors.green,
                 ),
-                title: Text(walk.name?.isNotEmpty == true
-                    ? walk.name!
-                    : dateFormat.format(walk.startedAt.toLocal())),
+                title: Text(walkLabel(walk, dateFormat)),
                 subtitle: Text(_subtitle(walk, dateFormat)),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {

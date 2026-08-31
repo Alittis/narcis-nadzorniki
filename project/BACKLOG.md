@@ -399,7 +399,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-17 · Show the obhod (patrol) link in the records list
-`✨ Enhancement` · `P3` (quick win) · `Todo` · Reporter: Matjaž · Updated: 2026-06-22
+`✨ Enhancement` · `P3` (quick win) · `Doing` (built + tested, pending a release) · Reporter: Matjaž · Updated: 2026-08-31
 - **Problem / want:** In *Seznam zapisov* (the user's own disturbance list), also show which **obhod** a
   record belongs to, when the disturbance was captured during a patrol.
 - **Context:** [`record_list_screen.dart`](../lib/screens/record_list_screen.dart) renders each record as a
@@ -410,6 +410,23 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Discussion:** Decide the label when `walk.name` is null (common — walks are often unnamed): fall back to
   the walk's start date/time or a generic "Del obhoda". Optionally make the label tappable →
   `WalkDetailScreen` (nice-to-have). If it shows the walk date, use **local** time (TB-13).
+- **Decision (maintainer, 2026-08-31):** walk **name with a date fallback**, and **tappable**.
+- **Done (2026-08-31, in source; release pending):** `ObhodLink`
+  ([`record_list_screen.dart`](../lib/screens/record_list_screen.dart)) as the row's **second** subtitle
+  line (`isThreeLine`), under the date + status line TB-30 built. Walking icon, the label in the primary
+  colour and underlined, tapping it pushes `WalkDetailScreen`.
+- **The fallback logic already existed, so it was extracted rather than copied.** Seznam obhodov had
+  `walk.name?.isNotEmpty == true ? name : startedAt` inline; that is now `walkLabel(walk, fmt)` in
+  [`walk.dart`](../lib/models/walk.dart) and **both** screens call it, so they cannot drift into naming
+  the same walk differently. Local time, per TB-13.
+- **The link can be set while the walk is unresolvable, and that is a real case, not defensive padding.**
+  A disturbance logged during an active walk carries `obhodId` before that walk has ever reached the
+  server, and a fresh install pulls records and walks independently. When the lookup misses, the row
+  shows a muted, **non-tappable** *"Del obhoda"* — the tap would otherwise dead-end on
+  *"Obhod ni najden."*.
+- **Tests:** in `test/record_list_status_test.dart` — named walk, unnamed → local-time fallback, empty
+  name treated as unnamed, unresolvable → non-tappable *Del obhoda*, and a real **navigation** assertion
+  (route pushed + `WalkDetailScreen` on screen) rather than merely "an InkWell exists". Suite **125/125**.
 - **Shipped:** —
 
 ### TB-18 · Filter map entries by year / reporter / category

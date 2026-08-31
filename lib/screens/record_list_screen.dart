@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:narcis_nadzorniki/models/walk.dart';
 import 'package:narcis_nadzorniki/screens/detail_screen.dart';
+import 'package:narcis_nadzorniki/screens/walk_detail_screen.dart';
 import 'package:narcis_nadzorniki/state/app_state.dart';
 import 'package:narcis_nadzorniki/widgets/basemap.dart';
 import 'package:provider/provider.dart';
@@ -35,15 +37,31 @@ class RecordListScreen extends StatelessWidget {
               final typePreview = record.types.isEmpty
                   ? 'Brez tipa'
                   : record.types.map((t) => t.typeName).join(', ');
+              // TB-17: the walk this record was captured during, if any. The
+              // link can be set while the walk itself is still local-only or
+              // simply not pulled yet, so resolution is allowed to fail — see
+              // ObhodLink.
+              final linkedWalk = state.walks
+                  .where((w) => w.id == record.obhodId)
+                  .firstOrNull;
               return ListTile(
+                isThreeLine: record.obhodId != null,
                 leading: Icon(
                   record.pendingSync ? Icons.sync_problem : Icons.check_circle,
                   color: record.pendingSync ? Colors.orange : Colors.green,
                 ),
                 title: Text(typePreview),
-                subtitle: RecordStatusLine(
-                  date: dateFormat.format(record.observedAt.toLocal()),
-                  caseStatus: record.caseStatus,
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    RecordStatusLine(
+                      date: dateFormat.format(record.observedAt.toLocal()),
+                      caseStatus: record.caseStatus,
+                    ),
+                    if (record.obhodId != null)
+                      ObhodLink(walk: linkedWalk, dateFormat: dateFormat),
+                  ],
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
@@ -121,6 +139,66 @@ class RecordStatusLine extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+/// The obhod a record was captured during (TB-17), as the row's second subtitle
+/// line. Tappable through to the walk.
+///
+/// [walk] is null when `obhodId` is set but the walk is not in `AppState.walks`
+/// — a real case, not defensive padding: a disturbance logged during an active
+/// walk carries the link before that walk has ever reached the server, and a
+/// fresh install pulls records and walks independently. There is nothing to
+/// navigate to then, so the row says it belongs to a patrol and stops there
+/// rather than offering a tap that would dead-end.
+class ObhodLink extends StatelessWidget {
+  const ObhodLink({super.key, required this.walk, required this.dateFormat});
+
+  final Walk? walk;
+  final DateFormat dateFormat;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final resolved = walk;
+
+    final content = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.directions_walk, size: 14, color: colors.onSurfaceVariant),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            resolved == null ? 'Del obhoda' : walkLabel(resolved, dateFormat),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: resolved == null ? colors.onSurfaceVariant : colors.primary,
+              decoration:
+                  resolved == null ? null : TextDecoration.underline,
+              decorationColor: colors.primary,
+            ),
+          ),
+        ),
+      ],
+    );
+
+    if (resolved == null) {
+      return Padding(padding: const EdgeInsets.only(top: 2), child: content);
+    }
+    return InkWell(
+      // Opens the walk instead of the record. The padding is what keeps this a
+      // real tap target inside a row whose own onTap opens the disturbance.
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => WalkDetailScreen(walkId: resolved.id),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: content,
+      ),
     );
   }
 }

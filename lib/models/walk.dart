@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 
 /// One GPS sample taken during a walk-around. `seq` is a 0-based monotonic
@@ -143,3 +144,12 @@ class Walk {
     );
   }
 }
+
+/// Human label for a walk: its name, or its **local** start time when unnamed —
+/// which walks usually are. Shared by Seznam obhodov and the obhod link in
+/// Seznam zapisov (TB-17) so the two screens cannot drift into naming the same
+/// walk differently.
+String walkLabel(Walk walk, DateFormat fmt) =>
+    walk.name?.isNotEmpty == true
+        ? walk.name!
+        : fmt.format(walk.startedAt.toLocal());

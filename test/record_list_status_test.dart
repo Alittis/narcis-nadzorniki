@@ -4,9 +4,14 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 import 'package:narcis_nadzorniki/data/disturbance_filter.dart';
+import 'package:narcis_nadzorniki/models/walk.dart';
 import 'package:narcis_nadzorniki/screens/record_list_screen.dart';
+import 'package:narcis_nadzorniki/screens/walk_detail_screen.dart';
+import 'package:narcis_nadzorniki/state/app_state.dart';
 import 'package:narcis_nadzorniki/widgets/basemap.dart';
+import 'package:provider/provider.dart';
 
 Future<void> _pump(
   WidgetTester tester,
@@ -94,4 +99,107 @@ void main() {
       contains(const Color(0xFF8E8E93)),
     );
   });
+
+  // ---- TB-17: the obhod link ---------------------------------------------
+
+  Walk walk({String? name}) => Walk(
+        id: 'walk-1',
+        startedAt: DateTime.utc(2026, 8, 20, 6, 30),
+        endedAt: DateTime.utc(2026, 8, 20, 9, 0),
+        pendingSync: false,
+        name: name,
+      );
+
+  Future<void> pumpLink(WidgetTester tester, Walk? w) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ObhodLink(walk: w, dateFormat: DateFormat('dd.MM.yyyy HH:mm')),
+        ),
+      ),
+    );
+    await tester.pump();
+  }
+
+  testWidgets('a named walk shows its name', (tester) async {
+    await pumpLink(tester, walk(name: 'Jutranji obhod'));
+    expect(find.text('Jutranji obhod'), findsOneWidget);
+  });
+
+  testWidgets('an unnamed walk falls back to its LOCAL start time',
+      (tester) async {
+    await pumpLink(tester, walk());
+    final expected = DateFormat('dd.MM.yyyy HH:mm')
+        .format(DateTime.utc(2026, 8, 20, 6, 30).toLocal());
+    expect(find.text(expected), findsOneWidget);
+  });
+
+  testWidgets('an empty name is treated as no name', (tester) async {
+    await pumpLink(tester, walk(name: ''));
+    expect(find.text(''), findsNothing);
+    final expected = DateFormat('dd.MM.yyyy HH:mm')
+        .format(DateTime.utc(2026, 8, 20, 6, 30).toLocal());
+    expect(find.text(expected), findsOneWidget);
+  });
+
+  testWidgets('an unresolvable walk says so and is NOT tappable',
+      (tester) async {
+    // obhodId set but the walk is not in AppState.walks yet — a disturbance
+    // logged during a walk carries the link before that walk reaches the
+    // server. Offering a tap here would dead-end.
+    await pumpLink(tester, null);
+    expect(find.text('Del obhoda'), findsOneWidget);
+    expect(find.byType(InkWell), findsNothing);
+  });
+
+  testWidgets('tapping a resolved walk navigates to that walk', (tester) async {
+    // Asserting the route push, not just that an InkWell exists — "tappable"
+    // should mean it goes somewhere.
+    final pushed = <Route<dynamic>>[];
+    final observer = _RecordingObserver(pushed);
+    await tester.pumpWidget(
+      ChangeNotifierProvider<AppState>(
+        create: (_) => AppState(),
+        child: MaterialApp(
+          navigatorObservers: [observer],
+          home: Scaffold(
+            body: ObhodLink(
+              walk: walk(name: 'Jutranji obhod'),
+              dateFormat: DateFormat('dd.MM.yyyy HH:mm'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    pushed.clear(); // drop the initial home route
+
+    await tester.tap(find.text('Jutranji obhod'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1)); // run the route transition
+
+    expect(pushed, hasLength(1));
+    expect(find.byType(WalkDetailScreen), findsOneWidget);
+    // The destination's lazy point-fetch runs post-frame and has no server in
+    // a widget test; drain whatever it threw so it cannot fail this test, which
+    // is about navigation.
+    tester.takeException();
+  });
+
+  testWidgets('walkLabel is the single source both screens use', (tester) async {
+    final fmt = DateFormat('dd.MM.yyyy HH:mm');
+    expect(walkLabel(walk(name: 'Popoldanski'), fmt), 'Popoldanski');
+    expect(walkLabel(walk(name: ''), fmt),
+        fmt.format(DateTime.utc(2026, 8, 20, 6, 30).toLocal()));
+    expect(walkLabel(walk(), fmt),
+        fmt.format(DateTime.utc(2026, 8, 20, 6, 30).toLocal()));
+  });
+}
+
+class _RecordingObserver extends NavigatorObserver {
+  _RecordingObserver(this.pushed);
+  final List<Route<dynamic>> pushed;
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) =>
+      pushed.add(route);
 }
