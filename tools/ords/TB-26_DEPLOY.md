@@ -41,29 +41,27 @@ DELETE / photo handlers are byte-identical to what is already live.
 ## Verify (read-only, ~1 minute)
 
 ```bash
-curl -s -H "X-Narcis-Auth: Bearer $TOKEN" \
-  https://narcis.gov.si/ords/narcis/disturbances/ \
-  | python3 -m json.tool | head -40
+bash tools/ords/verify_tb26.sh
 ```
 
-Then check three things:
+Prompts for the NarcIS password with hidden input (nothing reaches shell history), issues a
+**single GET**, and writes nothing anywhere. It checks:
 
-1. **A reviewed record carries both keys.** Any record the back office has closed shows
-   `"reviewedBy": "<email>"` and `"reviewedAt": "…Z"`.
-2. **`reviewedAt` is not shifted.** Compare against the same record in the web
-   backoffice: the two must show the **same wall-clock**. A **+1 h / +2 h** discrepancy
-   means `OBRAVNAVANO` is not being stored UTC after all and the serializer double-shifts
-   — roll back (step below) and re-open TB-26.
-3. **`opombaUradna` is absent.** It must appear nowhere in the response. Its presence
-   would mean the wrong column list shipped:
+1. **HTTP 200 and the pre-existing payload intact** — no regression in the keys that were
+   already there.
+2. **Reviewed records carry both keys** — `reviewedBy` and a Z-tagged `reviewedAt`.
+3. **`opombaUradna` is absent** from the raw bytes. Its presence would mean the wrong column
+   list shipped.
 
-   ```bash
-   curl -s -H "X-Narcis-Auth: Bearer $TOKEN" \
-     https://narcis.gov.si/ords/narcis/disturbances/ | grep -c opomba   # expect 0
-   ```
+An **unreviewed** record simply omits both keys (APEX_JSON elides NULLs) — correct, not a
+failure. If *no* record carries a stamp the script says so rather than passing silently: that
+is fine if the back office hasn't reviewed anything in your org, and a real failure if you
+know it has.
 
-An **unreviewed** record simply omits both keys (APEX_JSON elides NULLs) — that is
-correct, not a failure.
+**The one thing the script cannot settle, and you must eyeball.** It prints each review time
+as both the UTC on the wire and the wall-clock the phone will show. Open the same record in
+the web backoffice: the wall-clocks must **match**. A **1 h / 2 h** gap means `OBRAVNAVANO`
+is not stored UTC after all and the serializer double-shifts — roll back and re-open TB-26.
 
 ## Rollback
 
