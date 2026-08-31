@@ -659,7 +659,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-26 · Show the back-office obravnava on the phone — a warden sees the verdict but not the reasoning
-`✨ Enhancement` · `P2` · **Half 1 `Doing`** (built into v1.6.0+15, pending ORDS deploy + Play upload/rollout) · **Half 2 `Blocked`** · Updated: 2026-08-31
+`✨ Enhancement` · `P2` · **Half 1 `Doing`** (ORDS deployed + verified on prod 2026-08-31; built into v1.6.0+15, pending Play upload/rollout) · **Half 2 `Blocked`** · Updated: 2026-08-31
 
 - **Problem.** Since narcis-vibed **NV-220** (live 2026-08-26) the web backoffice records a case
   review against `TB_MOTNJE`: `STATUS_OBRAVNAVE`, plus `OPOMBA_URADNA` (an official note),
@@ -724,12 +724,21 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   - **Deploy order is free.** Older app ignores the new keys; newer app reads them as null until the
     handler ships. Neither side is breaking.
 - **Built into v1.6.0+15** (2026-08-31, archived `~/Releases/terenska-beleznica-1.6.0+15.aab`, signed with the
-  upload key — signer SHA-256 matches `STATE.json`). **Two gates remain, in this order:**
-  1. **ORDS re-publish** ([`TB-26_DEPLOY.md`](../tools/ords/TB-26_DEPLOY.md)) — until it runs, the review
-     pills stay blank on the phone, because the handler does not yet send the fields. Not a crash: the
-     client reads both keys as optional, so the build is safe either way.
-  2. **Play upload + rollout** to the Closed testing track.
-- **Shipped:** — (built, not yet deployed or rolled out)
+  upload key — signer SHA-256 matches `STATE.json`).
+- **ORDS DEPLOYED + VERIFIED on prod, 2026-08-31** (maintainer-run via APEX SQL Workshop), checked
+  read-only with the new [`verify_tb26.sh`](../tools/ords/verify_tb26.sh): `GET` 200 over 74 records with
+  the pre-existing payload intact · one reviewed record returns `reviewedBy` + a Z-tagged `reviewedAt`
+  (`caaaf260…`, `2026-08-27T07:08:35.963Z`) · **`opomba` appears nowhere in the body**, so half 2 is
+  confirmed not leaking.
+- **The timezone is proved, not eyeballed — and that mattered.** Comparing `reviewedAt` against the web
+  backoffice would only have compared two *renderings*; had both applied the same wrong conversion it
+  would have read as correct. So the script re-runs **TB-14's own diagnostic** instead, comparing a
+  server-stamped instant against a client-supplied one on the same row: across the 10 most recent walks
+  `createdAt − endedAt` spans **−0.3 s … +1.0 s** (the POST delay), where a session-offset shift would
+  read ~3600 s / ~7200 s. `TB_OBHODI.USTVARJEN` and `OBRAVNAVANO` are both stamped
+  `SYS_EXTRACT_UTC(SYSTIMESTAMP)` and read through the identical serializer, so `reviewedAt` is honest UTC.
+- **One gate remains:** the **Play upload + rollout** to the Closed testing track.
+- **Shipped:** — (server live; client built, not yet rolled out)
 
 ### TB-27 · Colour the map dots by status obravnave, not age — restore parity with the web
 `✨ Enhancement` · `P2` · `Doing` (built into v1.6.0+15, pending Play upload/rollout) · Updated: 2026-08-31

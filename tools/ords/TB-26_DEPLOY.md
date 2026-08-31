@@ -63,6 +63,12 @@ as both the UTC on the wire and the wall-clock the phone will show. Open the sam
 the web backoffice: the wall-clocks must **match**. A **1 h / 2 h** gap means `OBRAVNAVANO`
 is not stored UTC after all and the serializer double-shifts — roll back and re-open TB-26.
 
+## Deployment record
+
+- **2026-08-31** — deployed to ARSO prod via APEX SQL Workshop (maintainer-run). Verified the same
+  day with `verify_tb26.sh`: all checks pass, and the timezone proof reads −0.3 s … +1.0 s across the
+  10 most recent walks (a shift would read ~3600 s / ~7200 s). `reviewedAt` confirmed honest UTC.
+
 ## Rollback
 
 `git revert` the commit and re-run the whole file. The handler is stateless and the
