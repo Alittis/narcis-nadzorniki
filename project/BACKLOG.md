@@ -399,7 +399,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-17 · Show the obhod (patrol) link in the records list
-`✨ Enhancement` · `P3` (quick win) · `Doing` (built into v1.7.0+16, pending Play upload/rollout) · Reporter: Matjaž · Updated: 2026-08-31
+`✨ Enhancement` · `P3` (quick win) · `Done` (shipped v1.7.0+16; rolled out on the Play Closed testing track 2026-08-31) · Reporter: Matjaž · Updated: 2026-08-31
 - **Problem / want:** In *Seznam zapisov* (the user's own disturbance list), also show which **obhod** a
   record belongs to, when the disturbance was captured during a patrol.
 - **Context:** [`record_list_screen.dart`](../lib/screens/record_list_screen.dart) renders each record as a
@@ -427,9 +427,8 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Tests:** in `test/record_list_status_test.dart` — named walk, unnamed → local-time fallback, empty
   name treated as unnamed, unresolvable → non-tappable *Del obhoda*, and a real **navigation** assertion
   (route pushed + `WalkDetailScreen` on screen) rather than merely "an InkWell exists". Suite **125/125**.
-- **Built into v1.7.0+16** (2026-08-31, archived `~/Releases/terenska-beleznica-1.7.0+16.aab`, signed with the
-  upload key). Awaiting the Play upload + rollout.
-- **Shipped:** —
+- **Shipped:** **v1.7.0+16**, archived `~/Releases/terenska-beleznica-1.7.0+16.aab` (signed with the upload
+  key); **rolled out on the Play Closed testing track 2026-08-31**.
 
 ### TB-18 · Filter map entries by year / reporter / category
 `✨ Enhancement` · `P2` · `Done` (shipped v1.5.0+14; rolled out on the Play Closed testing track 2026-06-24; delivered via TB-6's filter) · Reporters: Tomaž, Rudi · Updated: 2026-06-24
@@ -678,7 +677,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-29 · Retire age colouring end to end — the walk map, and the Starost filter with it
-`🔧 Chore` · `P2` · `Doing` (built into v1.7.0+16, pending Play upload/rollout) · Reporter: maintainer (on the v1.6.0+15 rollout) · Updated: 2026-08-31
+`🔧 Chore` · `P2` · `Done` (shipped v1.7.0+16; rolled out on the Play Closed testing track 2026-08-31) · Reporter: maintainer (on the v1.6.0+15 rollout) · Updated: 2026-08-31
 
 - **Problem, as reported on the rolled-out build:** the Motnje filter sheet showed **two colour legends at
   once** — Starost (red/orange/blue) and the new Status obravnave (amber/blue/green/gray) — with only one
@@ -709,12 +708,11 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   people asked for. Flagged before doing it; the maintainer's call was that Obdobje covers the need. If
   field feedback disagrees, the cheapest restoration is a Starost section that filters without pretending
   to be a legend.
-- **Built into v1.7.0+16** (2026-08-31, archived `~/Releases/terenska-beleznica-1.7.0+16.aab`, signed with the
-  upload key). Awaiting the Play upload + rollout.
-- **Shipped:** —
+- **Shipped:** **v1.7.0+16**, archived `~/Releases/terenska-beleznica-1.7.0+16.aab` (signed with the upload
+  key); **rolled out on the Play Closed testing track 2026-08-31**.
 
 ### TB-30 · Show the case status in Seznam zapisov
-`✨ Enhancement` · `P3` · `Doing` (built into v1.7.0+16, pending Play upload/rollout) · Reporter: maintainer · Updated: 2026-08-31
+`✨ Enhancement` · `P3` · `Done` (shipped v1.7.0+16; rolled out on the Play Closed testing track 2026-08-31) · Reporter: maintainer · Updated: 2026-08-31
 
 - **Want:** the record list should show each record's *status obravnave* after the observed date,
   in colour — today the subtitle is the date alone, so a warden must open every record to learn
@@ -739,12 +737,11 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   unmodifiable with no test seam, and adding a test-only seam to production state for one row of UI
   was the worse trade.
 - **Adjacent, still open:** TB-17 wants the *obhod* link on these same rows.
-- **Built into v1.7.0+16** (2026-08-31, archived `~/Releases/terenska-beleznica-1.7.0+16.aab`, signed with the
-  upload key). Awaiting the Play upload + rollout.
-- **Shipped:** —
+- **Shipped:** **v1.7.0+16**, archived `~/Releases/terenska-beleznica-1.7.0+16.aab` (signed with the upload
+  key); **rolled out on the Play Closed testing track 2026-08-31**.
 
 ### TB-26 · Show the back-office obravnava on the phone — a warden sees the verdict but not the reasoning
-`✨ Enhancement` · `P2` · **Half 1 `Done`** (ORDS live + verified, shipped v1.6.0+15, rolled out 2026-08-31; presentation defect carried by TB-29) · **Half 2 `Blocked`** · Updated: 2026-08-31
+`✨ Enhancement` · `P2` · **Half 1 `Done`** (ORDS live + verified, shipped v1.6.0+15, rolled out 2026-08-31; presentation defect fixed in TB-29, shipped v1.7.0+16 2026-08-31) · **Half 2 `Blocked`** · Updated: 2026-08-31
 
 - **Problem.** Since narcis-vibed **NV-220** (live 2026-08-26) the web backoffice records a case
   review against `TB_MOTNJE`: `STATUS_OBRAVNAVE`, plus `OPOMBA_URADNA` (an official note),
@@ -834,7 +831,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   and an unlabelled date is exactly that.
 
 ### TB-27 · Colour the map dots by status obravnave, not age — restore parity with the web
-`✨ Enhancement` · `P2` · `Done` (shipped v1.6.0+15; rolled out on the Play Closed testing track 2026-08-31, confirmed working on device; two follow-up defects carried by TB-29) · Updated: 2026-08-31
+`✨ Enhancement` · `P2` · `Done` (shipped v1.6.0+15; rolled out on the Play Closed testing track 2026-08-31, confirmed working on device; two follow-up defects fixed in TB-29, shipped v1.7.0+16 2026-08-31) · Updated: 2026-08-31
 
 - **Wanted (user, 2026-08-26):** match narcis-vibed **NV-221**, which moved the web's disturbance
   dots from age-colouring to **status obravnave** colouring.
