@@ -151,7 +151,11 @@ class _MapSection extends StatelessWidget {
                             width: 44,
                             height: 44,
                             child: RecordMarker(
-                              color: recordMarkerColorForAge(r.observedAt),
+                              // Same encoding as the home map (TB-27): fill is
+                              // status obravnave, shape is authorship. Two maps
+                              // in one app must not colour the same dot by two
+                              // different rules.
+                              color: recordMarkerColorForStatus(r.caseStatus),
                               isMine: state.isAuthoredByCurrentUser(r),
                             ),
                           ),

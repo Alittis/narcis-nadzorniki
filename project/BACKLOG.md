@@ -658,8 +658,42 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   ship until this is settled, since the whole point is naming someone.
 - **Shipped:** —
 
+### TB-29 · Retire age colouring end to end — the walk map, and the Starost filter with it
+`🔧 Chore` · `P2` · `Doing` (built + tested, pending a release) · Reporter: maintainer (on the v1.6.0+15 rollout) · Updated: 2026-08-31
+
+- **Problem, as reported on the rolled-out build:** the Motnje filter sheet showed **two colour legends at
+  once** — Starost (red/orange/blue) and the new Status obravnave (amber/blue/green/gray) — with only one
+  of them meaning anything on the map. Investigating that surfaced a second, worse defect: the
+  **walk-detail map had been left colouring by age**, so the same disturbance dot was encoded two
+  different ways depending on which screen you opened it from.
+- **Decision (maintainer, 2026-08-31): remove age colouring and the Starost filter entirely**, rather than
+  keeping the filter and de-colouring its swatches. The reasoning that decided it: **Obdobje already
+  filters the same axis, and better** — a day-granularity range over the records' real distribution, with
+  a histogram — so three fixed buckets were the weaker of two overlapping controls, kept only because they
+  used to double as the map legend. That justification died with TB-27.
+- **Done (2026-08-31, in source; release pending):**
+  - [`walk_detail_screen.dart`](../lib/screens/walk_detail_screen.dart) now uses
+    `recordMarkerColorForStatus`, so both maps agree.
+  - Removed: `AgeBucket`, `allAgeBuckets`, `ageBucketOf`, `MotnjeFilter.ageBuckets`,
+    `recordMarkerColorForAge`, the sheet's `_buckets`/`_bucketRow`/`_toggleBucket` and its whole **Starost**
+    section. `MotnjeFilter.matches` also lost its now-unused injectable `now:` clock, which existed only to
+    make `ageBucketOf` testable.
+  - **`_ObravnavaCard`** on the detail screen (see TB-26) — the same pass, since both defects were "TB-26/27
+    shipped, but the user cannot read it".
+  - Corrected two ARCHITECTURE claims this work falsified, one of which was **wrong when written**:
+    §10.3 said `recordMarkerColorForAge` was the Starost swatch source, but the sheet hardcoded
+    `Colors.red/orange/blue` and never called it; and the legacy-record note still credited the age filter
+    with decluttering the 703 migrated records.
+  - **Tests:** suite **114/114** (six age-specific tests deleted, three `_ObravnavaCard` tests added);
+    `flutter analyze` at the documented 10 pre-existing info lints.
+- **Discussion:** TB-6/TB-18 shipped Starost on Tomaž's and Rudi's request, so this removes something two
+  people asked for. Flagged before doing it; the maintainer's call was that Obdobje covers the need. If
+  field feedback disagrees, the cheapest restoration is a Starost section that filters without pretending
+  to be a legend.
+- **Shipped:** —
+
 ### TB-26 · Show the back-office obravnava on the phone — a warden sees the verdict but not the reasoning
-`✨ Enhancement` · `P2` · **Half 1 `Doing`** (ORDS deployed + verified on prod 2026-08-31; built into v1.6.0+15, pending Play upload/rollout) · **Half 2 `Blocked`** · Updated: 2026-08-31
+`✨ Enhancement` · `P2` · **Half 1 `Done`** (ORDS live + verified, shipped v1.6.0+15, rolled out 2026-08-31; presentation defect carried by TB-29) · **Half 2 `Blocked`** · Updated: 2026-08-31
 
 - **Problem.** Since narcis-vibed **NV-220** (live 2026-08-26) the web backoffice records a case
   review against `TB_MOTNJE`: `STATUS_OBRAVNAVE`, plus `OPOMBA_URADNA` (an official note),
@@ -737,11 +771,19 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   `createdAt − endedAt` spans **−0.3 s … +1.0 s** (the POST delay), where a session-offset shift would
   read ~3600 s / ~7200 s. `TB_OBHODI.USTVARJEN` and `OBRAVNAVANO` are both stamped
   `SYS_EXTRACT_UTC(SYSTIMESTAMP)` and read through the identical serializer, so `reviewedAt` is honest UTC.
-- **One gate remains:** the **Play upload + rollout** to the Closed testing track.
-- **Shipped:** — (server live; client built, not yet rolled out)
+- **Shipped:** ORDS live 2026-08-31; client in v1.6.0+15, **rolled out on the Play Closed testing track
+  2026-08-31**.
+- **⚠️ The v1.6.0+15 presentation was wrong, and a user said so immediately (fixed in TB-29).** The review
+  fields shipped as two **unlabelled pills** sitting among the action pills — a bare e-mail and a bare
+  date. The data was right and the warden still could not tell what they were, which is most of the
+  original problem restated. Replaced with an `_ObravnavaCard`: a titled block, every value labelled,
+  `caseStatus` moved in beside them with its TB-27 colour dot, and an explicit *"Zapis še ni bil
+  obravnavan."* when unreviewed. Lesson worth keeping: *the field reaching the screen is not the feature
+  landing* — half 1's whole point was that a verdict without context is the weaker half of a review loop,
+  and an unlabelled date is exactly that.
 
 ### TB-27 · Colour the map dots by status obravnave, not age — restore parity with the web
-`✨ Enhancement` · `P2` · `Doing` (built into v1.6.0+15, pending Play upload/rollout) · Updated: 2026-08-31
+`✨ Enhancement` · `P2` · `Done` (shipped v1.6.0+15; rolled out on the Play Closed testing track 2026-08-31, confirmed working on device; two follow-up defects carried by TB-29) · Updated: 2026-08-31
 
 - **Wanted (user, 2026-08-26):** match narcis-vibed **NV-221**, which moved the web's disturbance
   dots from age-colouring to **status obravnave** colouring.
@@ -808,9 +850,15 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   still says *"The field app (narcis-nadzorniki) colours disturbance dots by AGE, not status"*. That
   becomes false when this ships. Worth an NV item.
 - **Built into v1.6.0+15** (2026-08-31, archived `~/Releases/terenska-beleznica-1.6.0+15.aab`, signed with the
-  upload key). **Needs no server change** — unlike TB-26 it works the moment the build is installed, so its
-  only gate is the Play upload + rollout.
-- **Shipped:** — (built, not yet rolled out)
+  upload key). **Needs no server change** — unlike TB-26 it works the moment the build is installed.
+- **Shipped:** v1.6.0+15, **rolled out on the Play Closed testing track 2026-08-31**; confirmed working on
+  device — changing a record's status in the back office changes its dot colour on the phone.
+- **⚠️ Two defects this pass missed, both found on the rolled-out build and fixed in TB-29:**
+  1. **The walk-detail map was left colouring by age.** TB-27 was scoped as "one marker-colour expression"
+     and that was wrong — [`walk_detail_screen.dart`](../lib/screens/walk_detail_screen.dart) draws
+     disturbance dots too, so for one release the two maps encoded the *same dot* by different rules.
+  2. **Two colour legends at once.** Keeping Starost (red/orange/blue swatches) beside the new Status
+     swatches read as two competing legends. Resolved by removing Starost — see TB-29.
 
 ---
 

@@ -1,27 +1,5 @@
 import 'package:narcis_nadzorniki/models/disturbance.dart';
 
-/// How old a disturbance is, bucketed for the Motnje age filter (TB-6). The
-/// filter sheet's own colour swatches are the legend for these thresholds:
-/// [AgeBucket.recent] → red, [AgeBucket.mid] → orange, [AgeBucket.old] → blue.
-/// Since TB-27 the map marker colour encodes **status obravnave**, not age —
-/// these three colours now live only in the Starost filter rows.
-enum AgeBucket { recent, mid, old }
-
-const Set<AgeBucket> allAgeBuckets = {
-  AgeBucket.recent,
-  AgeBucket.mid,
-  AgeBucket.old,
-};
-
-/// ≤ 31 days → [AgeBucket.recent], ≤ 365 days → [AgeBucket.mid], older → old.
-/// [now] is injectable for deterministic tests; defaults to the wall clock.
-AgeBucket ageBucketOf(DateTime observedAt, {DateTime? now}) {
-  final days = (now ?? DateTime.now()).difference(observedAt).inDays;
-  if (days <= 31) return AgeBucket.recent;
-  if (days <= 365) return AgeBucket.mid;
-  return AgeBucket.old;
-}
-
 /// The four review states `TB_MOTNJE.STATUS_OBRAVNAVE` allows (DB CHECK
 /// `ck_tb_motnje_stat`, mirrored by the create form's dropdown). Insertion
 /// order is display order — open → in progress → closed → handed off — and
@@ -33,14 +11,18 @@ const Set<String> allCaseStatuses = {
   'Predano drugi službi',
 };
 
-/// Visibility filter for the home-map Motnje layer (TB-6). Five independent
-/// dimensions composed with AND — age bucket, case status (TB-27), author,
-/// category (TB-18) and an observed-date window. [MotnjeFilter.unfiltered]
-/// shows everything. Immutable: the picker sheet emits a fresh instance on
-/// every change.
+/// Visibility filter for the home-map Motnje layer (TB-6). Four independent
+/// dimensions composed with AND — case status (TB-27), author, category
+/// (TB-18) and an observed-date window. [MotnjeFilter.unfiltered] shows
+/// everything. Immutable: the picker sheet emits a fresh instance on every
+/// change.
+///
+/// The age-bucket dimension was removed in TB-29: it existed to mirror the
+/// map's age colouring, and once TB-27 made the dots encode status instead,
+/// three coarse buckets were strictly worse than the [from]/[to] window that
+/// already sits beside them.
 class MotnjeFilter {
   const MotnjeFilter({
-    this.ageBuckets = allAgeBuckets,
     this.statuses = allCaseStatuses,
     this.authors = const {},
     this.groups,
@@ -50,11 +32,8 @@ class MotnjeFilter {
 
   const MotnjeFilter.unfiltered() : this();
 
-  /// Age buckets to show. Empty shows none (unchecking all hides the layer).
-  final Set<AgeBucket> ageBuckets;
-
-  /// Case-review states to show (TB-27) — the dimension the marker colour now
-  /// encodes. Empty shows none, same rule as [ageBuckets].
+  /// Case-review states to show (TB-27) — the dimension the marker colour
+  /// encodes. Empty shows none (unchecking all hides the layer).
   final Set<String> statuses;
 
   /// Lower-cased author emails to show; empty means "any author".
@@ -75,7 +54,6 @@ class MotnjeFilter {
   /// True when any dimension is narrower than "show everything" — drives the
   /// Filter chip's active state.
   bool get isActive =>
-      ageBuckets.length < allAgeBuckets.length ||
       statuses.length < allCaseStatuses.length ||
       authors.isNotEmpty ||
       groups != null ||
@@ -87,12 +65,8 @@ class MotnjeFilter {
   /// caller is the author by definition).
   bool matches(
     Disturbance record, {
-    DateTime? now,
     String? currentUserEmail,
   }) {
-    if (!ageBuckets.contains(ageBucketOf(record.observedAt, now: now))) {
-      return false;
-    }
     // A status outside [allCaseStatuses] — one added server-side after this
     // build ships — is never hidden by this dimension. It still draws, in the
     // web's unknown-status gray; silently vanishing off the map would be a far

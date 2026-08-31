@@ -661,12 +661,11 @@ class _HomeScreenState extends State<HomeScreen> {
       // filter sheet's Status swatches are its legend); shape encodes
       // authorship (own = filled disc, teammate = ring). White halo keeps
       // both legible against any basemap.
-      final now = DateTime.now();
       final sorted = [...state.records]
         ..sort((a, b) => a.observedAt.compareTo(b.observedAt));
       for (final record in sorted) {
         if (!_motnjeFilter.matches(record,
-            now: now, currentUserEmail: state.currentUser)) {
+            currentUserEmail: state.currentUser)) {
           continue;
         }
         markers.add(

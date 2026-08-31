@@ -8,6 +8,7 @@ import 'package:narcis_nadzorniki/models/disturbance_photo.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
 import 'package:narcis_nadzorniki/screens/photo_viewer_screen.dart';
 import 'package:narcis_nadzorniki/state/app_state.dart';
+import 'package:narcis_nadzorniki/widgets/basemap.dart';
 import 'package:provider/provider.dart';
 
 class DetailScreen extends StatefulWidget {
@@ -123,8 +124,11 @@ class _DetailScreenState extends State<DetailScreen> {
                     _FooterRow(
                       actionTaken: live.actionTaken,
                       legalBasis: live.legalBasis,
-                      caseStatus: live.caseStatus,
                       observers: live.observers,
+                    ),
+                    const SizedBox(height: 14),
+                    _ObravnavaCard(
+                      caseStatus: live.caseStatus,
                       reviewedBy: live.reviewedBy,
                       reviewedAt: live.reviewedAt,
                     ),
@@ -447,18 +451,12 @@ class _FooterRow extends StatelessWidget {
   const _FooterRow({
     required this.actionTaken,
     required this.legalBasis,
-    required this.caseStatus,
     required this.observers,
-    required this.reviewedBy,
-    required this.reviewedAt,
   });
 
   final String actionTaken;
   final String? legalBasis;
-  final String caseStatus;
   final List<String> observers;
-  final String? reviewedBy;
-  final DateTime? reviewedAt;
 
   @override
   Widget build(BuildContext context) {
@@ -469,20 +467,158 @@ class _FooterRow extends StatelessWidget {
         _Pill(icon: Icons.gavel_rounded, text: actionTaken),
         if (legalBasis != null && legalBasis!.isNotEmpty)
           _Pill(icon: Icons.menu_book_outlined, text: legalBasis!),
-        _Pill(icon: Icons.flag_outlined, text: caseStatus),
-        // Who took that decision and when (TB-26). Two pills rather than one so
-        // Wrap can break between a long e-mail and the date. Absent until the
-        // back office has actually reviewed the record.
-        if (reviewedBy != null && reviewedBy!.isNotEmpty)
-          _Pill(icon: Icons.how_to_reg_outlined, text: reviewedBy!),
-        if (reviewedAt != null)
-          _Pill(
-            icon: Icons.event_available_outlined,
-            text: DateFormat('dd.MM.yyyy HH:mm').format(reviewedAt!.toLocal()),
-            tabular: true,
-          ),
         if (observers.isNotEmpty)
           _Pill(icon: Icons.group_outlined, text: observers.join(', ')),
+      ],
+    );
+  }
+}
+
+/// The back-office case review (TB-26), as its own labelled block.
+///
+/// Earlier this was two bare pills — an e-mail and a date — sitting among the
+/// action pills, which told the warden nothing about what they were. Everything
+/// the back office decided now lives together, under a heading that says so,
+/// with each value labelled.
+///
+/// Always rendered: `caseStatus` exists on every record (it defaults to
+/// 'Odprto'), so the card states plainly when a record has not been reviewed
+/// yet rather than leaving its absence to be inferred.
+class _ObravnavaCard extends StatelessWidget {
+  const _ObravnavaCard({
+    required this.caseStatus,
+    required this.reviewedBy,
+    required this.reviewedAt,
+  });
+
+  final String caseStatus;
+  final String? reviewedBy;
+  final DateTime? reviewedAt;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final hasWho = reviewedBy != null && reviewedBy!.trim().isNotEmpty;
+    final reviewed = hasWho || reviewedAt != null;
+
+    return Card(
+      elevation: 3,
+      margin: EdgeInsets.zero,
+      color: colors.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.gavel_rounded, size: 16, color: colors.onSurfaceVariant),
+                const SizedBox(width: 8),
+                Text(
+                  'Obravnava',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 104,
+                  child: Text(
+                    'Status',
+                    style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+                  ),
+                ),
+                // Same colour the dot carries on the map (TB-27), so the detail
+                // view and the map cannot disagree about what a status looks like.
+                Container(
+                  width: 10,
+                  height: 10,
+                  margin: const EdgeInsets.only(top: 4, right: 6),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: recordMarkerColorForStatus(caseStatus),
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    caseStatus,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+            if (reviewed) ...[
+              const SizedBox(height: 6),
+              _ObravnavaRow(
+                label: 'Obravnaval',
+                value: hasWho ? reviewedBy!.trim() : '—',
+              ),
+              const SizedBox(height: 6),
+              _ObravnavaRow(
+                label: 'Obravnavano',
+                value: reviewedAt == null
+                    ? '—'
+                    : DateFormat('dd.MM.yyyy HH:mm')
+                        .format(reviewedAt!.toLocal()),
+                tabular: true,
+              ),
+            ] else ...[
+              const SizedBox(height: 8),
+              Text(
+                'Zapis še ni bil obravnavan.',
+                style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ObravnavaRow extends StatelessWidget {
+  const _ObravnavaRow({
+    required this.label,
+    required this.value,
+    this.tabular = false,
+  });
+
+  final String label;
+  final String value;
+  final bool tabular;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 104,
+          child: Text(
+            label,
+            style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              color: colors.onSurface,
+              fontFeatures:
+                  tabular ? const [FontFeature.tabularFigures()] : null,
+            ),
+          ),
+        ),
       ],
     );
   }

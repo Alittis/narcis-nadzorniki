@@ -39,41 +39,12 @@ void main() {
   final now = DateTime(2026, 6, 24, 12);
   DateTime daysAgo(int d) => now.subtract(Duration(days: d));
 
-  group('ageBucketOf (TB-6)', () {
-    test('≤31 days is recent (boundary inclusive)', () {
-      expect(ageBucketOf(daysAgo(0), now: now), AgeBucket.recent);
-      expect(ageBucketOf(daysAgo(31), now: now), AgeBucket.recent);
-    });
-    test('32–365 days is mid (both boundaries)', () {
-      expect(ageBucketOf(daysAgo(32), now: now), AgeBucket.mid);
-      expect(ageBucketOf(daysAgo(365), now: now), AgeBucket.mid);
-    });
-    test('>365 days is old', () {
-      expect(ageBucketOf(daysAgo(366), now: now), AgeBucket.old);
-      expect(ageBucketOf(daysAgo(1000), now: now), AgeBucket.old);
-    });
-  });
-
   group('MotnjeFilter.unfiltered', () {
     test('is inactive and matches every record', () {
       const f = MotnjeFilter.unfiltered();
       expect(f.isActive, isFalse);
-      expect(f.matches(_rec(observedAt: daysAgo(0)), now: now), isTrue);
-      expect(f.matches(_rec(observedAt: daysAgo(500)), now: now), isTrue);
-    });
-  });
-
-  group('age dimension', () {
-    test('only-recent excludes mid and old; isActive', () {
-      const f = MotnjeFilter(ageBuckets: {AgeBucket.recent});
-      expect(f.isActive, isTrue);
-      expect(f.matches(_rec(observedAt: daysAgo(10)), now: now), isTrue);
-      expect(f.matches(_rec(observedAt: daysAgo(100)), now: now), isFalse);
-      expect(f.matches(_rec(observedAt: daysAgo(700)), now: now), isFalse);
-    });
-    test('empty bucket set matches nothing', () {
-      const f = MotnjeFilter(ageBuckets: {});
-      expect(f.matches(_rec(observedAt: daysAgo(0)), now: now), isFalse);
+      expect(f.matches(_rec(observedAt: daysAgo(0))), isTrue);
+      expect(f.matches(_rec(observedAt: daysAgo(500))), isTrue);
     });
   });
 
@@ -82,28 +53,28 @@ void main() {
       const f = MotnjeFilter.unfiltered();
       expect(
         f.matches(_rec(observedAt: now, createdBy: 'a@gov.si'),
-            currentUserEmail: 'me@gov.si', now: now),
+            currentUserEmail: 'me@gov.si'),
         isTrue,
       );
     });
     test('specific author includes only that author (case-insensitive)', () {
       const f = MotnjeFilter(authors: {'a@gov.si'});
       expect(f.isActive, isTrue);
-      expect(f.matches(_rec(observedAt: now, createdBy: 'A@gov.si'), now: now),
+      expect(f.matches(_rec(observedAt: now, createdBy: 'A@gov.si')),
           isTrue);
-      expect(f.matches(_rec(observedAt: now, createdBy: 'b@gov.si'), now: now),
+      expect(f.matches(_rec(observedAt: now, createdBy: 'b@gov.si')),
           isFalse);
     });
     test('null createdBy folds into the current user', () {
       const f = MotnjeFilter(authors: {'me@gov.si'});
       expect(
         f.matches(_rec(observedAt: now, createdBy: null),
-            currentUserEmail: 'me@gov.si', now: now),
+            currentUserEmail: 'me@gov.si'),
         isTrue,
       );
       expect(
         f.matches(_rec(observedAt: now, createdBy: null),
-            currentUserEmail: 'other@gov.si', now: now),
+            currentUserEmail: 'other@gov.si'),
         isFalse,
       );
     });
@@ -118,31 +89,31 @@ void main() {
     });
     test('inside the window matches; boundaries inclusive', () {
       expect(
-          f.matches(_rec(observedAt: DateTime(2025, 5, 15)), now: now), isTrue);
-      expect(f.matches(_rec(observedAt: from), now: now), isTrue);
-      expect(f.matches(_rec(observedAt: to), now: now), isTrue);
+          f.matches(_rec(observedAt: DateTime(2025, 5, 15))), isTrue);
+      expect(f.matches(_rec(observedAt: from)), isTrue);
+      expect(f.matches(_rec(observedAt: to)), isTrue);
     });
     test('outside the window is excluded', () {
       expect(
-          f.matches(_rec(observedAt: DateTime(2025, 4, 30)), now: now), isFalse);
+          f.matches(_rec(observedAt: DateTime(2025, 4, 30))), isFalse);
       expect(
-          f.matches(_rec(observedAt: DateTime(2025, 6, 1)), now: now), isFalse);
+          f.matches(_rec(observedAt: DateTime(2025, 6, 1))), isFalse);
     });
   });
 
   group('dimensions compose with AND', () {
-    test('a record must pass age AND author AND date', () {
+    test('a record must pass status AND author AND date', () {
       final f = MotnjeFilter(
-        ageBuckets: const {AgeBucket.old},
+        statuses: const {'Odprto'},
         authors: const {'me@gov.si'},
         from: DateTime(2025, 1, 1),
         to: DateTime(2025, 12, 31, 23, 59, 59),
       );
       final pass = _rec(observedAt: DateTime(2025, 2, 1), createdBy: 'me@gov.si');
-      expect(f.matches(pass, now: now, currentUserEmail: 'me@gov.si'), isTrue);
+      expect(f.matches(pass, currentUserEmail: 'me@gov.si'), isTrue);
       final wrongAuthor =
           _rec(observedAt: DateTime(2025, 2, 1), createdBy: 'x@gov.si');
-      expect(f.matches(wrongAuthor, now: now, currentUserEmail: 'me@gov.si'),
+      expect(f.matches(wrongAuthor, currentUserEmail: 'me@gov.si'),
           isFalse);
     });
   });
@@ -157,29 +128,28 @@ void main() {
     test('null groups (unfiltered) means any category', () {
       const f = MotnjeFilter.unfiltered();
       expect(f.isActive, isFalse);
-      expect(f.matches(rec1, now: now), isTrue);
-      expect(f.matches(rec4, now: now), isTrue);
+      expect(f.matches(rec1), isTrue);
+      expect(f.matches(rec4), isTrue);
     });
     test('an empty (non-null) group set shows none', () {
       const f = MotnjeFilter(groups: {});
       expect(f.isActive, isTrue);
-      expect(f.matches(rec1, now: now), isFalse);
-      expect(f.matches(rec4, now: now), isFalse);
+      expect(f.matches(rec1), isFalse);
+      expect(f.matches(rec4), isFalse);
     });
     test('a selected group includes only records with a type in it', () {
       const f = MotnjeFilter(groups: {'1'});
       expect(f.isActive, isTrue);
-      expect(f.matches(rec1, now: now), isTrue);
-      expect(f.matches(rec4, now: now), isFalse);
-      expect(f.matches(recMulti, now: now), isTrue); // any type in group → match
+      expect(f.matches(rec1), isTrue);
+      expect(f.matches(rec4), isFalse);
+      expect(f.matches(recMulti), isTrue); // any type in group → match
     });
     test('multiple selected groups OR within the dimension', () {
       const f = MotnjeFilter(groups: {'1', '4'});
-      expect(f.matches(rec1, now: now), isTrue);
-      expect(f.matches(rec4, now: now), isTrue);
+      expect(f.matches(rec1), isTrue);
+      expect(f.matches(rec4), isTrue);
       expect(
-        f.matches(_rec(observedAt: now, types: [_type('2', 'Kopalci')]),
-            now: now),
+        f.matches(_rec(observedAt: now, types: [_type('2', 'Kopalci')])),
         isFalse,
       );
     });
@@ -232,7 +202,7 @@ void main() {
       const f = MotnjeFilter.unfiltered();
       expect(f.isActive, isFalse);
       for (final status in allCaseStatuses) {
-        expect(f.matches(_rec(observedAt: now, caseStatus: status), now: now),
+        expect(f.matches(_rec(observedAt: now, caseStatus: status)),
             isTrue,
             reason: status);
       }
@@ -244,15 +214,15 @@ void main() {
       );
       expect(f.isActive, isTrue);
       expect(
-          f.matches(_rec(observedAt: now, caseStatus: 'Zaključeno'), now: now),
+          f.matches(_rec(observedAt: now, caseStatus: 'Zaključeno')),
           isFalse);
-      expect(f.matches(_rec(observedAt: now, caseStatus: 'Odprto'), now: now),
+      expect(f.matches(_rec(observedAt: now, caseStatus: 'Odprto')),
           isTrue);
     });
 
     test('empty status set hides everything, like an empty age set', () {
       const f = MotnjeFilter(statuses: {});
-      expect(f.matches(_rec(observedAt: now, caseStatus: 'Odprto'), now: now),
+      expect(f.matches(_rec(observedAt: now, caseStatus: 'Odprto')),
           isFalse);
     });
 
@@ -261,28 +231,25 @@ void main() {
       // drawing (in gray) rather than silently vanishing off the map.
       final f = MotnjeFilter(statuses: {...allCaseStatuses}..remove('Odprto'));
       expect(
-          f.matches(_rec(observedAt: now, caseStatus: 'V mediaciji'), now: now),
+          f.matches(_rec(observedAt: now, caseStatus: 'V mediaciji')),
           isTrue);
     });
 
-    test('composes with AND against the age dimension', () {
+    test('composes with AND against the date window', () {
       final f = MotnjeFilter(
-        ageBuckets: const {AgeBucket.recent},
         statuses: const {'Odprto'},
+        from: DateTime(2026, 6, 1),
       );
       expect(
-          f.matches(_rec(observedAt: daysAgo(2), caseStatus: 'Odprto'),
-              now: now),
+          f.matches(_rec(observedAt: daysAgo(2), caseStatus: 'Odprto')),
           isTrue);
-      // right status, wrong age
+      // right status, outside the window
       expect(
-          f.matches(_rec(observedAt: daysAgo(400), caseStatus: 'Odprto'),
-              now: now),
+          f.matches(_rec(observedAt: daysAgo(400), caseStatus: 'Odprto')),
           isFalse);
-      // right age, wrong status
+      // inside the window, wrong status
       expect(
-          f.matches(_rec(observedAt: daysAgo(2), caseStatus: 'Zaključeno'),
-              now: now),
+          f.matches(_rec(observedAt: daysAgo(2), caseStatus: 'Zaključeno')),
           isFalse);
     });
 

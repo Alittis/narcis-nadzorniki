@@ -2,6 +2,8 @@
 // are shared with the web backoffice. These tests pin the exact hex values so a
 // drift from narcis-vibed `web/src/lib/trsca/format.ts` (STATUS_COLORS) fails
 // here rather than showing up as two apps disagreeing about what a colour means.
+//
+// The age-colour counterpart was deleted in TB-29 along with the Starost filter.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -39,18 +41,6 @@ void main() {
         for (final s in allCaseStatuses) recordMarkerColorForStatus(s),
       };
       expect(colors, hasLength(allCaseStatuses.length));
-    });
-  });
-
-  group('recordMarkerColorForAge (kept for the Starost swatches)', () {
-    test('still maps the three buckets to red / orange / blue', () {
-      final now = DateTime.now();
-      expect(recordMarkerColorForAge(now.subtract(const Duration(days: 2))),
-          Colors.red);
-      expect(recordMarkerColorForAge(now.subtract(const Duration(days: 200))),
-          Colors.orange);
-      expect(recordMarkerColorForAge(now.subtract(const Duration(days: 500))),
-          Colors.blue);
     });
   });
 }

@@ -75,16 +75,16 @@ void main() {
         _rec(observedAt: now.subtract(const Duration(days: 500)), createdBy: 'ana@gov.si'),
       ];
 
-  testWidgets('unchecking an age bucket emits a narrowed, active filter',
-      (tester) async {
-    final emitted = <MotnjeFilter>[];
-    await _open(tester, records: sampleRecords(), onChanged: emitted.add);
-
-    await tester.tap(find.text('Starejše'));
-    await tester.pump();
-
-    expect(emitted.last.ageBuckets, {AgeBucket.recent, AgeBucket.mid});
-    expect(emitted.last.isActive, isTrue);
+  testWidgets('the Starost section is gone (TB-29)', (tester) async {
+    // Removed with the age colouring it existed to mirror; Obdobje covers date
+    // filtering with a day-granularity range instead of three coarse buckets.
+    await _open(tester, records: sampleRecords(), onChanged: (_) {});
+    expect(find.text('Starost'), findsNothing);
+    expect(find.text('Zadnji mesec'), findsNothing);
+    expect(find.text('Zadnje leto'), findsNothing);
+    expect(find.text('Starejše'), findsNothing);
+    // and the dimension it fed is unfiltered by default
+    expect(const MotnjeFilter.unfiltered().isActive, isFalse);
   });
 
   testWidgets('the author section is single-select and emits one author',
@@ -108,13 +108,19 @@ void main() {
     final emitted = <MotnjeFilter>[];
     await _open(tester, records: sampleRecords(), onChanged: emitted.add);
 
-    await tester.tap(find.text('Starejše')); // narrow → enables Ponastavi
+    await tester.ensureVisible(find.text('Zaključeno'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Zaključeno')); // narrow → enables Ponastavi
     await tester.pump();
+    expect(emitted.last.isActive, isTrue); // guard: the narrowing actually landed
+
+    await tester.ensureVisible(find.text('Ponastavi'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Ponastavi'));
     await tester.pump();
 
     expect(emitted.last.isActive, isFalse);
-    expect(emitted.last.ageBuckets.length, allAgeBuckets.length);
+    expect(emitted.last.statuses, allCaseStatuses);
     expect(emitted.last.authors, isEmpty);
   });
 
@@ -131,7 +137,7 @@ void main() {
     );
 
     expect(find.text('Avtor'), findsNothing);
-    expect(find.text('Starost'), findsOneWidget);
+    expect(find.text('Status obravnave'), findsOneWidget);
   });
 
   testWidgets('category section narrows by group when >1 category present',

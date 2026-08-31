@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:narcis_nadzorniki/data/disturbance_filter.dart';
 import 'package:narcis_nadzorniki/data/obmocja_store.dart';
 
 enum BasemapMode { osm, satellite }
@@ -194,22 +193,6 @@ Color recordMarkerColorForStatus(String caseStatus) {
     case 'Predano drugi službi':
     default:
       return const Color(0xFF8E8E93); // gray — handed off / unknown
-  }
-}
-
-/// Age-based fill colour, keyed off the same [AgeBucket] thresholds the Motnje
-/// age filter uses (TB-6). Since TB-27 this no longer colours the map — it is
-/// the swatch source for the sheet's **Starost** rows, which is what keeps
-/// those swatches and [ageBucketOf] from drifting apart.
-/// red = recent · orange = mid · blue = old.
-Color recordMarkerColorForAge(DateTime observedAt) {
-  switch (ageBucketOf(observedAt)) {
-    case AgeBucket.recent:
-      return Colors.red;
-    case AgeBucket.mid:
-      return Colors.orange;
-    case AgeBucket.old:
-      return Colors.blue;
   }
 }
 

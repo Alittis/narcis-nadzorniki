@@ -65,7 +65,6 @@ class _MotnjeFilterSheet extends StatefulWidget {
 
 class _MotnjeFilterSheetState extends State<_MotnjeFilterSheet> {
   late bool _show;
-  late Set<AgeBucket> _buckets;
   late Set<String> _statuses;
   late Set<String> _authors; // 0 or 1 element (single-select UI)
   late Set<String> _groups; // explicit selected group codes (subset of present)
@@ -79,7 +78,6 @@ class _MotnjeFilterSheetState extends State<_MotnjeFilterSheet> {
   void initState() {
     super.initState();
     _show = widget.showMotnje;
-    _buckets = {...widget.initial.ageBuckets};
     _statuses = {...widget.initial.statuses};
     _authors = {...widget.initial.authors};
     _authorKeys = authorsIn(widget.records, widget.currentUserEmail);
@@ -128,7 +126,6 @@ class _MotnjeFilterSheetState extends State<_MotnjeFilterSheet> {
       _groups.length == _presentGroups.length ? null : _groups;
 
   MotnjeFilter get _current => MotnjeFilter(
-        ageBuckets: _buckets,
         statuses: _statuses,
         authors: _authors,
         groups: _groupsForFilter,
@@ -140,17 +137,11 @@ class _MotnjeFilterSheetState extends State<_MotnjeFilterSheet> {
 
   void _reset() {
     setState(() {
-      _buckets = {...allAgeBuckets};
       _statuses = {...allCaseStatuses};
       _authors = {};
       _groups = {for (final g in _presentGroups) g.$1};
       _days = RangeValues(0, _dayCount.toDouble());
     });
-    _emit();
-  }
-
-  void _toggleBucket(AgeBucket b, bool on) {
-    setState(() => on ? _buckets.add(b) : _buckets.remove(b));
     _emit();
   }
 
@@ -180,7 +171,6 @@ class _MotnjeFilterSheetState extends State<_MotnjeFilterSheet> {
   /// over.
   List<int> _dayCounts() {
     final f = MotnjeFilter(
-      ageBuckets: _buckets,
       statuses: _statuses,
       authors: _authors,
       groups: _groupsForFilter,
@@ -253,11 +243,6 @@ class _MotnjeFilterSheetState extends State<_MotnjeFilterSheet> {
                     style: theme.textTheme.bodySmall,
                   ),
                 ),
-                const Divider(height: 8),
-                _sectionLabel('Starost'),
-                _bucketRow(AgeBucket.recent, Colors.red, 'Zadnji mesec'),
-                _bucketRow(AgeBucket.mid, Colors.orange, 'Zadnje leto'),
-                _bucketRow(AgeBucket.old, Colors.blue, 'Starejše'),
                 const Divider(height: 8),
                 // Doubles as the map legend (TB-27): these swatches are the only
                 // place the warden can learn what a dot's colour means, so the
@@ -334,21 +319,6 @@ class _MotnjeFilterSheetState extends State<_MotnjeFilterSheet> {
         child: Text(text,
             style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
       );
-
-  Widget _bucketRow(AgeBucket bucket, Color color, String label) {
-    return CheckboxListTile(
-      dense: true,
-      controlAffinity: ListTileControlAffinity.trailing,
-      value: _buckets.contains(bucket),
-      onChanged: (v) => _toggleBucket(bucket, v ?? false),
-      secondary: Container(
-        width: 16,
-        height: 16,
-        decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-      ),
-      title: Text(label),
-    );
-  }
 
   Widget _statusRow(String status) {
     return CheckboxListTile(
