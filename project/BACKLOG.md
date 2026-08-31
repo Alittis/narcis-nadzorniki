@@ -659,7 +659,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-26 · Show the back-office obravnava on the phone — a warden sees the verdict but not the reasoning
-`✨ Enhancement` · `P2` · **Half 1 `Doing`** (built + tested, awaiting ORDS deploy and a Flutter release) · **Half 2 `Blocked`** · Updated: 2026-08-31
+`✨ Enhancement` · `P2` · **Half 1 `Doing`** (built into v1.6.0+15, pending ORDS deploy + Play upload/rollout) · **Half 2 `Blocked`** · Updated: 2026-08-31
 
 - **Problem.** Since narcis-vibed **NV-220** (live 2026-08-26) the web backoffice records a case
   review against `TB_MOTNJE`: `STATUS_OBRAVNAVE`, plus `OPOMBA_URADNA` (an official note),
@@ -723,10 +723,16 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
     Suite **117/117**, `flutter analyze` clean (10 pre-existing info lints, unchanged).
   - **Deploy order is free.** Older app ignores the new keys; newer app reads them as null until the
     handler ships. Neither side is breaking.
-- **Shipped:** — (half 1 awaits the ORDS re-publish + a Flutter release)
+- **Built into v1.6.0+15** (2026-08-31, archived `~/Releases/terenska-beleznica-1.6.0+15.aab`, signed with the
+  upload key — signer SHA-256 matches `STATE.json`). **Two gates remain, in this order:**
+  1. **ORDS re-publish** ([`TB-26_DEPLOY.md`](../tools/ords/TB-26_DEPLOY.md)) — until it runs, the review
+     pills stay blank on the phone, because the handler does not yet send the fields. Not a crash: the
+     client reads both keys as optional, so the build is safe either way.
+  2. **Play upload + rollout** to the Closed testing track.
+- **Shipped:** — (built, not yet deployed or rolled out)
 
 ### TB-27 · Colour the map dots by status obravnave, not age — restore parity with the web
-`✨ Enhancement` · `P2` · `Doing` (built + tested, awaiting a Flutter release) · Updated: 2026-08-31
+`✨ Enhancement` · `P2` · `Doing` (built into v1.6.0+15, pending Play upload/rollout) · Updated: 2026-08-31
 
 - **Wanted (user, 2026-08-26):** match narcis-vibed **NV-221**, which moved the web's disturbance
   dots from age-colouring to **status obravnave** colouring.
@@ -792,7 +798,10 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **⚠️ narcis-vibed now carries a stale comment of its own:** `web/src/lib/trsca/format.ts` (~line 54)
   still says *"The field app (narcis-nadzorniki) colours disturbance dots by AGE, not status"*. That
   becomes false when this ships. Worth an NV item.
-- **Shipped:** — (awaits a Flutter release)
+- **Built into v1.6.0+15** (2026-08-31, archived `~/Releases/terenska-beleznica-1.6.0+15.aab`, signed with the
+  upload key). **Needs no server change** — unlike TB-26 it works the moment the build is installed, so its
+  only gate is the Play upload + rollout.
+- **Shipped:** — (built, not yet rolled out)
 
 ---
 
