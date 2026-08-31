@@ -224,7 +224,27 @@ The app is intended for nature-protection wardens and authorised collaborators o
 This release is part of a closed test. Participation requires an invitation from the administrator and an existing NarcIS account with the appropriate authorization. For access or feedback, write to admin@alittis.com.
 ```
 
-### 3.3 Release notes — v1.6.0+15 (current)
+### 3.3 Release notes — v1.7.0+16 (current)
+
+**Slovene** (max 500 chars):
+```
+Različica 1.7.0 (build 16)
+• Podrobnosti motnje imajo nov razdelek „Obravnava": status, kdo je zadevo obravnaval in kdaj.
+• V „Seznamu zapisov" je ob datumu barvni status obravnave, pod njim pa obhod, med katerim je bil zapis narejen — dotik odpre ta obhod.
+• Pike na zemljevidu obhoda so obarvane po statusu, enako kot na glavnem zemljevidu.
+• Filter „Starost" je odstranjen; obdobje izberete z drsnikom „Obdobje".
+```
+
+**English** (max 500 chars):
+```
+Version 1.7.0 (build 16)
+• Disturbance details have a new "Obravnava" section: status, who handled the case and when.
+• In "Seznam zapisov" each record shows a colour-coded status next to the date, and below it the patrol it was recorded during — tap to open it.
+• Dots on the patrol map are coloured by status, matching the main map.
+• The "Starost" filter is gone; pick a period with the "Obdobje" slider.
+```
+
+### 3.3a Release notes — v1.6.0+15 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -242,7 +262,7 @@ Version 1.6.0 (build 15)
 • A disturbance's details now show who handled the case and when.
 ```
 
-### 3.3a Release notes — v1.5.0+14 (historical, superseded)
+### 3.3b Release notes — v1.5.0+14 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -258,7 +278,7 @@ Version 1.5.0 (build 14)
 • Easier marker selection on the map: the touch target is larger, so dots are easier to tap.
 ```
 
-### 3.3b Release notes — v1.4.0+13 (historical, superseded)
+### 3.3c Release notes — v1.4.0+13 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -276,7 +296,7 @@ Version 1.4.0 (build 13)
 • On the map, tracks no longer draw straight "phantom" lines across gaps between distant points.
 ```
 
-### 3.3c Release notes — v1.3.1+12 (historical, superseded)
+### 3.3d Release notes — v1.3.1+12 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -292,7 +312,7 @@ Version 1.3.1 (build 12)
 • Walk-around tracks on the map are more accurate and smoother: points with a weak GPS signal are filtered out and the track is smoothed to reduce zig-zag.
 ```
 
-### 3.3d Release notes — v1.3.0+11 (historical, superseded)
+### 3.3e Release notes — v1.3.0+11 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -308,7 +328,7 @@ Version 1.3.0 (build 11)
 • Your own walk-arounds are now coloured differently from your colleagues' on the map.
 ```
 
-### 3.3e Release notes — v1.2.3+10 (historical, superseded)
+### 3.3f Release notes — v1.2.3+10 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -324,7 +344,7 @@ Version 1.2.3 (build 10)
 • The LIFE Tršca project (no. 101114184) is co-funded by the European Union (LIFE programme) and the Slovenian Ministry of Natural Resources and Spatial Planning.
 ```
 
-### 3.3f Release notes — v1.2.0+7 (historical, superseded)
+### 3.3g Release notes — v1.2.0+7 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -340,7 +360,7 @@ Version 1.2.0 (build 7)
 • Password is not stored on the device: after the first login the app uses a revocable token that expires after 30 days of inactivity. Signing out also revokes it server-side.
 ```
 
-### 3.3g Release notes — v1.1.3+6 (historical, superseded)
+### 3.3h Release notes — v1.1.3+6 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -360,7 +380,7 @@ Version 1.1.3 (build 6)
 • Historical Notranjska Regional Park entries are now part of the regular Motnje layer.
 ```
 
-### 3.3h Release notes — v1.0.1+2 (historical, superseded)
+### 3.3i Release notes — v1.0.1+2 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```

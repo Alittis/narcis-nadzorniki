@@ -399,7 +399,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-17 · Show the obhod (patrol) link in the records list
-`✨ Enhancement` · `P3` (quick win) · `Doing` (built + tested, pending a release) · Reporter: Matjaž · Updated: 2026-08-31
+`✨ Enhancement` · `P3` (quick win) · `Doing` (built into v1.7.0+16, pending Play upload/rollout) · Reporter: Matjaž · Updated: 2026-08-31
 - **Problem / want:** In *Seznam zapisov* (the user's own disturbance list), also show which **obhod** a
   record belongs to, when the disturbance was captured during a patrol.
 - **Context:** [`record_list_screen.dart`](../lib/screens/record_list_screen.dart) renders each record as a
@@ -427,6 +427,8 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Tests:** in `test/record_list_status_test.dart` — named walk, unnamed → local-time fallback, empty
   name treated as unnamed, unresolvable → non-tappable *Del obhoda*, and a real **navigation** assertion
   (route pushed + `WalkDetailScreen` on screen) rather than merely "an InkWell exists". Suite **125/125**.
+- **Built into v1.7.0+16** (2026-08-31, archived `~/Releases/terenska-beleznica-1.7.0+16.aab`, signed with the
+  upload key). Awaiting the Play upload + rollout.
 - **Shipped:** —
 
 ### TB-18 · Filter map entries by year / reporter / category
@@ -676,7 +678,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-29 · Retire age colouring end to end — the walk map, and the Starost filter with it
-`🔧 Chore` · `P2` · `Doing` (built + tested, pending a release) · Reporter: maintainer (on the v1.6.0+15 rollout) · Updated: 2026-08-31
+`🔧 Chore` · `P2` · `Doing` (built into v1.7.0+16, pending Play upload/rollout) · Reporter: maintainer (on the v1.6.0+15 rollout) · Updated: 2026-08-31
 
 - **Problem, as reported on the rolled-out build:** the Motnje filter sheet showed **two colour legends at
   once** — Starost (red/orange/blue) and the new Status obravnave (amber/blue/green/gray) — with only one
@@ -707,10 +709,12 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   people asked for. Flagged before doing it; the maintainer's call was that Obdobje covers the need. If
   field feedback disagrees, the cheapest restoration is a Starost section that filters without pretending
   to be a legend.
+- **Built into v1.7.0+16** (2026-08-31, archived `~/Releases/terenska-beleznica-1.7.0+16.aab`, signed with the
+  upload key). Awaiting the Play upload + rollout.
 - **Shipped:** —
 
 ### TB-30 · Show the case status in Seznam zapisov
-`✨ Enhancement` · `P3` · `Doing` (built + tested, pending a release) · Reporter: maintainer · Updated: 2026-08-31
+`✨ Enhancement` · `P3` · `Doing` (built into v1.7.0+16, pending Play upload/rollout) · Reporter: maintainer · Updated: 2026-08-31
 
 - **Want:** the record list should show each record's *status obravnave* after the observed date,
   in colour — today the subtitle is the date alone, so a warden must open every record to learn
@@ -735,6 +739,8 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   unmodifiable with no test seam, and adding a test-only seam to production state for one row of UI
   was the worse trade.
 - **Adjacent, still open:** TB-17 wants the *obhod* link on these same rows.
+- **Built into v1.7.0+16** (2026-08-31, archived `~/Releases/terenska-beleznica-1.7.0+16.aab`, signed with the
+  upload key). Awaiting the Play upload + rollout.
 - **Shipped:** —
 
 ### TB-26 · Show the back-office obravnava on the phone — a warden sees the verdict but not the reasoning
