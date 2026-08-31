@@ -692,6 +692,34 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   to be a legend.
 - **Shipped:** —
 
+### TB-30 · Show the case status in Seznam zapisov
+`✨ Enhancement` · `P3` · `Doing` (built + tested, pending a release) · Reporter: maintainer · Updated: 2026-08-31
+
+- **Want:** the record list should show each record's *status obravnave* after the observed date,
+  in colour — today the subtitle is the date alone, so a warden must open every record to learn
+  where it stands.
+- **Done (2026-08-31, in source; release pending):** the subtitle is now `RecordStatusLine`
+  ([`record_list_screen.dart`](../lib/screens/record_list_screen.dart)) — date, then a colour dot
+  from `recordMarkerColorForStatus` **plus the status text**.
+- **Why dot + label rather than a bare coloured dot.** Two reasons, both learned the hard way this
+  week. The tile's `leading` icon already speaks in colour (green = synced, orange = pending sync),
+  so an unlabelled dot beside it would read as a second sync indicator; and an unlabelled colour is
+  exactly what made TB-26's first cut unreadable. The dot shares `recordMarkerColorForStatus` with
+  both maps, the detail card and the filter sheet, so one status is one colour everywhere in the app.
+- **A real layout bug the tests caught, not a hypothetical.** As a `Row`, *"Predano drugi službi"*
+  after a full `dd.MM.yyyy HH:mm` timestamp **overflowed a 320 dp screen by 85 px**. A `Row` can only
+  resolve that by ellipsizing, which would eat either the date or the status — both of which are the
+  point. It is a `Wrap` now, so the status drops to a second line and nothing is lost, with a
+  `Flexible`+ellipsis inside the status chunk as a last resort for large text scales.
+- **Tests:** `test/record_list_status_test.dart` — labelling, the shared palette across all four
+  statuses, the unknown-status gray fallback, and no-overflow at **320 / 360 / 411 dp** (the widths
+  that caught the bug). Suite **119/119**.
+- **Note:** `RecordStatusLine` is public so it can be widget-tested directly. `AppState.records` is
+  unmodifiable with no test seam, and adding a test-only seam to production state for one row of UI
+  was the worse trade.
+- **Adjacent, still open:** TB-17 wants the *obhod* link on these same rows.
+- **Shipped:** —
+
 ### TB-26 · Show the back-office obravnava on the phone — a warden sees the verdict but not the reasoning
 `✨ Enhancement` · `P2` · **Half 1 `Done`** (ORDS live + verified, shipped v1.6.0+15, rolled out 2026-08-31; presentation defect carried by TB-29) · **Half 2 `Blocked`** · Updated: 2026-08-31
 
