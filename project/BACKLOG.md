@@ -985,7 +985,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   2. **Two colour legends at once.** Keeping Starost (red/orange/blue swatches) beside the new Status
      swatches read as two competing legends. Resolved by removing Starost — see TB-29.
 ### TB-35 · A confirmed delete still showed as unsynced — and the test that should have caught it was vacuous
-`🐞 Bug` · `P1` · `Doing` (fixed, **needs a release**) · Reporter: Alexis (on the rolled-out v1.10.0+19) · Updated: 2026-09-02
+`🐞 Bug` · `P1` · `Doing` (fixed, built into v1.10.1+20 — **pending Play upload + rollout**) · Reporter: Alexis (on the rolled-out v1.10.0+19) · Updated: 2026-09-02
 - **Problem:** On v1.10.0+19 the delete worked, but the reporter had to hit sync manually before the app
   agreed it had. Claude had asserted the delete syncs immediately; the reporter said it did not, and was
   right about the observable behaviour.
@@ -1025,7 +1025,11 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Tests:** `the harness pull actually works`, `a confirmed delete leaves the sync badge clean`, and
   `a FAILED delete still reports honestly` (the mirror case: queued row → `pendingPushCount` 1 and
   `missingLocalCount` 0, so the badge is right in both directions). Suite **148/148**.
-- **Shipped:** —
+- **Built into v1.10.1+20** (2026-09-02, archived `~/Releases/terenska-beleznica-1.10.1+20.aab`, signed
+  with the upload key). Build exit 0; analyze at the documented 10 info lints; suite 148/148; signer cert
+  SHA-256 matches `upload_cert_sha256`; versionName 1.10.1 (1.10.0 absent), versionCode 20; manifest
+  otherwise identical to v1.10.0+19. **No server change.**
+- **Shipped:** — pending upload + rollout. Stays `Doing` until confirmed.
 
 ### TB-33 · Delete never reached the server — ORDS 400 on every bodyless DELETE
 `🐞 Bug` · `P1` · `Done` (shipped v1.10.0+19, rolled out on the Play Closed testing track 2026-09-02; **delete confirmed working on device**) · Reporter: Alexis (on the rolled-out v1.9.0+18) · Updated: 2026-09-02
