@@ -37,7 +37,19 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
      `deleteRecord` only reach Oracle when `isOnline && canSync` — offline edits/deletes
      are **not** queued (ARCHITECTURE §8, OPERATIONS §10). Decide whether this item also
      closes that gap or just exposes online edit/delete.
-- **Discussion:** —
+- **Discussion — sub-task 1 has an answer (2026-09-02, found while building TB-31).** The client had
+  **no in-flight guard on save**: `FilledButton.icon(onPressed: _save)` stayed enabled while
+  `addRecord` awaited photo materialisation, the optimistic POST *and* the photo uploads — seconds on a
+  weak link, which is exactly the "weak signal" condition Matjaž reported. A second tap re-entered
+  `_save`, minted a second `_uuid.v4()` and filed a second record. That fits the evidence: POST is
+  idempotent on the client UUID, so duplicates require the client to mint multiple ids.
+  **Fixed in TB-31** — the commit now happens in `DetailScreen._handleSave` behind a `_saving` flag with
+  the button disabled for the whole await, regression-tested in
+  [`preview_before_save_test.dart`](../test/preview_before_save_test.dart).
+  ⚠️ **This does not close TB-2.** It removes the most likely *source* of new duplicates; it neither
+  proves that was the only source (never reproduced on the reported device) nor gives anyone a way to
+  clean up records already in `TB_MOTNJE`. Sub-task 2 (edit/delete UI) and the offline-queue gap are
+  untouched, and this stays `P1`.
 - **Shipped:** —
 
 ### TB-3 · Patrol path accuracy
@@ -907,6 +919,66 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
      disturbance dots too, so for one release the two maps encoded the *same dot* by different rules.
   2. **Two colour legends at once.** Keeping Starost (red/orange/blue swatches) beside the new Status
      swatches read as two competing legends. Resolved by removing Starost — see TB-29.
+### TB-31 · Preview the record before saving, with a way back to editing
+`✨ Enhancement` · `P2` · `Done` (built + tested locally; **needs a Flutter release** to reach the field) · Reporter: Alexis · Updated: 2026-09-02
+- **Problem:** In [`form_screen.dart`](../lib/screens/form_screen.dart) *Shrani zapis* commits and pops
+  in one tap — there is no review step and no undo. After that the only correction path is the desktop
+  back office, because TB-2 (edit/delete on the phone) is still `Todo`. The warden's last look at the
+  record is a column of form fields, not the record.
+- **Want:** A preview step between the form and the commit that renders the record exactly as
+  *Podrobnosti zapisa* will, with two actions: back to editing, or save.
+- **Context — the client already has both halves, so this is small:**
+  - `_save()` ([`form_screen.dart:340`](../lib/screens/form_screen.dart)) already validates, then builds
+    the complete `Disturbance`, then calls `addRecord` + `pop`. The change is splitting it at the
+    `addRecord` line: validate → build → push preview → save from the preview's callback.
+  - `DetailScreen` takes a plain `Disturbance`, and `_liveRecord()`
+    ([`detail_screen.dart:55`](../lib/screens/detail_screen.dart)) falls back to `widget.record` when the
+    id is absent from `state.records` — which is exactly the unsaved-preview case. It renders an
+    uncommitted record as-is.
+  - `_ensurePhotos()` ([`detail_screen.dart:43`](../lib/screens/detail_screen.dart)) skips photos that
+    have a `localPath` **or** `pendingUpload: true`. A fresh form's photos are both, so the preview does
+    no network work.
+  - Push the preview **on top of** the form. `_FormScreenState` holds all the field state, so popping
+    back restores the filled form for free. Never pop-and-re-push the form.
+- **Two blocks must be suppressed in preview** (suggest a `preview: true` flag on `DetailScreen`):
+  1. **`_SyncBadge`** reads `record.pendingSync`, which the form sets `true` — it would announce
+     "queued to sync" for a record that does not exist yet.
+  2. **`_ObravnavaCard`** (TB-26/TB-29) would render *"Zapis še ni bil obravnavan"*, trivially true of
+     every unsaved record and pure noise at the moment of commit.
+- **Adjacent defect found while scoping this — likely TB-2's duplication root cause.** `_save` has **no
+  in-flight guard**: `FilledButton.icon(onPressed: _save)` stays enabled while `addRecord`
+  ([`app_state.dart:346`](../lib/state/app_state.dart)) awaits photo materialisation, the optimistic
+  POST **and** the photo uploads — seconds on a weak link. A second tap re-enters `_save`, mints a
+  second `_uuid.v4()` and files a second record. That matches TB-2 sub-task 1 ("POST is idempotent on
+  the client UUID, so duplicates mean the client minted multiple records… likely a double-tap on save")
+  exactly. Fix it in this pass whether or not the preview ships.
+- **Discussion — RESOLVED 2026-09-02: mandatory.** The alternative (*Predogled* beside *Shrani*) is
+  skipped by precisely the careless case that produces bad records. Built as mandatory with the save
+  living on the preview, so it reads "review → save" rather than "save → are you sure"; the net cost is
+  one tap in place of a blind commit.
+- **Relation to TB-2:** complementary, not a substitute. Preview catches what the warden notices *before*
+  committing; TB-2 covers everything noticed after. **This does not reduce TB-2's priority** — it is
+  still `P1`, and the desktop back office is still the only way to fix a saved record.
+- **Built 2026-09-02** — client-only, no ORDS/DB/schema change, no wire-payload change:
+  - [`form_screen.dart`](../lib/screens/form_screen.dart) — `_save` → `_openPreview`: same validation,
+    same `Disturbance`, but it pushes the preview instead of committing. Button is now
+    *Preglej in shrani*. A `_previewOpen` flag stops a double-tap stacking two preview routes (saving
+    from the top one would pop back into the second preview instead of out of the form).
+  - [`detail_screen.dart`](../lib/screens/detail_screen.dart) — `preview` + `onSave` params
+    (`assert(!preview || onSave != null)`), title *Predogled zapisa*, `_SyncBadge` and `_ObravnavaCard`
+    hidden, and a `bottomNavigationBar` action bar: *Uredi* / *Shrani zapis*. The bar adds
+    `viewPaddingOf().bottom` itself — Scaffold does not apply the gesture inset to that slot
+    (ARCHITECTURE §15, pattern 1b).
+  - **The double-tap guard** — `_handleSave` sets `_saving`, disables the button for the whole await,
+    and shows *Shranjujem...*. See the TB-2 note below.
+  - Tests: [`preview_before_save_test.dart`](../test/preview_before_save_test.dart) (4) and
+    [`form_preview_flow_test.dart`](../test/form_preview_flow_test.dart) (3). The latter pins the claim
+    that *Uredi* returns to a **filled** form — the failure mode a pop-and-re-push refactor would
+    reintroduce silently. Full suite **132/132**; `flutter analyze` clean (the 10 remaining infos are
+    all pre-existing).
+  - **Not verified on a device.** Analyzer + widget tests only; the narrow-screen test (320 px) covers
+    the action-bar layout, but the real gesture-bar check per ARCHITECTURE §15 still wants a build.
+- **Shipped:** — (built at v1.7.0+16; needs a version bump + release)
 
 ---
 

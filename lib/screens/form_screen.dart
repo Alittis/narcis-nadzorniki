@@ -8,6 +8,7 @@ import 'package:narcis_nadzorniki/data/disturbance_group_colors.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
 import 'package:narcis_nadzorniki/models/disturbance_photo.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
+import 'package:narcis_nadzorniki/screens/detail_screen.dart';
 import 'package:narcis_nadzorniki/screens/location_picker_screen.dart';
 import 'package:narcis_nadzorniki/screens/type_selection_screen.dart';
 import 'package:narcis_nadzorniki/services/location_service.dart';
@@ -58,6 +59,7 @@ class _FormScreenState extends State<FormScreen> {
   String? _legalBasis;
   String _caseStatus = 'Odprto';
   bool _pickedOnMap = false;
+  bool _previewOpen = false;
 
   @override
   void initState() {
@@ -337,7 +339,16 @@ class _FormScreenState extends State<FormScreen> {
     });
   }
 
-  Future<void> _save() async {
+  // TB-31: the form no longer commits. It validates, builds the record, and
+  // hands it to a read-only preview; the commit happens there, from
+  // DetailScreen's save button. The preview is pushed *on top of* this route,
+  // so returning to edit is a plain pop and every field is still filled.
+  //
+  // The guard stops a double-tap from stacking two preview routes: saving from
+  // the top one would pop back into the second preview rather than out of the
+  // form.
+  Future<void> _openPreview() async {
+    if (_previewOpen) return;
     if (!(_formKey.currentState?.validate() ?? false)) {
       return;
     }
@@ -378,11 +389,27 @@ class _FormScreenState extends State<FormScreen> {
           : _proposedTypeController.text.trim(),
     );
 
-    await context.read<AppState>().addRecord(record);
+    _previewOpen = true;
+    final bool? saved;
+    try {
+      saved = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => DetailScreen(
+            record: record,
+            preview: true,
+            onSave: () => context.read<AppState>().addRecord(record),
+          ),
+        ),
+      );
+    } finally {
+      _previewOpen = false;
+    }
     if (!mounted) {
       return;
     }
-    Navigator.of(context).pop();
+    if (saved == true) {
+      Navigator.of(context).pop();
+    }
   }
 
   void _showSnack(String message) {
@@ -697,9 +724,9 @@ class _FormScreenState extends State<FormScreen> {
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
-              onPressed: _save,
-              icon: const Icon(Icons.save),
-              label: const Text('Shrani zapis'),
+              onPressed: _openPreview,
+              icon: const Icon(Icons.fact_check_outlined),
+              label: const Text('Preglej in shrani'),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),

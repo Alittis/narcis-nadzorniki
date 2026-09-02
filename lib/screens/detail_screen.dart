@@ -15,9 +15,22 @@ class DetailScreen extends StatefulWidget {
   const DetailScreen({
     super.key,
     required this.record,
-  });
+    this.preview = false,
+    this.onSave,
+  }) : assert(!preview || onSave != null, 'a preview needs an onSave');
 
   final Disturbance record;
+
+  // TB-31: render a record the form has built but not yet committed, as a last
+  // look before saving. Two blocks are meaningless before the record exists and
+  // are hidden in this mode: the sync badge (pendingSync is always true here, so
+  // it would announce "queued to sync" for a record the server has never seen)
+  // and the obravnava card (nothing has been reviewed yet, by definition).
+  final bool preview;
+
+  // Commits the record. Awaited, so the button stays disabled for the whole
+  // push -- see the double-tap note on _handleSave.
+  final Future<void> Function()? onSave;
 
   @override
   State<DetailScreen> createState() => _DetailScreenState();
@@ -26,6 +39,7 @@ class DetailScreen extends StatefulWidget {
 class _DetailScreenState extends State<DetailScreen> {
   final _photoPageController = PageController();
   int _photoIndex = 0;
+  bool _saving = false;
 
   @override
   void initState() {
@@ -60,6 +74,22 @@ class _DetailScreenState extends State<DetailScreen> {
         widget.record;
   }
 
+  // TB-31 / TB-2: the double-tap that was filing duplicate records. `onSave`
+  // awaits the local write, the optimistic POST *and* the photo uploads, which
+  // is seconds on a weak link. Without this guard a second tap re-enters, mints
+  // a second UUID and files a second record. The button is disabled for the
+  // whole await as well; this flag covers the gap before the rebuild lands.
+  Future<void> _handleSave() async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      await widget.onSave!();
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+    if (mounted) Navigator.of(context).pop(true);
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
@@ -68,16 +98,19 @@ class _DetailScreenState extends State<DetailScreen> {
     return Scaffold(
       backgroundColor: colors.surface,
       appBar: AppBar(
-        title: const Text('Podrobnosti zapisa'),
+        title: Text(widget.preview ? 'Predogled zapisa' : 'Podrobnosti zapisa'),
         actions: [
-          Consumer<AppState>(
-            builder: (context, state, _) {
-              final live = _liveRecord(state);
-              return _SyncBadge(record: live);
-            },
-          ),
+          if (!widget.preview)
+            Consumer<AppState>(
+              builder: (context, state, _) {
+                final live = _liveRecord(state);
+                return _SyncBadge(record: live);
+              },
+            ),
         ],
       ),
+      bottomNavigationBar:
+          widget.preview ? _previewActions(colors, bottomInset) : null,
       body: Consumer<AppState>(
         builder: (context, state, _) {
           final live = _liveRecord(state);
@@ -126,18 +159,68 @@ class _DetailScreenState extends State<DetailScreen> {
                       legalBasis: live.legalBasis,
                       observers: live.observers,
                     ),
-                    const SizedBox(height: 14),
-                    _ObravnavaCard(
-                      caseStatus: live.caseStatus,
-                      reviewedBy: live.reviewedBy,
-                      reviewedAt: live.reviewedAt,
-                    ),
+                    if (!widget.preview) ...[
+                      const SizedBox(height: 14),
+                      _ObravnavaCard(
+                        caseStatus: live.caseStatus,
+                        reviewedBy: live.reviewedBy,
+                        reviewedAt: live.reviewedAt,
+                      ),
+                    ],
                   ],
                 ),
               ),
             ],
           );
         },
+      ),
+    );
+  }
+
+  // TB-31: the preview's two exits -- back into the form with every field still
+  // filled (this route sits on top of the form, so a pop restores it), or the
+  // commit. Save is the primary action: this is "review, then save", not
+  // "save, then confirm".
+  Widget _previewActions(ColorScheme colors, double bottomInset) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + bottomInset),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        border: Border(top: BorderSide(color: colors.outlineVariant)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: _saving ? null : () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.edit_outlined),
+              label: const Text('Uredi'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 2,
+            child: FilledButton.icon(
+              onPressed: _saving ? null : _handleSave,
+              icon: _saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.save),
+              label: Text(_saving ? 'Shranjujem...' : 'Shrani zapis'),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                textStyle:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
