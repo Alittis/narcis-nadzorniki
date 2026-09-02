@@ -980,7 +980,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   2. **Two colour legends at once.** Keeping Starost (red/orange/blue swatches) beside the new Status
      swatches read as two competing legends. Resolved by removing Starost — see TB-29.
 ### TB-33 · Delete never reached the server — ORDS 400 on every bodyless DELETE
-`🐞 Bug` · `P1` · `Doing` (fixed, built into v1.10.0+19 — **pending Play upload + rollout**) · Reporter: Alexis (on the rolled-out v1.9.0+18) · Updated: 2026-09-02
+`🐞 Bug` · `P1` · `Done` (shipped v1.10.0+19, rolled out on the Play Closed testing track 2026-09-02; **delete confirmed working on device**) · Reporter: Alexis (on the rolled-out v1.9.0+18) · Updated: 2026-09-02
 - **Problem:** On v1.9.0+18 a delete disappeared from the phone and **never synced**. The queue worked
   exactly as designed — it held the row, retried on every sync, and did not lose it — but every attempt
   failed, so the record stayed on the server indefinitely. Reproduced on a record created two minutes
@@ -1024,10 +1024,10 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   cert SHA-256 matches `upload_cert_sha256`; versionName 1.10.0 in the AAB manifest (1.9.0 absent),
   versionCode 19; manifest otherwise identical to v1.9.0+18. **No server change** — the ORDS handler was
   correct all along.
-- **Shipped:** — pending upload + rollout. Stays `Doing` until confirmed.
+- **Shipped:** v1.10.0+19, **rolled out on the Play Closed testing track 2026-09-02** — delete confirmed reaching the server on device.
 
 ### TB-34 · Delete from the record details view, not just the list row
-`✨ Enhancement` · `P2` · `Doing` (built into v1.10.0+19 — **pending Play upload + rollout**) · Reporter: Alexis · Updated: 2026-09-02
+`✨ Enhancement` · `P2` · `Done` (shipped v1.10.0+19, rolled out 2026-09-02) · Reporter: Alexis · Updated: 2026-09-02
 - **Problem:** TB-2 put delete only on the *Seznam zapisov* row, which shows a type and a date. That is
   rarely enough to be sure which record you are looking at — the reporter's point is that **most delete
   decisions are actually made in the details view**, where the photos, location and time are visible.
@@ -1043,7 +1043,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   - Moved to [`lib/widgets/record_actions_menu.dart`](../lib/widgets/record_actions_menu.dart): with two
     screens using it, leaving it in `record_list_screen.dart` made the two screens import each other.
 - **Built into v1.10.0+19** alongside TB-33's fix.
-- **Shipped:** — pending upload + rollout. Stays `Doing` until confirmed.
+- **Shipped:** v1.10.0+19, **rolled out 2026-09-02**.
 
 ### TB-32 · Edit a disturbance from the phone
 `✨ Enhancement` · `P2` · `Blocked` · Reporter: Matjaž (via TB-2) · Updated: 2026-09-02
