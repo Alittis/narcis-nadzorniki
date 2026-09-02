@@ -420,9 +420,9 @@ Many target devices (e.g. Samsung A56) reserve a strip at the bottom of the scre
 
 **When adding a new screen:** verify on a device with a gesture nav bar (or in the emulator with `Android Studio → AVD → Display → Gesture navigation` enabled) before declaring the screen done. Type-checking and `flutter test` won't catch this — only a real bottom-of-screen visual check will.
 
-**Audit status (2026-04-27):** all current screens are A56-safe.
+**Audit status (2026-04-27, re-confirmed 2026-09-02 for the TB-31 preview action bar):** all current screens are A56-safe.
 - Pattern 1 (list bottom padding): `form_screen.dart`, `detail_screen.dart`, `record_list_screen.dart`, `profile_screen.dart`, `legacy_detail_screen.dart`, `place_search_screen.dart`.
-- Pattern 1b (**`bottomNavigationBar` padding**, added TB-31): `detail_screen.dart`'s preview action bar is a `Container` in the `bottomNavigationBar` slot and adds `viewPaddingOf(context).bottom` to its own bottom padding — a Scaffold does **not** apply the gesture inset to that slot for you. Any future bottom action bar must do the same.
+- Pattern 1b (**`bottomNavigationBar` padding**, added TB-31): `detail_screen.dart`'s preview action bar is a `Container` in the `bottomNavigationBar` slot and adds `viewPaddingOf(context).bottom` to its own bottom padding — a Scaffold does **not** apply the gesture inset to that slot for you. Any future bottom action bar must do the same. **Confirmed on an A56 2026-09-02** (v1.8.0+17): the *Uredi* / *Shrani zapis* row clears the navigation bar.
 - Pattern 2 (`SafeArea` wrap): `login_screen.dart`, `type_selection_screen.dart`.
 - N/A (full-bleed map + Scaffold-managed FAB whose default location respects view padding): `home_screen.dart`, `location_picker_screen.dart`.
 

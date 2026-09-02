@@ -987,11 +987,10 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   `ACCESS_BACKGROUND_LOCATION` absent; all four `hardware.camera*`/`location*` features present.
   **Needs no server change** — it works the moment the build is installed.
 - **Shipped:** v1.8.0+17, **rolled out on the Play Closed testing track 2026-09-02**.
-- **⚠️ One verification still open.** The on-device gesture-bar check that ARCHITECTURE §15 requires for
-  new bottom-of-screen chrome has **not been reported back**. The preview's action bar is the app's first
-  `bottomNavigationBar`, and §15 is explicit that neither type-checking nor `flutter test` can settle it —
-  the 320 px widget test proves the two buttons do not overflow, not that they clear the gesture bar on an
-  A56. If a warden reports the buttons sitting under the nav bar, that is this, not a new defect.
+- **Verified on device 2026-09-02.** The gesture-bar check ARCHITECTURE §15 requires for new
+  bottom-of-screen chrome is **done**: on the A56, the *Uredi* / *Shrani zapis* row clears the navigation
+  bar. That closes the last open verification on this item — the action bar is the app's first
+  `bottomNavigationBar`, so the pattern is now confirmed, not just reasoned about (§15 pattern 1b).
 
 ---
 
