@@ -86,6 +86,13 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
     which did not exist in this repo before — **reusable for TB-32.** ⚠️ `pumpEventQueue()` **hangs**
     inside `testWidgets`, where the binding controls time; the harness only drains when online.
     Full suite **142/142**, analyze at the documented 10 pre-existing info lints.
+  - **⚠️ Known edge in the lock rule.** `isLockedByReview` keys partly off `caseStatus != 'Odprto'`,
+    and the phone's create form still has a `caseStatus` dropdown — so a warden who picks a non-default
+    status *at creation* locks their own record against deletion immediately, with no reviewer involved.
+    Accepted for now: it fails safe (refuses a delete rather than allowing a bad one) and it is rare,
+    since the dropdown defaults to `'Odprto'`. The real fix is [TB-32](#tb-32--edit-a-disturbance-from-the-phone)'s
+    open question — if status is web-owned, that dropdown should not be on the phone at all, and this
+    edge disappears with it.
   - **Not verified on a device.** Analyzer + tests only.
 - **Shipped:** — needs a release. Stays `Doing` until the rollout is confirmed.
 
