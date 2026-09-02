@@ -532,6 +532,15 @@ class AppState extends ChangeNotifier {
         continue;
       }
       _records = _records.where((item) => item.id != record.id).toList();
+      // TB-35: drop it from the last-pull snapshot too. `missingLocalCount`
+      // counts ids the server reported that we don't hold locally, so leaving
+      // a confirmed-deleted id in there makes the sync icon flip to the orange
+      // cloud_download "Prenesi z strežnika (1 manjkajočih)" state until the
+      // next pull happens to refresh the set. The delete had actually landed;
+      // the indicator just claimed otherwise, which reads exactly like a
+      // delete that failed to sync. The server no longer has this row, so our
+      // record of what the server has must forget it at the same moment.
+      _lastRemoteIds = _lastRemoteIds?.where((id) => id != record.id).toSet();
       await _photoStorage.deleteRecordDir(record.id);
       await _localStore.save(_records);
       notifyListeners();
@@ -996,6 +1005,12 @@ class AppState extends ChangeNotifier {
     if (isOnline && creds != null && !walk.pendingSync) {
       try {
         await _remoteApi.deleteWalk(walk.id, creds);
+        // TB-35: same snapshot problem as the record delete above — but only
+        // on success. A walk removed locally whose server DELETE failed IS
+        // genuinely missing locally, and the badge saying so is correct.
+        _lastRemoteWalkIds =
+            _lastRemoteWalkIds?.where((id) => id != walk.id).toSet();
+        notifyListeners();
       } on RemoteApiException catch (e) {
         _handleSyncException(e);
       }

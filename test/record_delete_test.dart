@@ -149,11 +149,25 @@ class _Harness {
   int postStatus = 201;
   late final AppState state;
 
+  /// ⚠️ `http.Response(String, …)` encodes the body with the encoding named in
+  /// the content-type header, defaulting to **latin-1**. Our fixtures contain
+  /// `Natančna`, so without an explicit UTF-8 charset the constructor throws
+  /// `Invalid argument (string): Contains invalid characters` — which
+  /// `fetchRecords` wraps as a network RemoteApiException and `_pullRemote`
+  /// swallows by design. The result is a harness whose pull silently never
+  /// runs, which is exactly how the first version of these tests came to
+  /// "cover" the merge guard without ever executing it.
+  static http.Response _json(Object body, int status) => http.Response(
+        jsonEncode(body),
+        status,
+        headers: {'content-type': 'application/json; charset=utf-8'},
+      );
+
   Future<void> boot() async {
     final client = MockClient((req) async {
       requests.add('${req.method} ${req.url.path}');
       if (req.url.path.contains('/walks')) {
-        return http.Response(jsonEncode({'walks': <dynamic>[]}), 200);
+        return _json({'walks': <dynamic>[]}, 200);
       }
       if (req.method == 'DELETE') {
         return http.Response('', deleteStatus);
@@ -166,7 +180,7 @@ class _Harness {
         final gone = requests.any((r) => r.startsWith('DELETE')) &&
             (deleteStatus == 204 || deleteStatus == 200);
         final rows = (_serverHasIt && !gone) ? [_remoteJson()] : <dynamic>[];
-        return http.Response(jsonEncode({'records': rows}), 200);
+        return _json({'records': rows}, 200);
       }
       return http.Response('', 200);
     });
@@ -230,6 +244,21 @@ void main() {
   });
 
   group('online', () {
+    test('the harness pull actually works', () async {
+      // Guards the harness, not the app. The latin-1 fixture bug above made
+      // every pull throw and be swallowed, so the merge-guard test below was
+      // passing without ever running the merge. `missingLocalCount` is readable
+      // proof that `_lastRemoteIds` got populated: it can only be 0-with-a-
+      // local-row if the pull genuinely landed.
+      final h = _Harness(online: true);
+      await h.boot();
+      expect(h.requests, contains('GET /ords/narcis/disturbances/'));
+      expect(h.state.records, hasLength(1));
+      expect(h.state.pendingCount, 0,
+          reason: 'a swallowed pull leaves _lastRemoteIds null, which would '
+              'also read as 0 — so the resurrect test below is the real check');
+    });
+
     test('a delete is sent, confirmed and purged', () async {
       final h = _Harness(online: true);
       await h.boot();
@@ -242,6 +271,44 @@ void main() {
       expect(h.photos.deletedDirs, [_id]);
       expect(h.state.pendingPushCount, 0);
       expect(h.requests.where((r) => r.startsWith('DELETE')), hasLength(1));
+    });
+
+    test('a confirmed delete leaves the sync badge clean', () async {
+      // TB-35: the bug this pins. `_drainPendingDeletes` purged the row from
+      // _records but left its id in `_lastRemoteIds` — the snapshot of what the
+      // last pull said the server holds. missingLocalCount counts ids in that
+      // snapshot with no local row, so a delete that HAD landed flipped the
+      // icon to the orange cloud_download "1 manjkajočih" state until some
+      // later pull refreshed the set. Indistinguishable, from the user's seat,
+      // from a delete that never synced.
+      //
+      // The original test asserted pendingPushCount, which was already 0. The
+      // number the user actually sees is pendingCount.
+      final h = _Harness(online: true);
+      await h.boot();
+      expect(h.state.pendingCount, 0, reason: 'clean before the delete');
+
+      final purged = await h.state.deleteRecord(_rec());
+
+      expect(purged, isTrue);
+      expect(h.state.missingLocalCount, 0,
+          reason: 'the server no longer has it, so the snapshot must forget it');
+      expect(h.state.pendingCount, 0, reason: 'nothing left to sync');
+    });
+
+    test('a FAILED delete still reports honestly', () async {
+      // The mirror image: the row is queued, so the badge should say there is
+      // work to push — and must NOT also count it as missing from the server.
+      final h = _Harness(online: true);
+      await h.boot();
+      h.deleteStatus = 500;
+
+      await h.state.deleteRecord(_rec());
+
+      expect(h.state.pendingPushCount, 1);
+      expect(h.state.missingLocalCount, 0,
+          reason: 'the row is still held locally, just flagged');
+      expect(h.state.pendingCount, 1);
     });
 
     test('a failed delete stays queued and the pull does NOT resurrect it',

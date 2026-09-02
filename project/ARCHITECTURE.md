@@ -355,6 +355,7 @@ STATUS: deployed to ARSO prod (`narcis.gov.si`, NARCIS schema) 2026-05-28 via AP
 **Divergence indicator.** The icon at [home_screen.dart:520](lib/screens/home_screen.dart:520) reads three numbers off `AppState`:
 - `pendingPushCount` — records with `pendingSync` OR any `pendingUpload` photo OR `pendingDelete` (TB-2: a queued delete is outstanding work like any other).
 - `missingLocalCount` — `|_lastRemoteIds \ localIds|` (zero until first successful pull).
+  - **⚠️ A confirmed delete must forget its id here too (TB-35).** `_lastRemoteIds` is the snapshot of what the last pull said the server holds. Purging a row from `_records` without dropping its id from that snapshot makes this count 1, which flips the icon to the orange `cloud_download` *"Prenesi z strežnika (1 manjkajočih)"* state until some later pull happens to refresh the set — telling the user a delete that **had** landed still needs syncing. `_drainPendingDeletes` and `deleteWalk` now drop the id at the same moment they purge. Note `deleteWalk` does so **only on a confirmed server delete**: a walk removed locally whose DELETE failed genuinely is missing locally, and the badge saying so is correct.
 - `pendingCount` — sum, shown as the badge.
 Three visual states: green `cloud_done` when in sync, orange `cloud_upload` when there's anything to push, orange `cloud_download` when only the remote has more. Grey `cloud_off` when offline.
 

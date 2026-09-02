@@ -108,6 +108,11 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   `MockClient`, which answers whatever it is told to, so **every test passed while the real request
   shape was rejected by ORDS.** The mechanism was verified; the contract with the server was not.
   Ironically the queue is why nothing was lost — the rows survived and drained once the header was fixed.
+  **And it was worse than that:** the harness's mock GET body was latin-1 encoded, so every pull in every
+  one of these tests silently never ran — meaning the *"the pull does NOT resurrect it"* test named above
+  as load-bearing was passing without executing the merge at all. Found and fixed in
+  [TB-35](#tb-35--a-confirmed-delete-still-showed-as-unsynced--and-the-test-that-should-have-caught-it-was-vacuous),
+  where both guards were re-verified by removal.
 - **Follow-up shipped alongside the fix:** [TB-34](#tb-34--delete-from-the-record-details-view-not-just-the-list-row)
   adds the same delete action to the details view, which is where the reporter points out most delete
   decisions are actually made.
@@ -979,6 +984,49 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
      disturbance dots too, so for one release the two maps encoded the *same dot* by different rules.
   2. **Two colour legends at once.** Keeping Starost (red/orange/blue swatches) beside the new Status
      swatches read as two competing legends. Resolved by removing Starost — see TB-29.
+### TB-35 · A confirmed delete still showed as unsynced — and the test that should have caught it was vacuous
+`🐞 Bug` · `P1` · `Doing` (fixed, **needs a release**) · Reporter: Alexis (on the rolled-out v1.10.0+19) · Updated: 2026-09-02
+- **Problem:** On v1.10.0+19 the delete worked, but the reporter had to hit sync manually before the app
+  agreed it had. Claude had asserted the delete syncs immediately; the reporter said it did not, and was
+  right about the observable behaviour.
+- **Root cause — the indicator, not the delete.** The DELETE *did* go out and succeed in the same tap.
+  But `_drainPendingDeletes` purged the row from `_records` while leaving its id in `_lastRemoteIds`, the
+  snapshot of what the last pull said the server holds. `missingLocalCount` counts ids in that snapshot
+  with no local row, so it became 1 → `pendingCount` 1 → the sync icon flipped to the orange
+  `cloud_download` *"Prenesi z strežnika (1 manjkajočih)"* state. Tapping sync ran a pull, which
+  refreshed the snapshot and turned it green. **From the user's seat that is indistinguishable from a
+  delete that never synced** — the app said there was outstanding work, so there was no reason to
+  believe otherwise.
+- **Fix:** drop the id from `_lastRemoteIds` at the moment the row is purged. **`deleteWalk` had the
+  identical defect** (pre-dating the delete queue — it removes the walk locally and never touched
+  `_lastRemoteWalkIds`), fixed in the same pass, but **only on a confirmed server delete**: a walk
+  removed locally whose DELETE failed genuinely *is* missing locally, and the badge saying so is right.
+- **⚠️ The bigger finding: TB-2's load-bearing test was not testing anything.** The booted-`AppState`
+  harness built the mock GET body with `http.Response(String, status)`, which encodes the body using the
+  encoding named in the content-type header and **defaults to latin-1**. The fixtures contain
+  `Natančna`, so the constructor threw `Invalid argument (string): Contains invalid characters`,
+  `fetchRecords` wrapped it as a network `RemoteApiException`, and `_pullRemote` swallowed it **by
+  design** (a failed pull is meant to be non-fatal). Net effect: **every pull in every harness test
+  silently never ran.** So:
+  - *"a failed delete stays queued and the pull does NOT resurrect it"* — described in TB-2 as the
+    load-bearing regression test — passed without ever executing the merge it claimed to exercise.
+  - `_lastRemoteIds` was always null, which is why this badge bug could not surface in tests either.
+  - The mock needs `headers: {'content-type': 'application/json; charset=utf-8'}`. There is now a
+    `_json` helper carrying that, and a `the harness pull actually works` test guarding the harness
+    itself, because a silently-swallowed pull is invisible by construction.
+  - **Both fixes were then verified by removal**: with the `_lastRemoteIds` line deleted the badge test
+    fails `Expected: <0> Actual: <1>`; with the merge's `pendingDelete` branch deleted the resurrect test
+    fails `Expected: empty Actual: [Instance of 'Disturbance']`. Neither had been checked that way
+    before, which is the whole reason a vacuous test survived. **Do this for any test whose job is to
+    catch a specific defect.**
+- **Lesson, stated plainly:** the first thing to establish about a mock-backed test is that the mock is
+  actually being reached. A swallowed error inside production code — here a deliberately non-fatal
+  pull — will make a test pass for the wrong reason and keep passing.
+- **Tests:** `the harness pull actually works`, `a confirmed delete leaves the sync badge clean`, and
+  `a FAILED delete still reports honestly` (the mirror case: queued row → `pendingPushCount` 1 and
+  `missingLocalCount` 0, so the badge is right in both directions). Suite **148/148**.
+- **Shipped:** —
+
 ### TB-33 · Delete never reached the server — ORDS 400 on every bodyless DELETE
 `🐞 Bug` · `P1` · `Done` (shipped v1.10.0+19, rolled out on the Play Closed testing track 2026-09-02; **delete confirmed working on device**) · Reporter: Alexis (on the rolled-out v1.9.0+18) · Updated: 2026-09-02
 - **Problem:** On v1.9.0+18 a delete disappeared from the phone and **never synced**. The queue worked
