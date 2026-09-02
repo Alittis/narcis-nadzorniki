@@ -267,7 +267,7 @@ class RemoteApi {
 
   Future<List<RemoteDisturbance>> fetchRecords(SyncCredentials credentials) async {
     final response = await _send(
-      () => _client.get(_baseUrl, headers: _jsonHeaders(credentials)),
+      () => _client.get(_baseUrl, headers: _authHeaders(credentials)),
     );
     _ensureStatus(response, const {200});
     final decoded = jsonDecode(response.body);
@@ -322,7 +322,7 @@ class RemoteApi {
     final response = await _send(
       () => _client.delete(
         _recordUri(id),
-        headers: _jsonHeaders(credentials),
+        headers: _authHeaders(credentials),
       ),
     );
     _ensureStatus(response, const {200, 204, 404});
@@ -375,7 +375,7 @@ class RemoteApi {
     final response = await _send(
       () => _client.delete(
         _photoUri(motnjaId, photoId),
-        headers: _jsonHeaders(credentials),
+        headers: _authHeaders(credentials),
       ),
     );
     _ensureStatus(response, const {200, 204, 404});
@@ -383,7 +383,7 @@ class RemoteApi {
 
   Future<List<RemoteWalk>> fetchWalks(SyncCredentials credentials) async {
     final response = await _send(
-      () => _client.get(_walksBaseUrl, headers: _jsonHeaders(credentials)),
+      () => _client.get(_walksBaseUrl, headers: _authHeaders(credentials)),
     );
     _ensureStatus(response, const {200});
     final decoded = jsonDecode(response.body);
@@ -408,7 +408,7 @@ class RemoteApi {
     final response = await _send(
       () => _client.get(
         _walkPointsUri(walkId),
-        headers: _jsonHeaders(credentials),
+        headers: _authHeaders(credentials),
       ),
     );
     _ensureStatus(response, const {200});
@@ -447,7 +447,7 @@ class RemoteApi {
     final response = await _send(
       () => _client.delete(
         _walkUri(id),
-        headers: _jsonHeaders(credentials),
+        headers: _authHeaders(credentials),
       ),
     );
     _ensureStatus(response, const {200, 204, 404});
@@ -473,10 +473,29 @@ class RemoteApi {
         '${Uri.encodeComponent(motnjaId)}/photos/${Uri.encodeComponent(photoId)}',
       );
 
-  Map<String, String> _jsonHeaders(SyncCredentials credentials) => {
+  /// Headers for a request that carries NO body: GET and DELETE.
+  ///
+  /// ⚠️ Content-Type is deliberately absent. ORDS parses the request payload
+  /// for a body-bearing method as soon as a JSON content type is declared, and
+  /// an empty body is not valid JSON — so a bodyless DELETE sent with
+  /// `Content-Type: application/json` is rejected by ORDS itself, **before the
+  /// PL/SQL handler runs**, with
+  /// `400 {"code":"BadRequest","message":"Expected one of: <<{,[>> but got: <<EOF>>"}`.
+  /// Verified against production 2026-09-02: the same DELETE returns 401
+  /// (i.e. reaches the handler) without the header and 400 with it. GET happens
+  /// to survive it because ORDS does not attempt payload parsing on GET, which
+  /// is why this stayed latent — the disturbance DELETE had no UI path until
+  /// TB-2, and `tools/ords/test_disturbances.sh` only adds Content-Type when it
+  /// actually sends a body, so the endpoint's own smoke test always passed.
+  Map<String, String> _authHeaders(SyncCredentials credentials) => {
         'X-Narcis-Auth': credentials.authHeaderValue,
-        'Content-Type': 'application/json; charset=utf-8',
         'Accept': 'application/json',
+      };
+
+  /// Headers for a request that DOES carry a JSON body: POST and PUT.
+  Map<String, String> _jsonHeaders(SyncCredentials credentials) => {
+        ..._authHeaders(credentials),
+        'Content-Type': 'application/json; charset=utf-8',
       };
 
   Map<String, dynamic> _payload(Disturbance d) => {

@@ -23,7 +23,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 ## Open
 
 ### TB-2 · Delete disturbance entries from the phone
-`🐞 Bug` · `P1` · `Doing` (delete built into v1.9.0+18 — **pending Play upload + rollout**) · Reporter: Matjaž · Updated: 2026-09-02
+`🐞 Bug` · `P1` · `Done` (shipped v1.9.0+18, rolled out on the Play Closed testing track 2026-09-02; **the delete never reached the server on that build** — fixed in [TB-33](#tb-33--delete-never-reached-the-server--ords-400-on-every-bodyless-delete)) · Reporter: Matjaž · Updated: 2026-09-02
 - **Scope narrowed 2026-09-02.** This item was "edit / delete". Delete is what the report actually
   needed — duplicates — and it is the clean half: `DELETE :id` sends no body, so none of the
   column-ownership problems arise. **Edit moved to [TB-32](#tb-32--edit-a-disturbance-from-the-phone),**
@@ -100,8 +100,17 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   versionName 1.9.0 in the AAB manifest (1.8.0 absent), versionCode 18 from `packaged_manifests`;
   `com.example` and `ACCESS_BACKGROUND_LOCATION` absent; all four `hardware.camera*`/`location*`
   features present. **Needs no server change** — `DELETE :id` already existed.
-- **Shipped:** — **not yet uploaded.** Stays `Doing` until the rollout is confirmed on the Play Closed
-  testing track; only then does this flip to `Done`.
+- **Shipped:** v1.9.0+18, **rolled out on the Play Closed testing track 2026-09-02**.
+- **⚠️ The queue was right; the wire call was not.** On the rolled-out build every `DELETE` failed with
+  an ORDS 400, so records vanished from the phone and stayed on the server — see
+  [TB-33](#tb-33--delete-never-reached-the-server--ords-400-on-every-bodyless-delete). Worth recording
+  what that says about this item's own testing: the queue mechanics were tested thoroughly against a
+  `MockClient`, which answers whatever it is told to, so **every test passed while the real request
+  shape was rejected by ORDS.** The mechanism was verified; the contract with the server was not.
+  Ironically the queue is why nothing was lost — the rows survived and drained once the header was fixed.
+- **Follow-up shipped alongside the fix:** [TB-34](#tb-34--delete-from-the-record-details-view-not-just-the-list-row)
+  adds the same delete action to the details view, which is where the reporter points out most delete
+  decisions are actually made.
 
 ### TB-3 · Patrol path accuracy
 `🐞 Bug` · `P2` · `Done` (shipped 1.3.1+12) · Reporters: Tomaž, Matjaž · Updated: 2026-06-22
@@ -970,6 +979,66 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
      disturbance dots too, so for one release the two maps encoded the *same dot* by different rules.
   2. **Two colour legends at once.** Keeping Starost (red/orange/blue swatches) beside the new Status
      swatches read as two competing legends. Resolved by removing Starost — see TB-29.
+### TB-33 · Delete never reached the server — ORDS 400 on every bodyless DELETE
+`🐞 Bug` · `P1` · `Done` (fixed in source; **needs a release**) · Reporter: Alexis (on the rolled-out v1.9.0+18) · Updated: 2026-09-02
+- **Problem:** On v1.9.0+18 a delete disappeared from the phone and **never synced**. The queue worked
+  exactly as designed — it held the row, retried on every sync, and did not lose it — but every attempt
+  failed, so the record stayed on the server indefinitely. Reproduced on a record created two minutes
+  earlier, so nothing to do with old or migrated rows.
+- **Root cause — the client, not the server.** `RemoteApi._jsonHeaders` put
+  `Content-Type: application/json; charset=utf-8` on **every** request, including bodyless ones. ORDS
+  parses the request payload for a body-bearing method as soon as a JSON content type is declared, and an
+  empty body is not valid JSON, so the `DELETE` was rejected by **ORDS itself before the PL/SQL handler
+  ran**: `400 {"code":"BadRequest","message":"Expected one of: <<{,[>> but got: <<EOF>>"}`. That 400 is
+  not in §9.3's DELETE row because the handler cannot produce it — it returns only 204/401/404/500.
+- **How it was diagnosed.** The device log (`OPERATIONS.md` → Sync diagnostics, whose delete lines were
+  added the day before for exactly this) gave `delete <uuid> FAILED, stays queued:
+  RemoteApiException(400): {` on a loop. Then two unauthenticated `curl` DELETEs against the all-zeros
+  UUID in production — the same probe [`test_disturbances.sh`](../tools/ords/test_disturbances.sh) runs
+  first, safe because auth is checked before any DML — isolated the variable: **401 without the header,
+  400 with it.**
+- **⚠️ Why nothing caught it for months.** Three things lined up:
+  1. `GET` survives the bad header — ORDS does not attempt payload parsing on GET — so the whole app
+     looked healthy.
+  2. The disturbance `DELETE` had **no UI path until TB-2**, so no bodyless Dart request was ever sent in
+     anger. `updateRecord` was equally unexercised.
+  3. [`test_disturbances.sh`](../tools/ords/test_disturbances.sh) adds `Content-Type` **only when it
+     sends a body**, so the endpoint's own smoke test passed every time — which is how §9.3 came to call
+     DELETE "smoke-tested" while the client could not call it at all.
+  **The lesson worth keeping: a curl smoke test passing is not evidence the Dart client's request shape
+  is right.** The two were never compared.
+- **Fix:** split the headers by verb — `_authHeaders` (auth + `Accept`) for GET/DELETE, `_jsonHeaders`
+  (adds `Content-Type`) for POST/PUT. **Also fixed `deleteWalk` and `deletePhoto`**, which carried the
+  identical defect and had never been exercised either — two latent bugs closed alongside the reported
+  one. Documented in ARCHITECTURE §9.3.
+- **Tests:** a `the Content-Type contract` group in
+  [`remote_api_test.dart`](../test/remote_api_test.dart) asserts that no bodyless request declares a
+  Content-Type (and still authenticates), and that POST/PUT still do. Asserting the header contract
+  per verb is the check that was missing — the existing `deleteRecord` tests never looked at headers.
+  Suite **145/145**.
+- **No data was lost.** Queued deletes are persisted, so the rows still marked `pendingDelete` on the
+  device drain by themselves on the first sync after the fixed build is installed. Nothing to clean up
+  by hand.
+- **Shipped:** —
+
+### TB-34 · Delete from the record details view, not just the list row
+`✨ Enhancement` · `P2` · `Done` (built; **needs a release**) · Reporter: Alexis · Updated: 2026-09-02
+- **Problem:** TB-2 put delete only on the *Seznam zapisov* row, which shows a type and a date. That is
+  rarely enough to be sure which record you are looking at — the reporter's point is that **most delete
+  decisions are actually made in the details view**, where the photos, location and time are visible.
+- **Want:** The same delete action in the details view.
+- **Built:** the identical `RecordActionsMenu` in `DetailScreen`'s AppBar — deliberately the *same*
+  widget, so the confirm dialog and the `isLockedByReview` refusal cannot drift apart between two entry
+  points. It gained an `onDeleted` callback: the list needs nothing (the row vanishes on its own because
+  `AppState.records` hides it) but the detail screen must pop, or it would sit there showing a record
+  that no longer exists. The `ScaffoldMessenger` is captured **before** the pop, or the confirmation
+  snackbar would go with the route.
+  - Shown for **own records only** — the list is author-scoped but the home map is not, and the server
+    gate is org-wide (see TB-32). Hidden in TB-31's preview mode, where there is nothing to delete yet.
+  - Moved to [`lib/widgets/record_actions_menu.dart`](../lib/widgets/record_actions_menu.dart): with two
+    screens using it, leaving it in `record_list_screen.dart` made the two screens import each other.
+- **Shipped:** —
+
 ### TB-32 · Edit a disturbance from the phone
 `✨ Enhancement` · `P2` · `Blocked` · Reporter: Matjaž (via TB-2) · Updated: 2026-09-02
 - **Problem:** Split out of [TB-2](#tb-2--delete-disturbance-entries-from-the-phone) on 2026-09-02. A

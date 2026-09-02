@@ -7,8 +7,10 @@ import 'package:narcis_nadzorniki/models/disturbance.dart';
 import 'package:narcis_nadzorniki/models/disturbance_photo.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
 import 'package:narcis_nadzorniki/screens/photo_viewer_screen.dart';
+
 import 'package:narcis_nadzorniki/state/app_state.dart';
 import 'package:narcis_nadzorniki/widgets/basemap.dart';
+import 'package:narcis_nadzorniki/widgets/record_actions_menu.dart';
 import 'package:provider/provider.dart';
 
 class DetailScreen extends StatefulWidget {
@@ -105,6 +107,26 @@ class _DetailScreenState extends State<DetailScreen> {
               builder: (context, state, _) {
                 final live = _liveRecord(state);
                 return _SyncBadge(record: live);
+              },
+            ),
+          // TB-33: delete from the details view too. This is where most delete
+          // decisions actually get made -- the list row shows a type and a date,
+          // which is rarely enough to be sure. Deliberately the SAME
+          // RecordActionsMenu the list uses, so the confirm dialog and the
+          // isLockedByReview refusal cannot drift apart between the two entry
+          // points. Own records only: the list is author-scoped but the map is
+          // not, and the server gate is org-wide (see TB-32).
+          if (!widget.preview)
+            Consumer<AppState>(
+              builder: (context, state, _) {
+                final live = _liveRecord(state);
+                if (!state.isAuthoredByCurrentUser(live)) {
+                  return const SizedBox.shrink();
+                }
+                return RecordActionsMenu(
+                  record: live,
+                  onDeleted: () => Navigator.of(context).pop(),
+                );
               },
             ),
         ],

@@ -28,7 +28,7 @@ import 'package:narcis_nadzorniki/models/disturbance_photo.dart';
 import 'package:narcis_nadzorniki/models/legacy_disturbance.dart';
 import 'package:narcis_nadzorniki/models/walk.dart';
 import 'package:narcis_nadzorniki/services/auth_service.dart';
-import 'package:narcis_nadzorniki/screens/record_list_screen.dart';
+import 'package:narcis_nadzorniki/widgets/record_actions_menu.dart';
 import 'package:narcis_nadzorniki/services/photo_storage.dart';
 import 'package:narcis_nadzorniki/state/app_state.dart';
 import 'package:provider/provider.dart';
@@ -342,6 +342,43 @@ void main() {
 
       expect(h.state.records, hasLength(1));
       expect(h.store.seed.single.pendingDelete, isFalse);
+    });
+
+    testWidgets('onDeleted fires so the detail screen can pop', (tester) async {
+      // TB-33: the detail screen shows one record; once it is queued for
+      // deletion, staying on it would display something that no longer exists.
+      final h = _Harness(online: false, seed: [_rec()]);
+      await h.boot();
+      var popped = false;
+      await tester.pumpWidget(
+        ChangeNotifierProvider<AppState>.value(
+          value: h.state,
+          child: MaterialApp(
+            home: Scaffold(
+              body: Center(
+                child: RecordActionsMenu(
+                  record: _rec(),
+                  onDeleted: () => popped = true,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.byIcon(Icons.more_vert));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Izbriši zapis'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Izbriši'));
+      await tester.pumpAndSettle();
+
+      expect(popped, isTrue);
+      expect(h.state.records, isEmpty);
+      // The confirmation still lands: the messenger is captured before the pop.
+      expect(
+        find.text('Zapis bo izbrisan ob naslednji sinhronizaciji.'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('confirming queues the delete and says so', (tester) async {

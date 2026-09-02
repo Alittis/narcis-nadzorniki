@@ -180,6 +180,78 @@ void main() {
     });
   });
 
+  // Regression group for the ORDS 400 that broke TB-2's delete on the rolled-out
+  // v1.9.0+18 build.
+  //
+  // ORDS parses the request payload for a body-bearing method as soon as a JSON
+  // content type is declared, and an empty body is not valid JSON. So a bodyless
+  // DELETE sent with `Content-Type: application/json` is rejected by ORDS
+  // itself, before the PL/SQL handler runs:
+  //   400 {"code":"BadRequest","message":"Expected one of: <<{,[>> but got: <<EOF>>"}
+  // Verified against production: the same DELETE returns 401 without the header
+  // and 400 with it.
+  //
+  // Nothing caught this for months because (a) the disturbance DELETE had no UI
+  // path until TB-2, (b) GET survives it — ORDS does not parse a payload on GET
+  // — and (c) test_disturbances.sh only adds Content-Type when it sends a body,
+  // so the endpoint's own smoke test always passed. The header contract is now
+  // asserted per verb rather than left implicit.
+  group('the Content-Type contract', () {
+    Future<http.Request> capture(
+      Future<void> Function(RemoteApi api) call, {
+      int status = 204,
+    }) async {
+      late http.Request captured;
+      final api = _api((req) async {
+        captured = req;
+        return http.Response('', status);
+      });
+      await call(api);
+      return captured;
+    }
+
+    test('no bodyless request declares a Content-Type', () async {
+      final calls = <String, Future<void> Function(RemoteApi)>{
+        'deleteRecord': (api) => api.deleteRecord('id-1', _creds),
+        'deleteWalk': (api) => api.deleteWalk('walk-1', _creds),
+        'deletePhoto': (api) => api.deletePhoto(
+              motnjaId: 'id-1',
+              photoId: 'photo-1',
+              credentials: _creds,
+            ),
+      };
+
+      for (final entry in calls.entries) {
+        final req = await capture(entry.value);
+        expect(req.body, isEmpty, reason: '${entry.key} sends no body');
+        expect(
+          req.headers.keys.map((k) => k.toLowerCase()),
+          isNot(contains('content-type')),
+          reason: '${entry.key} must not declare a Content-Type — ORDS would '
+              'try to parse the empty body as JSON and 400 before the handler',
+        );
+        expect(req.headers['X-Narcis-Auth'], isNotNull,
+            reason: '${entry.key} still authenticates');
+      }
+    });
+
+    test('requests that DO carry a body still declare JSON', () async {
+      final post = await capture(
+        (api) => api.createRecord(_sample(), _creds),
+        status: 201,
+      );
+      expect(post.headers['Content-Type'], contains('application/json'));
+      expect(post.body, isNotEmpty);
+
+      final put = await capture(
+        (api) => api.updateRecord(_sample(), _creds),
+        status: 200,
+      );
+      expect(put.headers['Content-Type'], contains('application/json'));
+      expect(put.body, isNotEmpty);
+    });
+  });
+
   group('fetchRecords', () {
     test('GETs the base URL with auth and parses {"records":[...]}', () async {
       late http.Request captured;
