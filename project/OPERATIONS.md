@@ -121,13 +121,19 @@ automatic:
 
 ### Sync diagnostics (`[sync] …`)
 The disturbance sync pipeline emits debug-print lines prefixed with `[sync]`
-from four sites in [lib/state/app_state.dart](../lib/state/app_state.dart):
+from six sites in [lib/state/app_state.dart](../lib/state/app_state.dart):
 
 - `addRecord` — new record id, plus `isOnline` and `canSync` at save time.
+- `deleteRecord` (TB-2) — the queued record id, plus `isOnline`/`canSync`. Says the
+  delete was **queued**, not that it reached Oracle.
+- `_drainPendingDeletes` (TB-2) — how many deletes are queued, then per record
+  either `confirmed, purged locally` or `FAILED, stays queued` with the wrapped
+  exception. A record that keeps printing `stays queued` across syncs is the
+  line to look for when a warden says "I deleted it and it came back".
 - The `Connectivity.onConnectivityChanged` listener — raw result list, normalized
   result, and the resulting `isOnline` after the change.
 - `syncAll` — entry/exit, count of `pendingSync==true` records to push, and the
-  per-record push outcome.
+  per-record push outcome. The push count **excludes** rows queued for deletion.
 - `_sendAndMarkSynced` — failures with the wrapped `RemoteApiException` (HTTP
   status code or underlying network cause).
 

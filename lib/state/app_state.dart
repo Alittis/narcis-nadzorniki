@@ -97,7 +97,11 @@ class AppState extends ChangeNotifier {
   StreamSubscription<dynamic>? _walkServicePortSub;
   Set<String>? _lastRemoteWalkIds;
 
-  List<Disturbance> get records => List.unmodifiable(_records);
+  /// TB-2: rows queued for deletion are hidden here, so the map, the lists and
+  /// the counters all behave as though the delete already happened. Sync code
+  /// works off `_records` directly and still sees them.
+  List<Disturbance> get records =>
+      List.unmodifiable(_records.where((r) => !r.pendingDelete));
   List<LegacyDisturbance> get legacyRecords => List.unmodifiable(_legacyRecords);
   bool get showLegacy => _showLegacy;
   bool get offlineOverride => _offlineOverride;
@@ -226,7 +230,10 @@ class AppState extends ChangeNotifier {
   /// the session password is missing) plus records whose photos still need to
   /// be uploaded, plus walks waiting to be pushed.
   int get pendingPushCount {
-    final recs = _records.where((r) => r.pendingSync || r.hasPendingPhotoUploads).length;
+    final recs = _records
+        .where((r) =>
+            r.pendingSync || r.hasPendingPhotoUploads || r.pendingDelete)
+        .length;
     final ws = _walks.where((w) => w.pendingSync).length;
     return recs + ws;
   }
@@ -473,18 +480,62 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<void> deleteRecord(Disturbance record) async {
-    _records = _records.where((item) => item.id != record.id).toList();
+  /// TB-2: queues a delete instead of applying it locally and hoping the wire
+  /// call lands.
+  ///
+  /// The old version removed the row and its photos immediately and only then
+  /// tried the server, with no retry — so an offline delete looked like it
+  /// worked and then **undid itself**: `_mergeRemoteIntoLocal` treats the server
+  /// as authoritative, so the next pull found a row the server still had and no
+  /// local copy, and re-created it (photos and all, re-downloaded). Marking it
+  /// `pendingDelete` keeps the row addressable until the server confirms,
+  /// survives a restart via the local store, and hides it from `records` in the
+  /// meantime so the user sees the delete they asked for.
+  /// Returns true when the server confirmed the delete and the row has been
+  /// purged; false when it is still queued (offline, no session, or the call
+  /// failed). The caller needs the difference to tell the user the truth —
+  /// "deleted" and "will be deleted on the next sync" are not the same promise.
+  Future<bool> deleteRecord(Disturbance record) async {
+    _records = _records
+        .map((item) =>
+            item.id == record.id ? item.copyWith(pendingDelete: true) : item)
+        .toList(growable: false);
     await _localStore.save(_records);
-    await _photoStorage.deleteRecordDir(record.id);
     notifyListeners();
+    debugPrint('[sync] deleteRecord ${record.id} queued '
+        'isOnline=$isOnline canSync=$canSync');
+    if (isOnline && canSync) {
+      await _drainPendingDeletes();
+    }
+    return !_records.any((r) => r.id == record.id);
+  }
+
+  /// Sends every queued delete and purges the ones the server confirms.
+  ///
+  /// A 404 counts as success — `RemoteApi.deleteRecord` accepts it — which is
+  /// what makes this safe for a record whose create never landed, and for a
+  /// retry after a response was lost. Anything else (network, 5xx) leaves the
+  /// row queued for the next drain.
+  Future<void> _drainPendingDeletes() async {
     final creds = _credentials;
-    if (isOnline && creds != null) {
+    if (creds == null) return;
+    // Snapshot: the loop mutates _records.
+    final queued = _records.where((r) => r.pendingDelete).toList();
+    if (queued.isEmpty) return;
+    debugPrint('[sync] draining ${queued.length} pending delete(s)');
+    for (final record in queued) {
       try {
         await _remoteApi.deleteRecord(record.id, creds);
       } on RemoteApiException catch (e) {
+        debugPrint('[sync] delete ${record.id} FAILED, stays queued: $e');
         _handleSyncException(e);
+        continue;
       }
+      _records = _records.where((item) => item.id != record.id).toList();
+      await _photoStorage.deleteRecordDir(record.id);
+      await _localStore.save(_records);
+      notifyListeners();
+      debugPrint('[sync] delete ${record.id} confirmed, purged locally');
     }
   }
 
@@ -519,11 +570,17 @@ class AppState extends ChangeNotifier {
       // or queued walk that just failed to push above). Pushing them would
       // 500 with ORA-02291; endWalk's post-push drain or the next syncAll
       // (after the walk lands) will catch them up.
+      // TB-2: a row queued for deletion is never pushed, even if its create
+      // never landed. Posting it and then deleting it would be two pointless
+      // round trips, and on a flaky link the POST could land while the DELETE
+      // does not — leaving exactly the orphan the user asked us to remove.
       final pendingRecords = _records
-          .where((r) => r.pendingSync && !_isWalkPending(r.obhodId))
+          .where((r) =>
+              r.pendingSync && !r.pendingDelete && !_isWalkPending(r.obhodId))
           .toList();
       final deferred = _records
-          .where((r) => r.pendingSync && _isWalkPending(r.obhodId))
+          .where((r) =>
+              r.pendingSync && !r.pendingDelete && _isWalkPending(r.obhodId))
           .length;
       debugPrint('[sync] pending records to push: ${pendingRecords.length} '
           '(deferred waiting on walk: $deferred)');
@@ -539,6 +596,10 @@ class AppState extends ChangeNotifier {
       // this in a second pass so a record that just got created can have its
       // photos uploaded in the same sync cycle.
       await _drainPendingPhotos();
+      // TB-2: deletes go out before the pull, so a confirmed delete is purged
+      // locally rather than being merged straight back in from the server list
+      // fetched moments earlier.
+      await _drainPendingDeletes();
       // Pull remote list to surface any IDs the device doesn't have locally.
       await _pullRemoteWalks();
       await _prefetchAllWalkPoints();
@@ -650,7 +711,8 @@ class AppState extends ChangeNotifier {
     // for the new user (cross-account bleed).
     final byId = <String, Disturbance>{
       for (final r in _records)
-        if (r.pendingSync || remoteIds.contains(r.id)) r.id: r,
+        if (r.pendingSync || r.pendingDelete || remoteIds.contains(r.id))
+          r.id: r,
     };
     for (final remoteRec in remote) {
       final local = byId[remoteRec.id];
@@ -662,6 +724,12 @@ class AppState extends ChangeNotifier {
         byId[remoteRec.id] = remoteRec.toLocal().copyWith(
               types: _resolveTypeNames(remoteRec.types),
             );
+      } else if (local.pendingDelete) {
+        // TB-2: the user deleted this locally and the DELETE hasn't landed yet.
+        // The server still reports the row, but overwriting the local copy
+        // would clear pendingDelete and the delete would silently undo itself
+        // — the exact bug the queue exists to prevent. Leave local alone; the
+        // next drain removes it from both sides.
       } else if (local.pendingSync) {
         // Local has a queued create with the same ID. Trust local; the next
         // push will reconcile (POST is idempotent on motnja_id so the server

@@ -22,8 +22,13 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 
 ## Open
 
-### TB-2 · Edit / delete disturbance entries
-`🐞 Bug` · `P1` · `Todo` · Reporter: Matjaž · Updated: 2026-06-03
+### TB-2 · Delete disturbance entries from the phone
+`🐞 Bug` · `P1` · `Doing` (delete built + tested; **needs a release**) · Reporter: Matjaž · Updated: 2026-09-02
+- **Scope narrowed 2026-09-02.** This item was "edit / delete". Delete is what the report actually
+  needed — duplicates — and it is the clean half: `DELETE :id` sends no body, so none of the
+  column-ownership problems arise. **Edit moved to [TB-32](#tb-32--edit-a-disturbance-from-the-phone),**
+  which carries an ORDS change and cross-repo coordination. Splitting was a deliberate call, not a
+  descoping: see TB-32 for what edit needs and why it is not a UI task.
 - **Problem:** In the field, one disturbance was logged several times instead of once
   (reporter suspects weak signal or low battery). There is no way to correct it afterward.
 - **Want:** Edit and delete entries from the profile → *Seznam zapisov* list.
@@ -33,10 +38,9 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   1. **Root-cause the duplication.** POST is idempotent on the client UUID, so duplicates
      mean the client minted *multiple* records (multiple UUIDs) — likely a double-tap on
      save or a retry that re-generated the id. Reproduce before fixing.
-  2. **Surface edit/delete in the UI.** Note the known gap: `AppState.updateRecord` /
-     `deleteRecord` only reach Oracle when `isOnline && canSync` — offline edits/deletes
-     are **not** queued (ARCHITECTURE §8, OPERATIONS §10). Decide whether this item also
-     closes that gap or just exposes online edit/delete.
+  2. **Surface delete in the UI, and close the offline gap while doing it.** The old
+     `deleteRecord` only reached Oracle when `isOnline && canSync`, and it applied the local
+     removal *first* — see the Built note for why that was worse than it sounds.
 - **Discussion — sub-task 1 has an answer (2026-09-02, found while building TB-31).** The client had
   **no in-flight guard on save**: `FilledButton.icon(onPressed: _save)` stayed enabled while
   `addRecord` awaited photo materialisation, the optimistic POST *and* the photo uploads — seconds on a
@@ -47,11 +51,43 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   `DetailScreen._handleSave` behind a `_saving` flag with
   the button disabled for the whole await, regression-tested in
   [`preview_before_save_test.dart`](../test/preview_before_save_test.dart).
-  ⚠️ **This does not close TB-2.** It removes the most likely *source* of new duplicates; it neither
-  proves that was the only source (never reproduced on the reported device) nor gives anyone a way to
-  clean up records already in `TB_MOTNJE`. Sub-task 2 (edit/delete UI) and the offline-queue gap are
-  untouched, and this stays `P1`.
-- **Shipped:** —
+  ⚠️ **That did not close TB-2.** It removed the most likely *source* of new duplicates; it neither
+  proves that was the only source (never reproduced on the reported device) nor gave anyone a way to
+  clean up records already in `TB_MOTNJE`. This item is that cleanup path.
+- **Discussion — RESOLVED 2026-09-02 (two calls by Alexis):** (1) **delete first, properly queued**,
+  rather than edit+delete at once or an online-only version — an online-only delete would be useless in
+  exactly the weak-signal situation the bug was reported from; (2) **records the back office has acted
+  on are not deletable from the phone**, and the UI says why.
+- **Built 2026-09-02** — client-only, **no ORDS/DB/schema change** (`DELETE :id` already existed and was
+  smoke-tested, §9.3):
+  - **`pendingDelete` on `Disturbance`** ([`disturbance.dart`](../lib/models/disturbance.dart)) — persisted,
+    and defaulted `false` when absent so pre-TB-2 cached rows rehydrate.
+  - **`deleteRecord` queues instead of applying** ([`app_state.dart`](../lib/state/app_state.dart)): mark
+    `pendingDelete`, persist, then drain if online. Returns `true` only when the server confirmed and the
+    row was purged, so the snackbar can say *"Zapis je izbrisan"* vs *"Zapis bo izbrisan ob naslednji
+    sinhronizaciji"* truthfully.
+  - **⚠️ The bug the old version actually had.** It removed the row *and deleted its photo directory*
+    immediately, then fired DELETE with no retry. `_mergeRemoteIntoLocal` treats the server as
+    authoritative for records known to both sides — so an offline delete **silently undid itself**: the
+    next pull found a row the server still had and no local copy, and re-created it, photos and all. The
+    naive "just add two buttons" version of this item would have shipped that. Three pieces fix it: the
+    `records` getter hides `pendingDelete` rows from every read surface, the merge has an explicit
+    `pendingDelete` branch, and the drain runs *before* the pull inside `syncAll`.
+  - **A `pendingSync` row queued for delete is never POSTed** — on a flaky link the POST could land while
+    the DELETE does not, leaving exactly the orphan the user asked to remove. Safe because
+    `RemoteApi.deleteRecord` already accepts 404.
+  - **`Disturbance.isLockedByReview`** — true once TB-26's `reviewedBy`/`reviewedAt` are set (web-only
+    fields) or `caseStatus` has moved off `'Odprto'`. `RecordActionsMenu` explains rather than deletes;
+    the menu item stays *enabled* on purpose, because a greyed-out row tells the warden nothing.
+  - Tests: [`record_delete_test.dart`](../test/record_delete_test.dart) — 9 covering the model, the
+    lock rule, the offline queue, the confirmed purge, the create-skip, and the row menu. The
+    load-bearing one is *"a failed delete stays queued and the pull does NOT resurrect it"*. It needed a
+    booted-`AppState` harness (fake local/walks store, auth, connectivity, photo storage + `MockClient`)
+    which did not exist in this repo before — **reusable for TB-32.** ⚠️ `pumpEventQueue()` **hangs**
+    inside `testWidgets`, where the binding controls time; the harness only drains when online.
+    Full suite **142/142**, analyze at the documented 10 pre-existing info lints.
+  - **Not verified on a device.** Analyzer + tests only.
+- **Shipped:** — needs a release. Stays `Doing` until the rollout is confirmed.
 
 ### TB-3 · Patrol path accuracy
 `🐞 Bug` · `P2` · `Done` (shipped 1.3.1+12) · Reporters: Tomaž, Matjaž · Updated: 2026-06-22
@@ -920,6 +956,46 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
      disturbance dots too, so for one release the two maps encoded the *same dot* by different rules.
   2. **Two colour legends at once.** Keeping Starost (red/orange/blue swatches) beside the new Status
      swatches read as two competing legends. Resolved by removing Starost — see TB-29.
+### TB-32 · Edit a disturbance from the phone
+`✨ Enhancement` · `P2` · `Blocked` · Reporter: Matjaž (via TB-2) · Updated: 2026-09-02
+- **Problem:** Split out of [TB-2](#tb-2--delete-disturbance-entries-from-the-phone) on 2026-09-02. A
+  warden who spots a wrong type, time or description on a saved record still has to go to the desktop
+  back office. TB-31's preview catches mistakes *before* the commit; this is the after.
+- **Want:** Edit a own record's fields from *Seznam zapisov* — the same form, prefilled, saving over the
+  existing `motnja_id`.
+- **⚠️ This is not a UI task. Three things sit under it:**
+  1. **The phone's PUT clobbers the back office's case decision — needs an ORDS change.** The handler
+     writes `status_obravnave = l_case_status` and `obhod_id = l_obhod_id`
+     ([`disturbance_endpoints.sql:580`](../tools/ords/disturbance_endpoints.sql)). A warden fixing a typo
+     would push their possibly-stale local status over a reviewer's verdict, silently reopening a closed
+     case. It does **not** touch `obravnaval`/`obravnavano`/`opomba_uradna`, so those are already safe.
+  2. **The web side has already decided the rule, and its reasoning names this app.** From
+     `narcis-vibed` `project/ARCHITECTURE.md` (verified against source 2026-09-02, not paraphrased):
+     *"`STATUS_OBRAVNAVE` and the three obravnava columns belong to NV-220's handler and its different
+     gate — an author must not close their own case from the edit form, which is the same concern
+     NV-220's follow-up raised about the phone's create-time status dropdown. `OBHOD_ID` is refused
+     outright: on an absent-means-null wire, a panel that forgot to echo it would silently unlink the
+     record from its patrol walk."* It **does** write `SPREMENJEN`/`SPREMENJEN_OD`. Match those rules
+     rather than inventing new ones, and check whether that handler shipped before designing the phone's.
+  3. **Offline edits are not queued.** `updateRecord` is still fire-and-forget, and the merge treats the
+     server as authoritative — so an offline edit silently reverts on the next pull, the same class of
+     bug TB-2 fixed for delete. Delete needed one boolean; edit needs field-level reconciliation, or a
+     documented last-write-wins with the window made visible to the user.
+- **Also worth settling:** the phone's own create-time `caseStatus` dropdown
+  ([`form_screen.dart`](../lib/screens/form_screen.dart)) is the thing NV-220's follow-up objected to. If
+  status is web-owned, that dropdown probably should not exist either — decide both together.
+- **Server gate is org-wide, not author-scoped.** PUT/DELETE 404 only across organisations, so the UI is
+  the only thing stopping a warden editing a teammate's record. Fine while *Seznam zapisov* lists own
+  records only; worth an author check server-side if edit ships.
+- **Reusable from TB-2:** the booted-`AppState` test harness in
+  [`record_delete_test.dart`](../test/record_delete_test.dart) (fake stores/auth/connectivity/photos +
+  `MockClient`) is what any queue test for this needs.
+- **Discussion — BLOCKED on two decisions:** (a) does the ORDS PUT stop writing `status_obravnave`/
+  `obhod_id` for everyone, or does the phone get a separate edit-scoped endpoint? (b) which fields are
+  editable — text and types only, or location/time/photos too? Location and time are what a
+  contested record turns on, so editing them silently is a different risk from fixing a typo.
+- **Shipped:** —
+
 ### TB-31 · Preview the record before saving, with a way back to editing
 `✨ Enhancement` · `P2` · `Done` (shipped v1.8.0+17; rolled out on the Play Closed testing track 2026-09-02) · Reporter: Alexis · Updated: 2026-09-02
 - **Problem:** In [`form_screen.dart`](../lib/screens/form_screen.dart) *Shrani zapis* commits and pops

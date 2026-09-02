@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:narcis_nadzorniki/models/disturbance.dart';
 import 'package:narcis_nadzorniki/models/walk.dart';
 import 'package:narcis_nadzorniki/screens/detail_screen.dart';
 import 'package:narcis_nadzorniki/screens/walk_detail_screen.dart';
@@ -63,7 +64,7 @@ class RecordListScreen extends StatelessWidget {
                       ObhodLink(walk: linkedWalk, dateFormat: dateFormat),
                   ],
                 ),
-                trailing: const Icon(Icons.chevron_right),
+                trailing: RecordActionsMenu(record: record),
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -81,6 +82,104 @@ class RecordListScreen extends StatelessWidget {
     );
   }
 
+}
+
+/// TB-2: the per-row action menu in Seznam zapisov. Delete is the only action
+/// for now; the menu shape is what lets edit join it later without disturbing
+/// the row's tap target, which still opens the detail view.
+///
+/// Public so it can be widget-tested against a real AppState without seeding
+/// the whole screen.
+class RecordActionsMenu extends StatelessWidget {
+  const RecordActionsMenu({super.key, required this.record});
+
+  final Disturbance record;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String>(
+      icon: const Icon(Icons.more_vert),
+      tooltip: 'Dejanja',
+      onSelected: (value) {
+        if (value == 'delete') {
+          _handleDelete(context);
+        }
+      },
+      itemBuilder: (_) => const [
+        PopupMenuItem<String>(
+          value: 'delete',
+          child: Row(
+            children: [
+              Icon(Icons.delete_outline),
+              SizedBox(width: 12),
+              Text('Izbriši zapis'),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _handleDelete(BuildContext context) async {
+    final state = context.read<AppState>();
+
+    // The item is deliberately left enabled for a locked record: a greyed-out
+    // row that cannot be tapped tells the user nothing about why.
+    if (record.isLockedByReview) {
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Zapisa ni mogoče izbrisati'),
+          content: Text(
+            'Zapis je v obravnavi (status: „${record.caseStatus}"). '
+            'Zapise, ki jih je pisarna že prevzela v obravnavo, lahko '
+            'odstrani samo pisarna.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Razumem'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Izbriši zapis?'),
+        content: const Text(
+          'Zapis bo trajno izbrisan skupaj s fotografijami. '
+          'Tega ni mogoče razveljaviti.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Prekliči'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Izbriši'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    // The row vanishes from `records` the moment this is queued, so there is no
+    // second tap to guard against here.
+    final purged = await state.deleteRecord(record);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(purged
+            ? 'Zapis je izbrisan.'
+            : 'Zapis bo izbrisan ob naslednji sinhronizaciji.'),
+      ),
+    );
+  }
 }
 
 /// Subtitle line for a record row: observed date, then the case status (TB-30).

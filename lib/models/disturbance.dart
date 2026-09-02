@@ -16,6 +16,7 @@ class Disturbance {
     required this.caseStatus,
     required this.pendingSync,
     required this.createdAt,
+    this.pendingDelete = false,
     this.legalBasis,
     this.proposedType,
     this.createdBy,
@@ -41,6 +42,12 @@ class Disturbance {
   // 'Zaključeno', 'Predano drugi službi'. Default 'Odprto' for new records.
   final String caseStatus;
   final bool pendingSync;
+  // TB-2: the user deleted this record while the DELETE could not be sent (no
+  // network, or no session). The row stays in _records so the queue can find it
+  // after a restart, but AppState.records hides it, so every read surface --
+  // map, lists, counts -- behaves as though it is already gone. Cleared only by
+  // purging the record outright once the server has confirmed the delete.
+  final bool pendingDelete;
   final DateTime createdAt;
   final String? proposedType;
   // Email of the user who created the record. Null for local-only records
@@ -60,6 +67,16 @@ class Disturbance {
 
   bool get hasPendingPhotoUploads => photos.any((p) => p.pendingUpload);
 
+  /// TB-2: the back office has acted on this record, so the phone must not
+  /// delete it. Either a reviewer stamped it (TB-26's `reviewedBy`/`reviewedAt`,
+  /// which only the web backoffice writes) or the case status has moved off the
+  /// create-time default. Deleting such a row would pull the evidence out from
+  /// under a decision someone has already taken, and `DELETE :id` is a hard
+  /// cascade -- the record, its type/observer junctions and its photos all go,
+  /// with nothing to restore from.
+  bool get isLockedByReview =>
+      reviewedBy != null || reviewedAt != null || caseStatus != 'Odprto';
+
   Disturbance copyWith({
     double? latitude,
     double? longitude,
@@ -73,6 +90,7 @@ class Disturbance {
     String? legalBasis,
     String? caseStatus,
     bool? pendingSync,
+    bool? pendingDelete,
     DateTime? createdAt,
     String? proposedType,
     String? createdBy,
@@ -94,6 +112,7 @@ class Disturbance {
       legalBasis: legalBasis ?? this.legalBasis,
       caseStatus: caseStatus ?? this.caseStatus,
       pendingSync: pendingSync ?? this.pendingSync,
+      pendingDelete: pendingDelete ?? this.pendingDelete,
       createdAt: createdAt ?? this.createdAt,
       proposedType: proposedType ?? this.proposedType,
       createdBy: createdBy ?? this.createdBy,
@@ -117,6 +136,7 @@ class Disturbance {
         'legalBasis': legalBasis,
         'caseStatus': caseStatus,
         'pendingSync': pendingSync,
+        'pendingDelete': pendingDelete,
         'createdAt': createdAt.toIso8601String(),
         'proposedType': proposedType,
         'createdBy': createdBy,
@@ -145,6 +165,9 @@ class Disturbance {
       legalBasis: json['legalBasis'] as String?,
       caseStatus: (json['caseStatus'] as String?) ?? 'Odprto',
       pendingSync: json['pendingSync'] as bool,
+      // Absent on every record cached before TB-2; such a record was, by
+      // definition, not queued for deletion.
+      pendingDelete: (json['pendingDelete'] as bool?) ?? false,
       createdAt: DateTime.parse(json['createdAt'] as String),
       proposedType: json['proposedType'] as String?,
       createdBy: json['createdBy'] as String?,
