@@ -43,7 +43,8 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   weak link, which is exactly the "weak signal" condition Matjaž reported. A second tap re-entered
   `_save`, minted a second `_uuid.v4()` and filed a second record. That fits the evidence: POST is
   idempotent on the client UUID, so duplicates require the client to mint multiple ids.
-  **Fixed in TB-31** — the commit now happens in `DetailScreen._handleSave` behind a `_saving` flag with
+  **Fixed in TB-31** (live in the field from v1.8.0+17, 2026-09-02) — the commit now happens in
+  `DetailScreen._handleSave` behind a `_saving` flag with
   the button disabled for the whole await, regression-tested in
   [`preview_before_save_test.dart`](../test/preview_before_save_test.dart).
   ⚠️ **This does not close TB-2.** It removes the most likely *source* of new duplicates; it neither
@@ -920,7 +921,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   2. **Two colour legends at once.** Keeping Starost (red/orange/blue swatches) beside the new Status
      swatches read as two competing legends. Resolved by removing Starost — see TB-29.
 ### TB-31 · Preview the record before saving, with a way back to editing
-`✨ Enhancement` · `P2` · `Doing` (built into v1.8.0+17 — **pending Play upload + rollout**) · Reporter: Alexis · Updated: 2026-09-02
+`✨ Enhancement` · `P2` · `Done` (shipped v1.8.0+17; rolled out on the Play Closed testing track 2026-09-02) · Reporter: Alexis · Updated: 2026-09-02
 - **Problem:** In [`form_screen.dart`](../lib/screens/form_screen.dart) *Shrani zapis* commits and pops
   in one tap — there is no review step and no undo. After that the only correction path is the desktop
   back office, because TB-2 (edit/delete on the phone) is still `Todo`. The warden's last look at the
@@ -985,8 +986,12 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   the AAB manifest (1.7.0 absent), versionCode 17 from `packaged_manifests`; `com.example` and
   `ACCESS_BACKGROUND_LOCATION` absent; all four `hardware.camera*`/`location*` features present.
   **Needs no server change** — it works the moment the build is installed.
-- **Shipped:** — **not yet uploaded.** Stays `Doing` until the rollout is confirmed on the Play Closed
-  testing track; only then does this flip to `Done`.
+- **Shipped:** v1.8.0+17, **rolled out on the Play Closed testing track 2026-09-02**.
+- **⚠️ One verification still open.** The on-device gesture-bar check that ARCHITECTURE §15 requires for
+  new bottom-of-screen chrome has **not been reported back**. The preview's action bar is the app's first
+  `bottomNavigationBar`, and §15 is explicit that neither type-checking nor `flutter test` can settle it —
+  the 320 px widget test proves the two buttons do not overflow, not that they clear the gesture bar on an
+  A56. If a warden reports the buttons sitting under the nav bar, that is this, not a new defect.
 
 ---
 
