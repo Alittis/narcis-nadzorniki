@@ -23,7 +23,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 ## Open
 
 ### TB-2 · Delete disturbance entries from the phone
-`🐞 Bug` · `P1` · `Doing` (delete built + tested; **needs a release**) · Reporter: Matjaž · Updated: 2026-09-02
+`🐞 Bug` · `P1` · `Doing` (delete built into v1.9.0+18 — **pending Play upload + rollout**) · Reporter: Matjaž · Updated: 2026-09-02
 - **Scope narrowed 2026-09-02.** This item was "edit / delete". Delete is what the report actually
   needed — duplicates — and it is the clean half: `DELETE :id` sends no body, so none of the
   column-ownership problems arise. **Edit moved to [TB-32](#tb-32--edit-a-disturbance-from-the-phone),**
@@ -94,7 +94,14 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
     open question — if status is web-owned, that dropdown should not be on the phone at all, and this
     edge disappears with it.
   - **Not verified on a device.** Analyzer + tests only.
-- **Shipped:** — needs a release. Stays `Doing` until the rollout is confirmed.
+- **Built into v1.9.0+18** (2026-09-02, archived `~/Releases/terenska-beleznica-1.9.0+18.aab`, signed
+  with the upload key). Build exit 0; analyze at the documented 10 pre-existing info lints; suite
+  **142/142**; signer cert SHA-256 matches `upload_cert_sha256` with Owner `CN=Terenska beleznica`;
+  versionName 1.9.0 in the AAB manifest (1.8.0 absent), versionCode 18 from `packaged_manifests`;
+  `com.example` and `ACCESS_BACKGROUND_LOCATION` absent; all four `hardware.camera*`/`location*`
+  features present. **Needs no server change** — `DELETE :id` already existed.
+- **Shipped:** — **not yet uploaded.** Stays `Doing` until the rollout is confirmed on the Play Closed
+  testing track; only then does this flip to `Done`.
 
 ### TB-3 · Patrol path accuracy
 `🐞 Bug` · `P2` · `Done` (shipped 1.3.1+12) · Reporters: Tomaž, Matjaž · Updated: 2026-06-22
