@@ -920,7 +920,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   2. **Two colour legends at once.** Keeping Starost (red/orange/blue swatches) beside the new Status
      swatches read as two competing legends. Resolved by removing Starost — see TB-29.
 ### TB-31 · Preview the record before saving, with a way back to editing
-`✨ Enhancement` · `P2` · `Done` (built + tested locally; **needs a Flutter release** to reach the field) · Reporter: Alexis · Updated: 2026-09-02
+`✨ Enhancement` · `P2` · `Doing` (built into v1.8.0+17 — **pending Play upload + rollout**) · Reporter: Alexis · Updated: 2026-09-02
 - **Problem:** In [`form_screen.dart`](../lib/screens/form_screen.dart) *Shrani zapis* commits and pops
   in one tap — there is no review step and no undo. After that the only correction path is the desktop
   back office, because TB-2 (edit/delete on the phone) is still `Todo`. The warden's last look at the
@@ -977,8 +977,16 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
     reintroduce silently. Full suite **132/132**; `flutter analyze` clean (the 10 remaining infos are
     all pre-existing).
   - **Not verified on a device.** Analyzer + widget tests only; the narrow-screen test (320 px) covers
-    the action-bar layout, but the real gesture-bar check per ARCHITECTURE §15 still wants a build.
-- **Shipped:** — (built at v1.7.0+16; needs a version bump + release)
+    the action-bar layout, but the real gesture-bar check per ARCHITECTURE §15 needs a device — it is on
+    the hand-over checklist for this release.
+- **Built into v1.8.0+17** (2026-09-02, archived `~/Releases/terenska-beleznica-1.8.0+17.aab`, signed with
+  the upload key). Build exit 0; analyze at the documented 10 pre-existing info lints; suite **133/133**;
+  signer cert SHA-256 matches `upload_cert_sha256` with Owner `CN=Terenska beleznica`; versionName 1.8.0 in
+  the AAB manifest (1.7.0 absent), versionCode 17 from `packaged_manifests`; `com.example` and
+  `ACCESS_BACKGROUND_LOCATION` absent; all four `hardware.camera*`/`location*` features present.
+  **Needs no server change** — it works the moment the build is installed.
+- **Shipped:** — **not yet uploaded.** Stays `Doing` until the rollout is confirmed on the Play Closed
+  testing track; only then does this flip to `Done`.
 
 ---
 
