@@ -116,6 +116,9 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Follow-up shipped alongside the fix:** [TB-34](#tb-34--delete-from-the-record-details-view-not-just-the-list-row)
   adds the same delete action to the details view, which is where the reporter points out most delete
   decisions are actually made.
+- **✅ Confirmed working end to end on device 2026-09-03**, on v1.10.1+20 — after two defects found on
+  rolled-out builds ([TB-33](#tb-33--delete-never-reached-the-server--ords-400-on-every-bodyless-delete),
+  [TB-35](#tb-35--a-confirmed-delete-still-showed-as-unsynced--and-the-test-that-should-have-caught-it-was-vacuous)).
 
 ### TB-3 · Patrol path accuracy
 `🐞 Bug` · `P2` · `Done` (shipped 1.3.1+12) · Reporters: Tomaž, Matjaž · Updated: 2026-06-22
@@ -985,7 +988,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   2. **Two colour legends at once.** Keeping Starost (red/orange/blue swatches) beside the new Status
      swatches read as two competing legends. Resolved by removing Starost — see TB-29.
 ### TB-35 · A confirmed delete still showed as unsynced — and the test that should have caught it was vacuous
-`🐞 Bug` · `P1` · `Done` (shipped v1.10.1+20, rolled out on the Play Closed testing track 2026-09-03) · Reporter: Alexis (on the rolled-out v1.10.0+19) · Updated: 2026-09-03
+`🐞 Bug` · `P1` · `Done` (shipped v1.10.1+20, rolled out 2026-09-03; **confirmed working on device**) · Reporter: Alexis (on the rolled-out v1.10.0+19) · Updated: 2026-09-03
 - **Problem:** On v1.10.0+19 the delete worked, but the reporter had to hit sync manually before the app
   agreed it had. Claude had asserted the delete syncs immediately; the reporter said it did not, and was
   right about the observable behaviour.
@@ -1033,6 +1036,11 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   ~20 h against this app's usual ~1 h and cleared with no action taken — the submission was the fourth
   in eight hours. Turnaround baseline now recorded in
   [`PLAY_CLOSED_TEST.md`](PLAY_CLOSED_TEST.md) §7.1, with the one-release-a-day rule that follows from it.
+- **Verified on device 2026-09-03** (reporter): deleting a record now completes without a manual sync —
+  the icon goes straight to green. **That closes the delete work end to end**: TB-2's queue, TB-33's wire
+  fix and TB-35's indicator are all confirmed on hardware, not just in tests. Worth noting given TB-33
+  and TB-35 were both found *on rolled-out builds* that had passed a green suite — the on-device check is
+  what actually settled this feature, twice.
 
 ### TB-33 · Delete never reached the server — ORDS 400 on every bodyless DELETE
 `🐞 Bug` · `P1` · `Done` (shipped v1.10.0+19, rolled out on the Play Closed testing track 2026-09-02; **delete confirmed working on device**) · Reporter: Alexis (on the rolled-out v1.9.0+18) · Updated: 2026-09-02
