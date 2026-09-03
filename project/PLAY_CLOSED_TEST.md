@@ -745,6 +745,38 @@ For each tester collected via reply email, store: full name, role / organisation
 - Subsequent releases: bump `version: X.Y.Z+B` in `pubspec.yaml`, run `flutter build appbundle --release`, replace the AAB on the same Closed track via **Create new release**. No need to re-fill App Content unless the data-collection footprint changes.
 - When promoting to **Open testing** or **Production**: same questionnaire answers carry over; the only new step is uploading to the higher track and waiting for re-review (typically faster).
 
+### 7.1 Review turnaround — observed (Closed testing / Alpha)
+
+Recorded because a release once sat ~20 h and there was no baseline to judge it against.
+Source: **Play Console → Publishing overview → Submission activity** (which only retains data
+from 2026-05-01). Submission times are exact; "cleared in" is an upper bound where the
+publish moment was not observed directly.
+
+| Sub. | Submitted | Build | Cleared in | Note |
+|---|---|---|---|---|
+| 12 | 2026-08-31 08:51 | v1.6.0+15 | ~1 h | |
+| 13 | 2026-08-31 10:58 | v1.7.0+16 | ~1 h | 2nd submission that day — still fast |
+| 14 | 2026-09-02 08:36 | v1.8.0+17 | ~1 h | |
+| 15 | 2026-09-02 10:50 | v1.9.0+18 | ~1 h | |
+| 16 | 2026-09-02 11:51 | v1.10.0+19 | ~1 h | 3rd that day — still fast |
+| 17 | 2026-09-02 16:48 | v1.10.1+20 | **≤ 20 h** | 4th that day; cleared 2026-09-03 with **no action taken** |
+
+**What the outlier was not.** Its AAB manifest differed from the build before it by a single
+string (`1.10.0` → `1.10.1`) — same applicationId, permissions, `uses-feature` set, SDK levels
+and signing key; no `android/` file changed in any of the four releases. Managed publishing was
+**off**, the Publishing-overview banner was Play's generic review text with **no policy message
+or rejection**, and every submission since 2026-05-01 has published. So it was queue variance,
+not a fault.
+
+**Practical rules drawn from this:**
+- **One release a day.** Four submissions in eight hours is the only thing that distinguished
+  the slow one, and nothing was gained by shipping them that fast — no tester saw three of them.
+- **Do not "fix" a slow review.** *Remove changes* cancels the submission and re-uploading
+  restarts the clock; it is the only lever available and it makes things worse.
+- **When to actually worry:** Google's stated ceiling is 7 days. Under ~24 h is normal variance
+  even against this app's own ~1 h habit. Open a support case only well past that, or
+  immediately if a **policy** message appears (which reads quite differently from "In review").
+
 ---
 
 ## 8. Open items / TODO before submission

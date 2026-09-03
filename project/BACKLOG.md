@@ -985,7 +985,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   2. **Two colour legends at once.** Keeping Starost (red/orange/blue swatches) beside the new Status
      swatches read as two competing legends. Resolved by removing Starost — see TB-29.
 ### TB-35 · A confirmed delete still showed as unsynced — and the test that should have caught it was vacuous
-`🐞 Bug` · `P1` · `Doing` (fixed, built into v1.10.1+20 — **pending Play upload + rollout**) · Reporter: Alexis (on the rolled-out v1.10.0+19) · Updated: 2026-09-02
+`🐞 Bug` · `P1` · `Done` (shipped v1.10.1+20, rolled out on the Play Closed testing track 2026-09-03) · Reporter: Alexis (on the rolled-out v1.10.0+19) · Updated: 2026-09-03
 - **Problem:** On v1.10.0+19 the delete worked, but the reporter had to hit sync manually before the app
   agreed it had. Claude had asserted the delete syncs immediately; the reporter said it did not, and was
   right about the observable behaviour.
@@ -1029,7 +1029,10 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   with the upload key). Build exit 0; analyze at the documented 10 info lints; suite 148/148; signer cert
   SHA-256 matches `upload_cert_sha256`; versionName 1.10.1 (1.10.0 absent), versionCode 20; manifest
   otherwise identical to v1.10.0+19. **No server change.**
-- **Shipped:** — pending upload + rollout. Stays `Doing` until confirmed.
+- **Shipped:** v1.10.1+20, **rolled out on the Play Closed testing track 2026-09-03**. Its review took
+  ~20 h against this app's usual ~1 h and cleared with no action taken — the submission was the fourth
+  in eight hours. Turnaround baseline now recorded in
+  [`PLAY_CLOSED_TEST.md`](PLAY_CLOSED_TEST.md) §7.1, with the one-release-a-day rule that follows from it.
 
 ### TB-33 · Delete never reached the server — ORDS 400 on every bodyless DELETE
 `🐞 Bug` · `P1` · `Done` (shipped v1.10.0+19, rolled out on the Play Closed testing track 2026-09-02; **delete confirmed working on device**) · Reporter: Alexis (on the rolled-out v1.9.0+18) · Updated: 2026-09-02
