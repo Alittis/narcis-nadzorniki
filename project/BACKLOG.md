@@ -283,6 +283,8 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   want an explicit "no disturbance observed" marker at specific recurring points?
 - **Discussion:** Clarify the unit of "nothing here" — per walk, or per monitored point? That
   decision drives whether this is a UI affordance over existing walks or a new record kind.
+  **2026-10-12:** [TB-39](#tb-39--hot-spots-vroče-točke--recurring-named-points-that-collect-records-over-time)'s
+  hot spots are exactly the "monitored point". Revisit this once hot-spot phase 1 exists.
 - **Shipped:** —
 
 ### TB-12 · Search the disturbance-type codebook
@@ -435,7 +437,18 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   (auth-token audit timestamps, same root cause but latent + security-critical — deferred, not folded in).
 
 ### TB-15 · Export a disturbances + walks report for a chosen date range
-`✨ Enhancement` · `P2` · `Blocked` (awaiting template) · Reporter: Matjaž · Updated: 2026-06-22
+`✨ Enhancement` · `P2` · `Blocked` (awaiting Matjaž's proposal; work moved to NarcIS desktop) · Reporter: Matjaž · Updated: 2026-10-12
+- **Re-scoped 2026-10-12 — this is no longer a phone feature.**
+  - Desktop Excel export shipped in narcis-vibed **NV-183**: sheets Povzetek / Motnje / Obhodi; photos
+    by count only; filtered by the panel's facets (Kategorija, Obdobje, Starost, Avtor, Status). It has
+    **no šifra facet**.
+  - Matjaž's 2026-10 mail asks for (AI-)generated reports in NarcIS: export by šifra *including
+    photos*, export of forwarded records (TB-38), and chronological reports for a chosen period. He
+    says the park still owes a proposal.
+  - The phone's only part is producing the attributes those filters need: TB-38's flag, TB-42 and
+    TB-43.
+  - Open an NV item once the proposal arrives. The notes below predate this and assumed an on-phone
+    export.
 - **Problem / want:** Export a report covering both disturbances (motnje) and patrols (obhodi) for a
   selected calendar period, so wardens/management can produce periodic reports.
 - **Blocked on:** Matjaž is sending a template (*predloga*) that defines the output — format
@@ -458,7 +471,9 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-16 · Preview a disturbance before submitting
-`✨ Enhancement` · `P2` · `Todo` · Reporter: Matjaž · Updated: 2026-06-22
+`✨ Enhancement` · `P2` · `Done` (superseded by [TB-31](#tb-31--preview-the-record-before-saving-with-a-way-back-to-editing), shipped v1.8.0+17) · Reporter: Matjaž · Updated: 2026-10-12
+- **Closed 2026-10-12:** TB-31 built exactly this (mandatory preview, *Uredi* back to a filled form),
+  and Matjaž's 2026-10 mail lists it as done. This item was never updated when TB-31 shipped.
 - **Problem / want:** Before a disturbance is saved, show a review of everything entered — photos, type
   (šifra), note (opomba), location, action taken (ukrep), and the rest — so the warden can catch mistakes
   before committing.
@@ -1109,7 +1124,12 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** v1.10.0+19, **rolled out 2026-09-02**.
 
 ### TB-32 · Edit a disturbance from the phone
-`✨ Enhancement` · `P2` · `Blocked` · Reporter: Matjaž (via TB-2) · Updated: 2026-09-02
+`✨ Enhancement` · `P3` · `Blocked` · Reporter: Matjaž (via TB-2) · Updated: 2026-10-12
+- **Demoted P2 → P3, 2026-10-12 (Claude's proposal; overrule freely).** The desktop now edits and
+  deletes own records (narcis-vibed **NV-222**, live 2026-08-27; org admins hold
+  `TERENSKA-BELEZNICA-ADMIN` for colleagues' records), and Matjaž's 2026-10 mail counts editing as
+  solved. Field edit on the phone is still not requested. Given everything below, consider closing this
+  unless wardens ask for it.
 - **Problem:** Split out of [TB-2](#tb-2--delete-disturbance-entries-from-the-phone) on 2026-09-02. A
   warden who spots a wrong type, time or description on a saved record still has to go to the desktop
   back office. TB-31's preview catches mistakes *before* the commit; this is the after.
@@ -1219,6 +1239,203 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   bottom-of-screen chrome is **done**: on the A56, the *Uredi* / *Shrani zapis* row clears the navigation
   bar. That closes the last open verification on this item — the action bar is the app's first
   `bottomNavigationBar`, so the pattern is now confirmed, not just reasoned about (§15 pattern 1b).
+
+### TB-36 · Emphasise municipal and NRP land on the map
+`✨ Enhancement` · `P2` · `Blocked` · Reporter: Matjaž (status/wishlist mail, triaged 2026-10-12) · Updated: 2026-10-12
+- **Want:** *"urediti vizualno poudarjenost občinskih / NRP zemljišč"* — make municipal and NRP land stand
+  out, now that narcis-vibed's land module (TRŠCA) exists. Listed as planned and already agreed.
+- **Blocked because no source exists that the phone can read** (narcis-vibed checked 2026-10-12):
+  - TRŠCA (NV-250/254/310) keeps parcels in **Postgres on the VPS** (`trsca.parcela`; NRP = org 152,
+    1,311 parcels), served only by Next.js `/api/trsca/*` behind a web session cookie + `ADMIN-TRSCA`.
+    There is no bearer-token path, so the phone's TB token cannot read it.
+  - The register does **not** store "municipal" or "Občina + NRP". The NRP sheet's
+    `LASTNIK_OC`/`UPR_NRP`/`LAST_UPR` flags were dropped on import by design (NV-310 notes).
+  - What *is* public: NV-368 `GET /api/parcele/obrisi?oseba=&ko=` on narcis.alittis.com — live GURS
+    owner/manager outlines as GeoJSON with a `vloga` per feature (cap 5,000). GURS lists NRP as
+    **manager** of 806 parcels and owner of none; Občina Cerknica holds 4,690. Using it would make the
+    field app depend on the narcis-vibed VPS deployment, which ARCHITECTURE §10.2 records the app
+    deliberately avoids.
+- **Questions for Matjaž:** (1) Which land is meant: the park's own TRŠCA register (incl. *v nameri* /
+  *oddano v zakup*), or GURS owner/manager = NRP plus which municipalities? (2) Is this for the phone
+  map, the desktop Beležnica map, or both?
+- **UX:** a tinted fill offered as one more row on the existing Parcele chip, not a new chip.
+- **Cross-repo:** whichever source is chosen needs an endpoint the phone can read, in narcis-vibed or as
+  a GeoServer layer. No NV item yet.
+- **Shipped:** —
+
+### TB-37 · Natural-monument filter in the Območja layer picker
+`✨ Enhancement` · `P2` · `Todo` (quick win) · Reporter: Matjaž · Updated: 2026-10-12
+- **Want:** *"dodan filter pri slojih za naravne spomenike"*. The web already has it: NV-84 gave the ZO
+  layer a Vrsta filter that includes `naravni-spomenik`.
+- **Reading (confirm with Matjaž):** natural monuments are shown and hidden separately from the rest of
+  ZO. Today they are bundled into the ZO sublayer as one of seven `ZO_VRSTA` classes
+  ([`obmocje_sheet.dart`](../lib/widgets/obmocje_sheet.dart)).
+- **Client-only, verified.** The NarcIS GeoServer accepts the `CQL_FILTER` vendor parameter on
+  `ZOS_ZO_PLG`/`ZOS_ZO_PNT` (probed 2026-10-12): `ZO_VRSTA='naravni spomenik'` and `<>` both
+  return filtered tiles, and a non-matching value returns an empty tile. No server change is needed.
+- **Shape:** split the picker's ZO row into *Zavarovana območja* and *Naravni spomeniki*
+  ([`obmocja_picker.dart`](../lib/widgets/obmocja_picker.dart)) — one more checkbox, no new control.
+  The identify call (GetFeatureInfo, [`obmocja_store.dart`](../lib/data/obmocja_store.dart)) must
+  carry the same filter, or a tap lists monuments that are hidden on the map. `CQL_FILTER` takes one
+  value per entry in `LAYERS`.
+- Pairs with TB-40: the picker selection should be remembered.
+- **Shipped:** —
+
+### TB-38 · Forward a record to the head of supervision by e-mail (opt-in)
+`✨ Enhancement` · `P2` · `Blocked` · Reporter: Matjaž · Updated: 2026-10-12
+- **Want:** a tick box the observer sets before submitting. When it is set, an e-mail *Obvestilo o
+  motnji* goes to the org's head of supervision with every attribute (šifra, observer, location,
+  description, photo). For NRP the address is `nadzor@notranjski-park.si`. TB-15's reports also want
+  to export "all forwarded records", so the choice must be **stored on the record**, not only acted on.
+- **The server must send it, not the phone.** Records are often saved offline, and the phone has no
+  mail transport. A `mailto:` or share-sheet hand-off would leave the app and lose the stored flag.
+- **Design constraints found in triage:**
+  1. **Photos land after the record.** `addRecord` POSTs the record and then uploads the photos one by
+     one (§13). A mail sent on the record POST would usually go out without its photo. The send needs
+     its own step once the photos have drained (a queued `notify` call), or a server job that waits
+     for them.
+  2. **The TB stack has no mail yet.** narcis-vibed sends none. The legacy NarcIS APEX app does (mail
+     templates in its prod export), so `APEX_MAIL` is probably configured on that instance. **STATUS:
+     UNKNOWN – REQUIRES CONFIRMATION** that an ORDS handler in the NARCIS schema can call it (outside an
+     APEX session it needs a workspace context) and that the relay delivers to external domains.
+  3. **There is no per-org recipient store.** A small org → address table is needed. Hide the tick box
+     for orgs without a recipient rather than offer a choice that does nothing.
+- **Schema:** a flag and a timestamp on `TB_MOTNJE`, plus the recipient table; GET/POST carry the flag.
+  narcis-vibed shows the flag on the record and offers it as an export filter.
+- **UX:** the tick box sits on the preview screen (TB-31) next to *Shrani zapis*, the moment the
+  observer commits. The preview names the recipient (*Obvestilo bo poslano: …*).
+- **Blocked on:** (a) the operator confirming that `APEX_MAIL` can be called from ORDS on prod;
+  (b) the recipients for orgs other than NRP.
+- **Shipped:** —
+
+### TB-39 · Hot spots (*vroče točke*) — recurring named points that collect records over time
+`✨ Enhancement` · `P2` · `Blocked` (scope decisions) · Reporters: Matjaž, Tomaž (proposal *Predlog »Vroča točka«*, 2026-08-27) · Updated: 2026-10-12
+- **Want (Tomaž's proposal):** permanent named points (*Zapornica Nova Karlovica*, *Zadrževalnik
+  Rešeto*, a dump site) where any warden adds a new record on each visit, instead of creating a new
+  one-off point every time. Modelled on eBird hotspots.
+  - **Created by** an authorised admin per org (NRP: Matjaž, initially Tomaž), plus ZRSVN generally.
+  - **Proposed** via a *Predlagaj za vročo točko* button on a record, **desktop only**, which mails the
+    admin (the "sito"). The admin gives each one a short name.
+  - **Distinct on the map**, and shown when a record's location is chosen. Tapping one lists its
+    records, newest first.
+  - **Existing records are regrouped by hand** in the desktop edit, never automatically: authors their
+    own, the org admin colleagues'. Proximity is not relation (Tomaž: a dump-site hot spot versus an
+    unrelated "bike off the trail" record a few metres away).
+- **Mostly back-office work.** Creating, naming, proposing and regrouping are all desktop
+  (narcis-vibed). The phone shows hot spots and attaches a new record to one.
+- **Already in place** (narcis-vibed, verified 2026-10-12):
+  - The org-admin role exists: `TERENSKA-BELEZNICA-ADMIN` already lets its holder edit and delete
+    colleagues' records within the org (NV-222).
+  - The desktop edit handler `motnje/:id/zapis` is where regrouping would go.
+- **No cross-org (ZRSVN-wide) admin exists.** Every TB handler is org-scoped, and cross-org review is
+  an open NV question. "ZRSVN may create anywhere" is therefore a separate decision.
+- **UX recommendation (simplicity):** Tomaž's *first* option — hot spots drawn on the location picker
+  and the home map, tap one to attach. **Not** a third entry button beside Foto/Šifrant: the speed dial
+  holds two intents by design (ARCHITECTURE §14). Optionally, when "+" is tapped within ~50 m of a hot
+  spot, the form offers it as a one-tap suggestion. Never auto-attached, given the proximity example.
+- **Proposed phasing:**
+  1. The admin creates hot spots on the desktop. The phone shows them, attaches records and lists a
+     hot spot's records.
+  2. *Predlagaj* + the mail to the admin (reusing TB-38's mail path), and regrouping in the desktop
+     edit.
+- **Data:** a new table (id, org, name, lat/lon, creator) and a nullable FK on `TB_MOTNJE`. A record
+  on a hot spot still stores its own lat/lon (copied from the hot spot), so maps, exports and the web
+  keep working unchanged.
+- **Hidden scope in example (3)** (Rešeto: "2 boats, 5 anglers, 12 walkers…"): records have **no
+  count per type**, since types are a plain multi-select. This is a separate question for
+  Matjaž/Tomaž, not part of the hot-spot MVP.
+- **Answers TB-9's open question.** "Per monitored point" is exactly a hot spot. A visit with nothing
+  found becomes a hot-spot record with no disturbance — revisit TB-9 once phase 1 exists.
+- **Sequencing:** narcis-vibed **NV-259** (Todo) moves all of Terenska beležnica from Oracle to
+  Postgres. A table built in Oracle now gets migrated by it later — not a blocker, but added scope there.
+- **Blocked on:** confirming phase 1 as the first cut, who holds the create right
+  (`TERENSKA-BELEZNICA-ADMIN`?), and the picker-not-third-button UX.
+- **Shipped:** —
+
+### TB-40 · Remember map-layer settings across app restarts
+`✨ Enhancement` · `P2` · `Todo` (quick win) · Reporter: Matjaž · Updated: 2026-10-12
+- **Want:** the last-used layer setup (e.g. Natura 2000 off) survives a restart. Today every toggle is
+  widget-local and resets: `_activeZos` defaults to N2k on (ARCHITECTURE §10.2), and the Motnje
+  filter is explicitly not persisted (TB-6).
+- **Persist:** basemap mode, the Območja selection (incl. TB-37's split), Parcele, and Motnje/Obhodi
+  layer visibility.
+- **Do not persist the Motnje filter's author/date/status window.** A date window remembered from last
+  week silently hides every new record, and nothing tells the warden a filter is on. Remembering layers
+  is safe; remembering filters is not.
+- **Client-only.** The app has no `shared_preferences` dependency, but it already persists JSON through
+  `path_provider`, so a small settings file needs no new package. Clear it on logout with the other
+  user state.
+- **Shipped:** —
+
+### TB-41 · Add *Sanirano* to the Ukrepanje options
+`✨ Enhancement` · `P2` · `Todo` (quick win) · Reporter: Matjaž · Updated: 2026-10-12
+- **Want:** a new *Ukrepanje* value, *Sanirano*.
+- **No DB change.** `TB_MOTNJE.UKREPANJE` is `VARCHAR2(50)` with no CHECK and no codebook table
+  ([`disturbance_schema.sql`](../tools/ords/disturbance_schema.sql)).
+- **Two hard-coded copies change together:** the phone dropdown
+  ([`form_screen.dart`](../lib/screens/form_screen.dart) ~line 541) and narcis-vibed's `ACTION_TAKEN`
+  (`web/src/lib/beleznica/types.ts`). The desktop editor tolerates an unknown value (it shows it as
+  *obstoječa vrednost*), so deploy order is free — but ship both, or the desktop edit cannot set it.
+- **Worth one sentence to Matjaž:** Ukrepanje is **single-select**, so a record cannot be both
+  *Ustno opozorilo* and *Sanirano*. If that matters, *Sanirano* reads more as an outcome than an action.
+- **Shipped:** —
+
+### TB-42 · New field *Vplivi in posledice* (impacts and consequences)
+`✨ Enhancement` · `P2` · `Blocked` (two small decisions) · Reporter: Matjaž · Updated: 2026-10-12
+- **Want:** a field directly under the šifrant in the form, with these options: (1) Splašene in
+  vznemirjene živali · (2) Poškodovan habitat · (3) Poškodovana naravna vrednota · (4) Okrnjena krajina ·
+  (5) Onesnaženje okolja · (6) Kršen varstveni režim · (7) Domnevna kršitev varstvenega režima ·
+  (8) Posledice motenj drugo. The future export must be able to filter on it.
+- **This touches every layer:**
+  - schema (a junction table if multi-select) and ORDS GET/POST/PUT
+  - `Disturbance`/`RemoteDisturbance`, the form, and the detail/preview
+  - narcis-vibed: the detail view, the `zapis` edit handler, an export column and a filter facet
+  - One ORDS deploy and one Flutter release — bundle with TB-43.
+- **Questions for Matjaž:**
+  - (a) One option or several? Recommend several, as chips: an off-lead dog can disturb animals *and*
+    damage habitat.
+  - (b) Required or optional? Recommend optional, so a quick entry stays quick.
+  - If several are allowed, (6) and (7) exclude each other and the UI should enforce that. (8) needs
+    no extra text field, because Opis covers it.
+- **UX — keep the form the same length.** This field and TB-38's tick box both add to the form, and two
+  existing controls do nothing useful:
+  - The *Zakonska podlaga* dropdown is an always-empty placeholder (`items: const []`).
+  - The create-time *Status obravnave* dropdown sets a value the back office now owns. That is the
+    open question in TB-25/TB-32, and the cause of TB-2's "locks its own record" edge.
+  - Proposal: remove both in the same release (needs the maintainer's yes).
+- **Shipped:** —
+
+### TB-43 · Means of transport for a patrol (*sredstvo obhoda*)
+`✨ Enhancement` · `P2` · `Todo` · Reporter: Matjaž · Updated: 2026-10-12
+- **Want:** when ending an obhod, choose how it was done (peš, avto, kolo, čoln, konj, dron), more
+  than one allowed. Filter and export by it later.
+- **Shape:** a chip row in the existing end-walk sheet (`_EndWalkSheet`,
+  [`home_screen.dart`](../lib/screens/home_screen.dart) ~line 1480, today *Ime* + *Opombe*). No new
+  screen.
+- **Wire:** a walk is POSTed once, at walk end, so the value rides on that POST. It needs one new
+  `TB_OBHODI` column, returned by GET. The walks PUT stays name/notes-only, so the value is set once.
+  Existing walks read as "unknown".
+- **Display, filter and export:** shown on the walk detail. Filtering and export belong in
+  narcis-vibed's export (Obhodi sheet) and its facets. Bundle the ORDS change with TB-42.
+- **Recommendation:** required, one tap, **no preselection**. If it is optional, most walks will carry
+  nothing and the filter Matjaž wants will be incomplete. A remembered default saves the tap, but is
+  silently wrong whenever it is stale.
+- *Dron:* the recorded track is the pilot's position, not the drone's. Say so in the reply.
+- **Shipped:** —
+
+### TB-44 · Search the šifrant by its explanation (*pojasnilo*), not only by name
+`✨ Enhancement` · `P3` · `Todo` (quick win) · Reporter: Matjaž · Updated: 2026-10-12
+- **⚠️ Matjaž's mail lists this as already done. It is not, in either app.**
+  - Phone: TB-12 chose type + group name and explicitly left notes out
+    ([`disturbance_type_search.dart`](../lib/data/disturbance_type_search.dart)).
+  - Web: narcis-vibed's `TipiPicker` (`MotnjaDetail.tsx`) matches name, code and group. It displays the
+    note but does not search it, and does not fold č/š/ž.
+- **Fix:** on the phone, also match `type.note` in `searchDisturbanceTypes`, with a test (a one-line
+  change). The web needs the same in `TipiPicker`.
+- **Expectation to set:** only ~15 of 172 types carry an explanation today, so the gain is small until
+  more are written. The phone codebook is hard-coded and kept in step with the seed by hand
+  (ARCHITECTURE §8), so new explanations also need an app release.
+- **Shipped:** —
 
 ---
 
