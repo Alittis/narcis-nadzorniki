@@ -58,7 +58,6 @@ class _FormScreenState extends State<FormScreen> {
   String _actionTaken = 'Brez ukrepa';
   String? _legalBasis;
   String _caseStatus = 'Odprto';
-  bool _pickedOnMap = false;
   bool _previewOpen = false;
 
   @override
@@ -102,7 +101,6 @@ class _FormScreenState extends State<FormScreen> {
     setState(() {
       _location = location;
       _accuracy = 'Natančna';
-      _pickedOnMap = false;
     });
   }
 
@@ -133,7 +131,10 @@ class _FormScreenState extends State<FormScreen> {
   }
 
   Future<void> _pickLocation() async {
-    final initial = _pickedOnMap && _location != null ? _location! : widget.mapCenter;
+    // TB-4: open on the record's own location — the device fix taken at "+",
+    // or an earlier map pick — so the red marker starts on the blue dot. The
+    // home map's centre is only the fallback for a record with no fix yet.
+    final initial = _location ?? widget.mapCenter;
     final selected = await Navigator.of(context).push<LatLng>(
       MaterialPageRoute(
         builder: (_) => LocationPickerScreen(
@@ -142,13 +143,15 @@ class _FormScreenState extends State<FormScreen> {
         ),
       ),
     );
-    if (selected != null) {
-      setState(() {
-        _location = selected;
-        _accuracy = 'Približna';
-        _pickedOnMap = true;
-      });
+    // Potrdi without a tap returns the location it opened on. Leave the record
+    // as it was then, rather than downgrade a GPS fix to Približna.
+    if (selected == null || selected == _location) {
+      return;
     }
+    setState(() {
+      _location = selected;
+      _accuracy = 'Približna';
+    });
   }
 
   Future<void> _selectTypes() async {

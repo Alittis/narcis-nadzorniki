@@ -185,7 +185,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   rolled out on the Play Closed testing track 2026-06-22 (v1.3.1+12). (Committed earlier as `d9aec82`.)
 
 ### TB-4 · Default disturbance location to the device's current position
-`✨ Enhancement` · `P2` · `Todo` (quick win) · Reporters: Tomaž, Matjaž · Updated: 2026-06-22
+`✨ Enhancement` · `P2` · `Done` (in source 2026-10-12; release pending) · Reporters: Tomaž, Matjaž · Updated: 2026-10-12
 - **Problem:** Setting an accurate location takes two manual steps — the app offers an
   approximate point, the satellite icon refines it (step 1), and a manual map tap gives the
   exact spot (step 2).
@@ -213,6 +213,25 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Discussion:** Is the non-overlap on purpose? Initially no (they should coincide); after a
   manual tap yes (the offset is deliberate). This enhancement makes them overlap on open without
   removing the fine-tune.
+- **Found when building it (2026-10-12):** the first half was already true. Since the two-path entry
+  (`859ff6c`, 2026-04-27) the "+" locks the device fix, and the form opens with it as `Natančna`
+  (ARCHITECTURE §14). The only remaining defect was the picker opening on `widget.mapCenter`.
+- **Fixed (2026-10-12):** `FormScreen._pickLocation` opens the picker on `_location` (the fix from "+",
+  or an earlier map pick) and falls back to the map centre only when the record has no location at
+  all. The red marker therefore starts on the record's location, which is the blue dot unless the
+  warden has walked on since "+".
+  - The seed is the record's location, not a fresh fix, on purpose. A fresh fix would silently move
+    the record to wherever the warden now stands, undoing the GPS lock at intent time.
+  - *Potrdi* without a tap now leaves the record as it was. Before, it moved the record to the map
+    centre; with the new seed it would only have downgraded a GPS fix to `Približna`.
+  - `_pickedOnMap` was left with no reader and is removed.
+- **Verified:** `test/location_picker_seed_test.dart` (4 tests), each running through to the saved
+  record: the picker opens on the fix, not the map centre; *Potrdi* with no tap keeps the fix and
+  `Natančna`; a tap moves the record to `Približna`, and a second visit opens on the pick; with no fix
+  the picker opens on the map centre and confirming it sets the location. **Checked by removal:** on the
+  old `_pickLocation` the first two fail. Full suite 182/182; `flutter analyze` at the documented 10
+  info lints.
+- **Still to check on a device:** that the red marker and the blue dot coincide when *Karta* opens.
 - **Shipped:** —
 
 ### TB-6 · Filter the Motnje layer — age / author / observed-date window
