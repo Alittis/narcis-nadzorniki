@@ -14,7 +14,9 @@
     "data_controller_contact": "narcis.arso@gov.si",
     "data_controller_url": "https://narcis.arso.gov.si",
     "privacy_policy_url": "https://alittis.github.io/terenska-beleznica/privacy/",
-    "privacy_policy_source": "~/Documents/PROJEKTI/alittis.github.io/terenska-beleznica/privacy/index.html (Alittis/alittis.github.io)",
+    "privacy_policy_source": "~/Developer/alittis.github.io/terenska-beleznica/privacy/index.html (Alittis/alittis.github.io, GitHub Pages from main)",
+    "privacy_policy_last_change": "2026-10-12 - rewritten for current production (GHP-3)",
+    "privacy_policy_post_cutover": "staged on branch ghp-3-post-cutover-policy of Alittis/alittis.github.io (not served); merge at the NV-259 T0 after filling in the [DATUM PREHODA] placeholders (TB-46)",
     "upload_keystore_path": "/Users/Alexis/keystores/narcis_nadzorniki_upload.jks",
     "upload_keystore_alias": "upload",
     "upload_keystore_algo": "RSA 2048",
@@ -400,7 +402,7 @@
     "endpoints_redeploy_note": "disturbance/walks endpoint modules unchanged - pkg_tb_auth.authenticate signature is the same; only the package body + login module change"
   },
   "planned_backend_migration": {
-    "status": "PLANNED, NOT BUILT - owner decision 2026-10-12; D1-D8 decided 2026-10-12; D9 ARSO agreed 2026-10-12; privacy policy rewrite + Data Safety re-check owed before the cutover",
+    "status": "PLANNED, NOT BUILT - owner decision 2026-10-12; D1-D8 decided 2026-10-12; D9 ARSO agreed 2026-10-12; privacy policy post-cutover version staged 2026-10-12 (publish at T0); Data Safety re-check owed at the cutover",
     "decisions": {
       "decided_at": "2026-10-12",
       "D1": "freeze, then switch; TB_AUTH_TOKENS never frozen (pkg_tb_auth turns any exception into 401)",
@@ -411,7 +413,7 @@
       "D6": "nightly full dump + light dump (no photo bytes) every 3 h; phone guard = dataset generation: on a new generation the phone re-queues its own unlisted records instead of evicting them (replaces the one-time no-evict flag)",
       "D7": "journal to Oracle",
       "D8": "TB_* kept frozen and read-only; ORDS modules + TB_AUTH_TOKENS deleted when every tester is on the new build + 30 days",
-      "D9": "ARSO agreed (to the owner, 2026-10-12; no formal request). Still owed before the cutover: privacy policy rewrite, Play Data Safety re-check. VPS data-centre location: Frankfurt am Main, Germany (EU), measured 2026-10-12 (RIPE country DE; ~1.4 ms to DE-CIX Frankfurt; detail in the VPS repo STATE.json host.location)"
+      "D9": "ARSO agreed (to the owner, 2026-10-12; no formal request). Privacy policy: post-cutover version staged 2026-10-12 on branch ghp-3-post-cutover-policy, published at T0. Still owed: Play Data Safety re-check at the cutover (PLAY_CLOSED_TEST 4.11). VPS data-centre location: Frankfurt am Main, Germany (EU), measured 2026-10-12 (RIPE country DE; ~1.4 ms to DE-CIX Frankfurt; detail in the VPS repo STATE.json host.location)"
     },
     "from": "Oracle/ORDS on narcis.gov.si (app-auth/, disturbances/, walks/; TB_* tables; TB_AUTH_TOKENS)",
     "to": "Postgres schema beleznica in narcis_spike on the narcis-vibed VPS, served by Next.js at https://narcis.alittis.com/api/beleznica/app/v1/ (proposed path), vibed token auth",

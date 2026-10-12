@@ -34,7 +34,8 @@ flutter analyze                 # static analysis
 These fingerprints are public (they're the public-key cert digest). Not the same as the **app-signing key** that Play assigns under Play App Signing — Google holds that one and exposes its fingerprint in Play Console after the first upload; record it in `STATE.json` once available. **Where in Play Console (2026 menu):** `Protected with Play → Play Store distribution → Go to Play app signing` → the **App signing key** section shows SHA-1 / SHA-256. (It is **not** under *Test and release* / *App integrity* — that menu was reorganised; the top-bar search for "app signing" also jumps straight there.) Copy the **App signing key certificate** fingerprints, not the upload key.
 
 **Privacy policy:**
-- Hosted at `https://alittis.github.io/terenska-beleznica/privacy/` (source: `~/Documents/PROJEKTI/alittis.github.io/terenska-beleznica/privacy/index.html`, served via the `Alittis/alittis.github.io` repo).
+- Hosted at `https://alittis.github.io/terenska-beleznica/privacy/` (source: `~/Developer/alittis.github.io/terenska-beleznica/privacy/index.html`, served by GitHub Pages from the `main` branch of the `Alittis/alittis.github.io` repo).
+- Rewritten 2026-10-12 (GHP-3). The **post-cutover version** (data on the Alittis VPS, NV-259) waits on branch `ghp-3-post-cutover-policy`, which Pages does not serve. Merge it at T0 (TB-46).
 - Slovenian primary text. Names ARSO (`narcis.arso@gov.si`) as data controller for submitted records and Alittis (`admin@alittis.com`) as Play Store publisher / developer contact.
 - Edit + push from that repo to update — Play Console reads the URL live.
 

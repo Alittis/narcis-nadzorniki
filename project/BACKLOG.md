@@ -1586,9 +1586,16 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Docs at ship time:**
   - ARCHITECTURE §2, §9, §9bis, §12, §13, §16;
   - DEPLOYMENT, OPERATIONS, and `STATE.json` `external_services` / `auth`;
-  - the **privacy policy**, which names Oracle/`TB_MOTNJE_FOTO` and the pre-token login. ARSO agreed
-    on 2026-10-12 (plan D9); the rewrite names the new location: the VPS is in Frankfurt am Main, Germany
-    (EU), measured 2026-10-12;
+  - the **privacy policy**. **Rewritten 2026-10-12, in two versions** (`Alittis/alittis.github.io`,
+    GHP-3):
+    - `main`: today's production. It replaced the policy dated 20 May 2026, which still described the
+      pre-token login and missed the gallery picker, EXIF data, Nominatim, the GURS and GeoServer
+      layers, deletion and the web review.
+    - Branch `ghp-3-post-cutover-policy`: the Postgres version — the data on the Alittis VPS in
+      Frankfurt, with the journal and backups in NarcIS (plan D9; ARSO agreed 2026-10-12). **At T0:**
+      fill in its four `[DATUM PREHODA]` placeholders, re-check §2.1, §2.10 and §3 against what was
+      built, merge it to `main`, push.
+    - Keep the two in step: a change to `main` before T0 is made on the branch too;
   - Play Data Safety, and PLAY_CLOSED_TEST.
 - **Shipped:** —
 
@@ -1634,6 +1641,38 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   different account while unsent work exists, do not sync. Ask instead:
   - log back in as the owner to send it; or
   - discard it — the TB-45 dialog, worded for this case.
+- **Shipped:** —
+
+### TB-49 · Photo files stay on the device after logout
+`🐞 Bug` · `P3` · `Todo` · Reporter: Claude (found while rewriting the privacy policy, 2026-10-12) · Updated: 2026-10-12
+- **Problem:** `AppState.logout()` empties the record and walk stores, but leaves every file under
+  `<docs>/disturbance_photos/` on disk. The code says so (*"Photo files … become orphans … sweeping them
+  is a follow-up"*). The files are in app-private storage and nothing in the app points at them any
+  more, so the next user cannot see them. But they stay on the device until the app is uninstalled.
+- **Why it matters:** the privacy policy (2026-10-12) now has to say *"ob odjavi se fotografije trenutno
+  ne izbrišejo"*. A logout that removed them would let it say that logout clears the device.
+- **Fix shape:** after the TB-45 dialog has confirmed the discard, delete the whole
+  `disturbance_photos/` directory in `logout()`, next to the store saves. Then update policy §2.3, §5
+  and §8, which say the photos survive a logout (both versions, GHP-3).
+- **Shipped:** —
+
+### TB-50 · Uploaded photos keep their EXIF metadata (GPS, phone make and model)
+`❓ Needs discussion` · `P2` · `Triage` · Reporter: Claude (found while rewriting the privacy policy, 2026-10-12) · Updated: 2026-10-12
+- **Finding (read in the installed plugin source, not measured on a device):** every photo goes through
+  `image_picker`'s resize, because `imageQuality: 85 < 100` makes `shouldScale` true. The resize then
+  copies the original's EXIF onto the re-encoded file: `image_picker_android` 0.8.13+13,
+  `ImageResizer.copyExif` → `ExifDataCopier`, whose list includes `TAG_GPS_*`, `TAG_MAKE` and
+  `TAG_MODEL`. `PhotoStorage.savePicked` copies that file byte for byte, and the upload sends it as is.
+  So a photo carries the phone's make and model and, when the camera tags location, GPS coordinates.
+- **Why it matters:**
+  - For a **gallery** pick, the GPS is where and when the photo was *taken*, which need not be the
+    record's location — it can be anywhere, including someone's home.
+  - PLAY_CLOSED_TEST §4.11 said the opposite (*"does not preserve EXIF GPS"*); corrected 2026-10-12.
+  - The policy now discloses it (§2.3).
+- **To decide:** strip all EXIF before saving (the record's own location is the declared one); strip
+  only GPS and make/model; or keep it and leave the disclosure. Check on a device first which tags
+  actually survive (camera intent versus the Android 13+ photo picker, which may already redact
+  location).
 - **Shipped:** —
 
 ---
