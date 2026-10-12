@@ -161,14 +161,14 @@ class AppState extends ChangeNotifier {
     // Clear cached records + walks + recently-used observer suggestions so a
     // subsequent login as a DIFFERENT user on the same device doesn't see
     // the previous user's data. Persisted store files are overwritten so the
-    // next AppState.init() loads empty. Photo files under
-    // <docs>/disturbance_photos/ become orphans (no record points at them);
-    // sweeping them is a follow-up.
+    // next AppState.init() loads empty, and the photo files go with them
+    // (TB-49) - once the records are gone nothing points at them.
     _records = [];
     _walks = [];
     _lastObservers = [];
     await _localStore.save(_records);
     await _walksStore.save(_walks);
+    await _photoStorage.deleteAll();
 
     // Revoke the token server-side (best-effort, fire-and-forget so logout
     // stays snappy on a poor connection). revokeToken captures the token by

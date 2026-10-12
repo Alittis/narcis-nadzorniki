@@ -1644,7 +1644,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-49 · Photo files stay on the device after logout
-`🐞 Bug` · `P3` · `Todo` · Reporter: Claude (found while rewriting the privacy policy, 2026-10-12) · Updated: 2026-10-12
+`🐞 Bug` · `P3` · `Done` (in source 2026-10-12; release pending) · Reporter: Claude (found while rewriting the privacy policy, 2026-10-12) · Updated: 2026-10-12
 - **Problem:** `AppState.logout()` empties the record and walk stores, but leaves every file under
   `<docs>/disturbance_photos/` on disk. The code says so (*"Photo files … become orphans … sweeping them
   is a follow-up"*). The files are in app-private storage and nothing in the app points at them any
@@ -1654,10 +1654,21 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Fix shape:** after the TB-45 dialog has confirmed the discard, delete the whole
   `disturbance_photos/` directory in `logout()`, next to the store saves. Then update policy §2.3, §5
   and §8, which say the photos survive a logout (both versions, GHP-3).
+- **Fixed (2026-10-12):** `PhotoStorage.deleteAll()` removes the whole photo root, own and teammates'
+  photos alike. `logout()` calls it after the two store saves; `logout()` runs only after the TB-45
+  dialog, so unsent photos are deleted only once the user has confirmed discarding them. The next
+  photo recreates the folder (`_recordDir` creates it recursively).
+- **Verified:** `test/logout_photos_test.dart` runs the real `logout()`, with the foreground-task
+  channel and the auth cache faked, and checks that both photo files and the root are gone. **Checked
+  by removal:** without the `deleteAll()` call the test fails (*Expected false, Actual true*). Full
+  suite 178/178; `flutter analyze` at the documented 10 info lints.
+- **At release:** in both policy versions (GHP-3), §2.3, §5 and §8 must say that logout deletes the
+  photos. Change the live one only once the release has rolled out: until then testers still run
+  builds that keep them.
 - **Shipped:** —
 
 ### TB-50 · Uploaded photos keep their EXIF metadata (GPS, phone make and model)
-`❓ Needs discussion` · `P2` · `Triage` · Reporter: Claude (found while rewriting the privacy policy, 2026-10-12) · Updated: 2026-10-12
+`🐞 Bug` · `P2` · `Done` (in source 2026-10-12; release pending) · Reporter: Claude (found while rewriting the privacy policy, 2026-10-12) · Updated: 2026-10-12
 - **Finding (read in the installed plugin source, not measured on a device):** every photo goes through
   `image_picker`'s resize, because `imageQuality: 85 < 100` makes `shouldScale` true. The resize then
   copies the original's EXIF onto the re-encoded file: `image_picker_android` 0.8.13+13,
@@ -1673,6 +1684,42 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   only GPS and make/model; or keep it and leave the disclosure. Check on a device first which tags
   actually survive (camera intent versus the Android 13+ photo picker, which may already redact
   location).
+- **Decided (owner asked for the fix, 2026-10-12):** strip everything except **Orientation**.
+  - Orientation is the one tag the app cannot drop. `image_picker` decodes without rotating, and
+    copies the tag across, so a portrait photo is upright only because viewers apply it — Flutter's
+    decoder and the browsers in the web back office both do.
+  - Capture time goes too. The record has its own `observedAt`, and for a gallery photo the EXIF time
+    is the original shot's time, which is the same leak as its GPS.
+- **Fixed (2026-10-12):** `lib/services/jpeg_metadata.dart` `stripJpegMetadata`, pure Dart, applied in
+  `PhotoStorage.savePicked` — the one place a picked photo enters the app — so the stored file and the
+  uploaded one are both clean.
+  - **Dropped:** every APP1 (Exif *and* XMP, which can repeat the GPS), APP13 (IPTC), COM, and anything
+    after EOI (Samsung's SEFT trailer).
+  - **Kept byte for byte:** JFIF, the ICC profile, Adobe APP14, and the image data. Nothing is
+    re-encoded.
+  - If the original Exif gives an Orientation of 2–8, a 34-byte Exif carrying only that tag takes the
+    original Exif's place.
+  - A non-JPEG, or a JPEG that does not parse, passes through unchanged rather than losing the photo.
+    `image_picker` writes JPEG unless the bitmap has alpha (then PNG, which carries no camera EXIF).
+- **Verified:**
+  - `test/jpeg_metadata_test.dart` (8 tests) runs on three Pillow-made fixtures in `test/fixtures/`.
+    They carry Make/Model, a body serial number, DateTimeOriginal, GPS, XMP with GPS, a comment, an ICC
+    profile and a trailer, in little- and big-endian Exif with and without Orientation. It also covers
+    a PNG, a truncated file and idempotence.
+  - **Cross-checked with an independent parser:** Pillow read the stripper's output, including a
+    progressive JPEG and one with restart markers. Only tag 274 remains, with the right value; the
+    ICC profile is kept; the decoded pixels are identical.
+  - **Checked by removal:** without the call in `savePicked` the storage test fails (`samsung`
+    survives).
+- **Not covered:** a photo picked **before** the update and still queued uploads as it was saved,
+  with its EXIF. Photos already on the server keep theirs too. That could be cleaned at the NV-259
+  migration if wanted (not planned).
+- **Still to do on a device:** take a photo on the A56 with location tagging on, sync it, and check
+  the server copy for EXIF (for example `exiftool`) — the fixtures are camera-like, not from a camera.
+- **At release:** in both policy versions (GHP-3), §2.3 changes from *"ostanejo v fotografiji"* to
+  *"aplikacija jih pred shranjevanjem odstrani (ohrani le usmerjenost slike)"*, and the
+  PLAY_CLOSED_TEST §4.11 note is updated to match. Change the live policy only once the release has
+  rolled out.
 - **Shipped:** —
 
 ---

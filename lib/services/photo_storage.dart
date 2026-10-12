@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:narcis_nadzorniki/services/jpeg_metadata.dart';
 import 'package:path_provider/path_provider.dart';
 
 /// Manages on-device photo files for disturbances.
@@ -51,6 +52,9 @@ class PhotoStorage {
   }
 
   /// Copies a freshly-picked photo into stable storage and returns the path.
+  /// A JPEG loses its location and device metadata on the way (TB-50,
+  /// [stripJpegMetadata]); this is the one place a picked photo enters the
+  /// app, so the stored file and the uploaded one are both clean.
   Future<String> savePicked({
     required String motnjaId,
     required String photoId,
@@ -60,7 +64,8 @@ class PhotoStorage {
     final dir = await _recordDir(motnjaId);
     final ext = extensionForMime(mimeType);
     final dest = File('${dir.path}/$photoId.$ext');
-    await File(sourcePath).copy(dest.path);
+    final bytes = await File(sourcePath).readAsBytes();
+    await dest.writeAsBytes(stripJpegMetadata(bytes), flush: true);
     return dest.path;
   }
 
@@ -97,6 +102,17 @@ class PhotoStorage {
       if (await dir.exists()) {
         await dir.delete(recursive: true);
       }
+    } catch (_) {
+      // Cache cleanup failures aren't actionable; swallow them.
+    }
+  }
+
+  /// Removes every photo on the device, own and teammates' alike (TB-49:
+  /// logout, so nothing of the session outlives it).
+  Future<void> deleteAll() async {
+    try {
+      final root = await _root();
+      if (await root.exists()) await root.delete(recursive: true);
     } catch (_) {
       // Cache cleanup failures aren't actionable; swallow them.
     }

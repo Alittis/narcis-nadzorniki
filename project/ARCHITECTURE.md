@@ -355,8 +355,9 @@ STATUS: deployed to ARSO prod (`narcis.gov.si`, NARCIS schema) 2026-05-28 via AP
 
 **Session credentials.** The disturbance endpoints re-authenticate every call via `X-Narcis-Auth`. The preferred credential is the bearer token (§12bis): set on a successful online login, persisted in secure storage, restored on app start, and sent as `Bearer <token>`. `AppState._sessionToken` holds it. `_sessionPassword` is a fallback that holds the plaintext password **in memory only** for the session, used only when the backend didn't mint a token (older deploy). Both are cleared on logout and on a sync 401; the token is also wiped from disk then, never otherwise written. `AppState.canSync` is true iff `_currentUser != null && (_sessionToken != null || _sessionPassword != null)` — note this is now true immediately after a cold-start token restore, so queued records sync as soon as connectivity returns, without a manual re-login (previously, an offline login left `canSync` false until the next online login).
 
-**Logout guards unsent work (TB-45).** `AppState.logout()` wipes both local stores and the active walk,
-so the next user of the device never sees the previous user's data. Unsent work goes with them. *Odjava*
+**Logout guards unsent work (TB-45).** `AppState.logout()` wipes both local stores, the active walk and
+(TB-49) every photo file under `<docs>/disturbance_photos/` (`PhotoStorage.deleteAll`), so the next user
+of the device never sees the previous user's data. Unsent work goes with them. *Odjava*
 is therefore a `LogoutTile` ([lib/widgets/logout_tile.dart](../lib/widgets/logout_tile.dart)), and it:
 1. calls `sendUnsentBeforeLogout`, which runs `syncAll` when online and returns `unsentWork` — a
    breakdown of the same work `pendingPushCount` counts, plus a walk still being recorded;
@@ -382,7 +383,7 @@ Three visual states: green `cloud_done` when in sync, orange `cloud_upload` when
 
 **Photo lifecycle.**
 1. Form picks a photo via `image_picker` (`maxWidth=1600`, `quality=85`) → temp path.
-2. `addRecord` calls `PhotoStorage.savePicked` to copy the file to `<docs>/disturbance_photos/<motnja_id>/<foto_id>.<ext>` so it survives across app restarts. The new `DisturbancePhoto` lands with `pendingUpload=true`.
+2. `addRecord` calls `PhotoStorage.savePicked` to copy the file to `<docs>/disturbance_photos/<motnja_id>/<foto_id>.<ext>` so it survives across app restarts. The new `DisturbancePhoto` lands with `pendingUpload=true`. On the way, a JPEG loses its metadata (TB-50, [`jpeg_metadata.dart`](../lib/services/jpeg_metadata.dart)). `image_picker`'s resize copies the original EXIF, GPS and make/model included, so the copy keeps only EXIF Orientation and drops XMP, IPTC, comments and trailers; the image data is not re-encoded. Everything later in the flow reads this file, so the upload is clean too.
 3. If the create was online, `addRecord` chains `_drainPendingPhotos` after the record POST so the photo uploads in the same call (otherwise the badge would sit at "1 to push" until the next `syncAll` trigger). Offline creates skip this step and wait for the next online sync.
 4. Otherwise (or for any leftover from a network blip) the next `syncAll` reads the file and POSTs the bytes. Success flips `pendingUpload=false`.
 5. `ensurePhotoCached` (called from `DetailScreen.initState`) downloads any photo with no `localPath` and writes it under the same canonical layout.
