@@ -294,6 +294,11 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
     the end sheet, which costs two taps.
   - **Gap:** keep TB-22's 200 m rule. Rejected: a time-based break, which would change how every walk
     draws, GPS dropouts included.
+  - **A record captured during a pause:** the capture is untouched, and after the save the map shows
+    *"Zapis je shranjen. Obhod je v premoru."* with a *Nadaljuj* action. Rejected: auto-resume on "+",
+    which restarts GPS unasked and can record a stretch meant to be left out; and a question before
+    the capture, which blocks the fastest path in the app. The record links to the walk either way,
+    so a forgotten resume costs only track line, never the record.
 - **Fixed (2026-10-12):** see ARCHITECTURE §17, *Pause / resume (TB-8)*.
   - **Pausing stops the recording service.** No GPS and no notification while paused, and the
     handler isolate is untouched. The walk stays open in `active_walk.json` with a local-only
@@ -303,20 +308,23 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   - **No wire change** (the "pure copy" rule for TB-46): `pausedAt` is never sent, so a walk's duration
     still includes its pauses. A pause-free duration needs a server field, so it waits until after
     the Postgres move.
-- **Verified:** `test/walk_pause_test.dart` (6 tests), on the real `AppState` with the foreground-service
+- **Verified:** `test/walk_pause_test.dart` (7 tests), on the real `AppState` with the foreground-service
   channel faked:
   - pausing stops the service and keeps every point, including ones that reached only the file;
   - resuming restarts it on the same walk, with the file unpaused first;
   - a paused walk stays paused across a restart, while a recording one is still restarted;
   - a walk ended while paused has `endedAt = pausedAt`, and the POST body has no `pausedAt`;
+  - a record captured during a pause links to the walk and does not resume it;
   - the local JSON round trip.
+  - Also `form_preview_flow_test`: a save returns `true` to the form's opener, which the reminder keys on.
 - **Checked by removal:** each guard, removed alone, fails its test: the `init()` branch, `endWalk`'s
-  `endedAt`, `pauseWalk`'s file re-read, and `resumeWalk`'s save before starting. Full suite 196/196;
-  `flutter analyze` at the documented 10 info lints.
+  `endedAt`, `pauseWalk`'s file re-read, `resumeWalk`'s save before starting, `addRecord`'s walk link,
+  and the form's `pop(true)`. Full suite 197/197; `flutter analyze` at the documented 10 info lints.
 - **Still to check on a device (A56):**
   - the button's place above the stop button;
   - that the notification goes away on pause and comes back on resume;
-  - that a pause survives the screen being off and the app being swiped away.
+  - that a pause survives the screen being off and the app being swiped away;
+  - the reminder after saving a record during a pause, and its *Nadaljuj*.
 - **Wording left as is:** the TB-45 and TB-48 dialogs list an open walk as *"obhod, ki se še snema"*,
   which is slightly off for a paused one.
 - **Shipped:** —

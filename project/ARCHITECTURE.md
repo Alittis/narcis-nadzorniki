@@ -499,6 +499,7 @@ Implemented across [lib/state/app_state.dart](../lib/state/app_state.dart), [lib
 - **Pause / resume (TB-8)**: while a walk exists, a mini button above the `stop` FAB reads *Premor* (⏸) or *Nadaljuj* (▶).
   - `AppState.pauseWalk()` stops the FGS, so the GPS stream and the "Snemanje obhoda" notification stop too. It re-reads `active_walk.json` for points the port never delivered, and saves the walk there with `Walk.pausedAt` set. The walk stays open: records captured during the pause still link to it, and the live track draws grey.
   - `resumeWalk()` clears `pausedAt` in the file first, then restarts the FGS. The handler reloads the walk, points and all.
+  - **A record saved during a pause** does not resume the walk. Back on the map, a snackbar says *"Zapis je shranjen. Obhod je v premoru."* with a *Nadaljuj* action, so a warden back on patrol resumes in one tap and one still on other duties ignores it. `FormScreen` pops `true` after a save so `HomeScreen._openForm` can tell. The record links to the walk either way; a forgotten resume costs only track line.
   - `init()` leaves a paused walk paused: no service restart.
   - `endWalk()` on a paused walk sets `endedAt` to `pausedAt`, not to the moment *Shrani* is tapped.
   - `pausedAt` is local-only: `RemoteApi._walkPayload` builds the wire body and does not send it. The server keeps start and end only, so a walk's duration includes its pauses.

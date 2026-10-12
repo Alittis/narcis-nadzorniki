@@ -36,7 +36,11 @@ const _type = SelectedDisturbanceType(
   typeName: 'Vožnja z motornim vozilom',
 );
 
+/// What the form route returned to its opener; null until it closes.
+bool? _formResult;
+
 Future<AppState> _openForm(WidgetTester tester, _FakeStore store) async {
+  _formResult = null;
   final state = AppState(localStore: store);
   await tester.pumpWidget(
     ChangeNotifierProvider<AppState>.value(
@@ -45,7 +49,8 @@ Future<AppState> _openForm(WidgetTester tester, _FakeStore store) async {
         home: Builder(
           builder: (context) => Scaffold(
             body: ElevatedButton(
-              onPressed: () => Navigator.of(context).push<void>(
+              onPressed: () async =>
+                  _formResult = await Navigator.of(context).push<bool>(
                 MaterialPageRoute(
                   builder: (_) => const FormScreen(
                     initialLocation: LatLng(45.79, 14.36),
@@ -184,5 +189,7 @@ void main() {
     expect(find.byType(DetailScreen), findsNothing);
     expect(find.byType(FormScreen), findsNothing);
     expect(find.text('domov'), findsOneWidget);
+    // The opener learns a record was saved (TB-8's paused-walk reminder).
+    expect(_formResult, isTrue);
   });
 }

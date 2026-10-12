@@ -243,6 +243,34 @@ void main() {
     expect(body['points'], hasLength(3));
   });
 
+  test('a record captured during a pause still links to the walk', () async {
+    // Only the walk's line stops during a pause, not its records: forgetting
+    // to resume must not leave a disturbance out of the walk.
+    final walks = _MemWalksStore(_active(pausedAt: DateTime.utc(2026, 10, 12, 10)));
+    final state = await _boot(walks);
+
+    await state.addRecord(
+      Disturbance(
+        id: 'm1',
+        latitude: 45.79,
+        longitude: 14.36,
+        locationAccuracy: 'Natančna',
+        observedAt: DateTime.utc(2026, 10, 12, 10, 15),
+        types: const [],
+        description: 'opis',
+        photos: const [],
+        observers: const [],
+        actionTaken: 'Brez ukrepa',
+        caseStatus: 'Odprto',
+        pendingSync: true,
+        createdAt: DateTime.utc(2026, 10, 12, 10, 15),
+      ),
+    );
+
+    expect(state.records.single.obhodId, 'w1');
+    expect(state.isWalkPaused, isTrue, reason: 'capturing does not resume');
+  });
+
   test('pausedAt survives the local file round trip', () {
     final pausedAt = DateTime.utc(2026, 10, 12, 10, 30);
     final walk = _active(pausedAt: pausedAt);

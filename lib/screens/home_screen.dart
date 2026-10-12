@@ -263,13 +263,13 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _openForm(
+  Future<void> _openForm(
     AppState state, {
     LatLng? location,
     String? initialPhotoPath,
     List<SelectedDisturbanceType>? initialTypes,
-  }) {
-    Navigator.of(context).push(
+  }) async {
+    final saved = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => FormScreen(
           initialLocation: location ?? _userLocation,
@@ -278,6 +278,24 @@ class _HomeScreenState extends State<HomeScreen> {
           initialBasemap: _basemapMode,
           initialPhotoPath: initialPhotoPath,
           initialTypes: initialTypes,
+        ),
+      ),
+    );
+    // TB-8: a record captured during a pause still links to the walk, but the
+    // walk's line is not being recorded. Say so once the record is safe, with
+    // a one-tap resume. Ignored, the pause stands.
+    if (saved != true || !mounted || !state.isWalkPaused) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Zapis je shranjen. Obhod je v premoru.'),
+        duration: const Duration(seconds: 8),
+        action: SnackBarAction(
+          label: 'Nadaljuj',
+          onPressed: () async {
+            await state.resumeWalk();
+            if (!mounted) return;
+            _showSnack('Snemanje obhoda se nadaljuje.');
+          },
         ),
       ),
     );
@@ -424,7 +442,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
     if (picked == null || !mounted) return;
-    _openForm(state, location: location, initialPhotoPath: picked.path);
+    await _openForm(state, location: location, initialPhotoPath: picked.path);
   }
 
   Future<void> _startCodebookFlow(AppState state) async {
@@ -441,7 +459,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     if (!mounted) return;
     if (selections == null || selections.isEmpty) return;
-    _openForm(state, location: location, initialTypes: selections);
+    await _openForm(state, location: location, initialTypes: selections);
   }
 
   void _showSnack(String message) {

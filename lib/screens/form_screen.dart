@@ -411,7 +411,8 @@ class _FormScreenState extends State<FormScreen> {
       return;
     }
     if (saved == true) {
-      Navigator.of(context).pop();
+      // True tells the opener a record was saved (TB-8's paused-walk reminder).
+      Navigator.of(context).pop(true);
     }
   }
 
