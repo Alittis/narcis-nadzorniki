@@ -1438,7 +1438,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-45 · Logout silently discards unsynced records and walks
-`🐞 Bug` · `P1` · `Todo` · Reporter: Claude (found while planning the Postgres cutover, NV-259) · Updated: 2026-10-12
+`🐞 Bug` · `P1` · `Done` (in source 2026-10-12; release pending) · Reporter: Claude (found while planning the Postgres cutover, NV-259) · Updated: 2026-10-12
 - **Problem:** *Odjava* on the Profil screen calls `state.logout()` straight away, with no confirmation
   ([`profile_screen.dart`](../lib/screens/profile_screen.dart) ~line 144). `AppState.logout()`
   ([`app_state.dart`](../lib/state/app_state.dart) ~line 148) then:
@@ -1467,11 +1467,39 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   4. No pending work: log out as today.
   Test with the booted-`AppState` harness (`record_delete_test.dart`). Per TB-35, verify the guard by
   removal.
-- **Related edge, unverified (STATUS: UNKNOWN – REQUIRES CONFIRMATION):** after a 401 the queue
-  survives, but if a *different* person then logs in on that device, `login()` does not appear to check
-  whether the user changed. The previous user's queued records would then be POSTed under the new
-  user's token, and the server stamps the author from the token. Confirm before deciding whether it
-  belongs here.
+- **Related edge — split out to [TB-48](#tb-48--after-a-rejected-session-a-different-user-can-send-the-previous-users-queued-records-as-their-own)**
+  after the code confirmed it.
+- **Built 2026-10-12 — client-only, no server change:**
+  - `AppState.unsentWork` ([`app_state.dart`](../lib/state/app_state.dart)) breaks down the work the sync
+    badge already counts:
+    - `records` — `pendingSync`, or with a photo still uploading;
+    - `deletes` — `pendingDelete`;
+    - `walks` — `pendingSync`;
+    - `activeWalk` — not in `_walks` yet, so the badge never counted it, but `logout()` discards it too.
+
+    `records + deletes + walks == pendingPushCount` is asserted, so the dialog cannot disagree with the
+    number the user has been looking at.
+  - `AppState.sendUnsentBeforeLogout()` runs `syncAll` when there is something to send and the device can
+    send it, then returns what is left.
+  - [`LogoutTile`](../lib/widgets/logout_tile.dart) replaces the plain *Odjava* row:
+    - it sends first, with the row disabled and *Pošiljam neposlane podatke…* shown, so a second tap
+      cannot start a second flow;
+    - it logs out directly if nothing is left;
+    - otherwise `showUnsentWorkDialog` lists only the kinds actually pending, says they will be lost,
+      and adds *Obhod pred odjavo zaključite* when a walk is recording.
+    - *Prekliči* and a tap outside keep everything. *Odjavi in zavrzi* (filled, error colour) proceeds.
+    - The dialog is `scrollable` for small screens with large text.
+  - **Tests:** [`logout_guard_test.dart`](../test/logout_guard_test.dart), 11 of them. It uses a trimmed
+    copy of the booted-`AppState` harness, with seedable walks and a mock server that lists what it
+    accepted.
+    - `logout()` itself is not called: it reaches the foreground-service and secure-storage plugins, so
+      the tile gets a recording callback.
+    - **Each guard was verified by removal** (TB-35's rule):
+      - without the tile's dialog check, *Prekliči keeps it* and *a tap outside also keeps it* fail;
+      - without the send-first `syncAll`, *online: sends the queue first* fails;
+      - without `scrollable`, the 320 dp / 1.6× text test fails on overflow.
+    - Suite **159/159**; `flutter analyze` at the documented 10 pre-existing info lints.
+  - **Not verified on a device yet.**
 - **Shipped:** —
 
 ### TB-46 · Move the app to the Postgres backend on the VPS (phone side of narcis-vibed NV-259)
@@ -1532,6 +1560,26 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Absorbs TB-37** (natural monuments): the web's ZO *Vrsta* facet (NV-84) already separates them, so
   if this lands within weeks, TB-37 should not be built on GeoServer first.
 - **Stays external either way:** GURS parcels (WMS), the OSM and Esri basemaps.
+- **Shipped:** —
+
+### TB-48 · After a rejected session, a different user can send the previous user's queued records as their own
+`🐞 Bug` · `P2` · `Todo` · Reporter: Claude (split from TB-45, 2026-10-12) · Updated: 2026-10-12
+- **Problem (confirmed by reading the code, not reproduced on a device):** a sync 401 drops the token
+  but deliberately keeps the queue (`_handleSyncException`), so a cold start lands on the login screen
+  with the previous user's records still in the local store. Then:
+  1. `AppState.init()` loads that store before anyone has logged in.
+  2. `login()` sets `_currentUser` from whoever logs in, and never compares it with the owner of the
+     queued work.
+  3. `login()` then calls `syncAll`, which POSTs every `pendingSync` record with the new user's token.
+  4. The server stamps `ustvarjen_od` from the caller, so **user A's records are filed as user B's**.
+     The pull's eviction also drops A's synced rows from B's view if their orgs differ.
+- **Why P2, not P1:** it needs a shared device, a rejected session and a different person logging in,
+  in that order. It misattributes rather than loses data, and the Postgres cutover does not make it more
+  likely (the cutover re-login is the same person).
+- **Fix shape (to decide):** remember the account that owns the local store. If `login()` sees a
+  different account while unsent work exists, do not sync. Ask instead:
+  - log back in as the owner to send it; or
+  - discard it — the TB-45 dialog, worded for this case.
 - **Shipped:** —
 
 ---

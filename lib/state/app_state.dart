@@ -255,6 +255,30 @@ class AppState extends ChangeNotifier {
     return missing;
   }
 
+  /// TB-45: the same work as [pendingPushCount], broken down for the logout
+  /// warning, plus a walk still being recorded — which is not in `_walks` yet,
+  /// so the badge never counts it, but [logout] discards it all the same.
+  UnsentWork get unsentWork => UnsentWork(
+        records: _records
+            .where((r) =>
+                !r.pendingDelete &&
+                (r.pendingSync || r.hasPendingPhotoUploads))
+            .length,
+        deletes: _records.where((r) => r.pendingDelete).length,
+        walks: _walks.where((w) => w.pendingSync).length,
+        activeWalk: _activeWalk != null,
+      );
+
+  /// TB-45: before a logout, send what can be sent and report what is left.
+  /// [logout] wipes both local stores, so whatever this returns is lost if the
+  /// user goes ahead — the caller must ask first.
+  Future<UnsentWork> sendUnsentBeforeLogout() async {
+    if (!unsentWork.isEmpty && isOnline && canSync) {
+      await syncAll();
+    }
+    return unsentWork;
+  }
+
   bool get isOutOfSync => pendingPushCount > 0 || missingLocalCount > 0;
 
   /// Total badge count for the sync icon. Sum of records-to-push and
@@ -1204,6 +1228,32 @@ class AppState extends ChangeNotifier {
     _walkServicePortSub?.cancel();
     super.dispose();
   }
+}
+
+/// Work on this device the server has not confirmed (TB-45). See
+/// [AppState.unsentWork].
+class UnsentWork {
+  const UnsentWork({
+    required this.records,
+    required this.deletes,
+    required this.walks,
+    required this.activeWalk,
+  });
+
+  /// Records not yet created on the server, or with photos still uploading.
+  final int records;
+
+  /// Deletes the server has not confirmed yet.
+  final int deletes;
+
+  /// Finished walks not yet sent.
+  final int walks;
+
+  /// A walk is being recorded right now.
+  final bool activeWalk;
+
+  bool get isEmpty =>
+      records == 0 && deletes == 0 && walks == 0 && !activeWalk;
 }
 
 extension<T> on Iterable<T> {

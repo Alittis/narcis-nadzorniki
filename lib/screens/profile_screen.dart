@@ -3,6 +3,7 @@ import 'package:narcis_nadzorniki/screens/record_list_screen.dart';
 import 'package:narcis_nadzorniki/screens/walks_list_screen.dart';
 import 'package:narcis_nadzorniki/state/app_state.dart';
 import 'package:narcis_nadzorniki/widgets/funding_footer.dart';
+import 'package:narcis_nadzorniki/widgets/logout_tile.dart';
 import 'package:provider/provider.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -135,11 +136,9 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
               const Divider(height: 1),
-              ListTile(
-                leading: const Icon(Icons.logout),
-                title: const Text('Odjava'),
-                subtitle: Text(email),
-                onTap: () async {
+              LogoutTile(
+                email: email,
+                onLogout: () async {
                   final navigator = Navigator.of(context);
                   await state.logout();
                   if (navigator.canPop()) navigator.pop();

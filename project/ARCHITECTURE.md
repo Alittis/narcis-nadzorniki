@@ -355,6 +355,18 @@ STATUS: deployed to ARSO prod (`narcis.gov.si`, NARCIS schema) 2026-05-28 via AP
 
 **Session credentials.** The disturbance endpoints re-authenticate every call via `X-Narcis-Auth`. The preferred credential is the bearer token (§12bis): set on a successful online login, persisted in secure storage, restored on app start, and sent as `Bearer <token>`. `AppState._sessionToken` holds it. `_sessionPassword` is a fallback that holds the plaintext password **in memory only** for the session, used only when the backend didn't mint a token (older deploy). Both are cleared on logout and on a sync 401; the token is also wiped from disk then, never otherwise written. `AppState.canSync` is true iff `_currentUser != null && (_sessionToken != null || _sessionPassword != null)` — note this is now true immediately after a cold-start token restore, so queued records sync as soon as connectivity returns, without a manual re-login (previously, an offline login left `canSync` false until the next online login).
 
+**Logout guards unsent work (TB-45).** `AppState.logout()` wipes both local stores and the active walk,
+so the next user of the device never sees the previous user's data. Unsent work goes with them. *Odjava*
+is therefore a `LogoutTile` ([lib/widgets/logout_tile.dart](../lib/widgets/logout_tile.dart)), and it:
+1. calls `sendUnsentBeforeLogout`, which runs `syncAll` when online and returns `unsentWork` — a
+   breakdown of the same work `pendingPushCount` counts, plus a walk still being recorded;
+2. logs out directly if nothing is left;
+3. otherwise shows what would be lost. *Prekliči* or a tap outside keeps everything; only *Odjavi in
+   zavrzi* proceeds.
+
+The row is disabled while the send runs. A sync 401 never reaches this path: it drops the token and
+keeps the queue.
+
 **`syncAll` (the sync icon's tap-target).** Single entry point that runs four phases under one `_isSyncing` flag:
 1. **Push pending records.** Drain `_records.where(pendingSync)` via POST `/disturbances/`. Server's idempotent-on-UUID semantics mean retries are safe. Rows also carrying `pendingDelete` are **skipped** — see the delete queue below.
 2. **Drain pending photo uploads.** For every record with a `pendingUpload` photo, read the local file and POST it to `/disturbances/:id/photos/:photoId`. Photos can't be uploaded before the parent record exists, hence the strict ordering.
