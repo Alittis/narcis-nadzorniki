@@ -1371,7 +1371,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-40 · Remember map-layer settings across app restarts
-`✨ Enhancement` · `P2` · `Doing` (built into v1.11.0+21 2026-10-12; pending upload + rollout) · Reporter: Matjaž · Updated: 2026-10-12
+`✨ Enhancement` · `P2` · `Done` (shipped v1.11.0+21; rolled out on the Play Closed testing track 2026-10-12, confirmed on device) · Reporter: Matjaž · Updated: 2026-10-12
 - **Want:** the last-used layer setup (e.g. Natura 2000 off) survives a restart. Today every toggle is
   widget-local and resets: `_activeZos` defaults to N2k on (ARCHITECTURE §10.2), and the Motnje
   filter is explicitly not persisted (TB-6).
@@ -1390,10 +1390,10 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   - **Web half: narcis-vibed NV-419, deployed 2026-10-12** (`5027a73`, BUILD_ID `LIv6970Z1fEzcot8f6qy7`).
     `ACTION_TAKEN` now has *Sanirano* before *Drugo*, so the desktop editor offers and saves it.
     Owner-accepted in the preview.
-- **Shipped:** — built into **v1.11.0+21** (2026-10-12, archived `~/Releases/terenska-beleznica-1.11.0+21.aab`, signed with the upload key); **not yet uploaded**. Flips to `Done` when the rollout is confirmed.
+- **Shipped:** **v1.11.0+21**, archived `~/Releases/terenska-beleznica-1.11.0+21.aab` (signed with the upload key); **rolled out on the Play Closed testing track 2026-10-12** and checked on the A56 by the owner.
 
 ### TB-41 · Add *Sanirano* to the Ukrepanje options
-`✨ Enhancement` · `P2` · `Doing` (built into v1.11.0+21 2026-10-12; pending upload + rollout) · Reporter: Matjaž · Updated: 2026-10-12
+`✨ Enhancement` · `P2` · `Done` (shipped v1.11.0+21 + narcis-vibed NV-419; rolled out on the Play Closed testing track 2026-10-12, confirmed on device) · Reporter: Matjaž · Updated: 2026-10-12
 - **Want:** a new *Ukrepanje* value, *Sanirano*.
 - **No DB change.** `TB_MOTNJE.UKREPANJE` is `VARCHAR2(50)` with no CHECK and no codebook table
   ([`disturbance_schema.sql`](../tools/ords/disturbance_schema.sql)).
@@ -1403,7 +1403,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   *obstoječa vrednost*), so deploy order is free — but ship both, or the desktop edit cannot set it.
 - **Worth one sentence to Matjaž:** Ukrepanje is **single-select**, so a record cannot be both
   *Ustno opozorilo* and *Sanirano*. If that matters, *Sanirano* reads more as an outcome than an action.
-- **Shipped:** — built into **v1.11.0+21** (2026-10-12, archived `~/Releases/terenska-beleznica-1.11.0+21.aab`, signed with the upload key); **not yet uploaded**. Flips to `Done` when the rollout is confirmed.
+- **Shipped:** **v1.11.0+21**, archived `~/Releases/terenska-beleznica-1.11.0+21.aab` (signed with the upload key); **rolled out on the Play Closed testing track 2026-10-12** and checked on the A56 by the owner. Web half: narcis-vibed **NV-419**, deployed 2026-10-12.
 
 ### TB-42 · New field *Vplivi in posledice* (impacts and consequences)
 `✨ Enhancement` · `P2` · `Blocked` (two small decisions) · Reporter: Matjaž · Updated: 2026-10-12
@@ -1449,7 +1449,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-44 · Search the šifrant by its explanation (*pojasnilo*), not only by name
-`✨ Enhancement` · `P3` · `Doing` (built into v1.11.0+21 2026-10-12; pending upload + rollout) · Reporter: Matjaž · Updated: 2026-10-12
+`✨ Enhancement` · `P3` · `Done` (shipped v1.11.0+21 + narcis-vibed NV-419; rolled out on the Play Closed testing track 2026-10-12, confirmed on device) · Reporter: Matjaž · Updated: 2026-10-12
 - **⚠️ Matjaž's mail lists this as already done. It is not, in either app.**
   - Phone: TB-12 chose type + group name and explicitly left notes out
     ([`disturbance_type_search.dart`](../lib/data/disturbance_type_search.dart)).
@@ -1469,10 +1469,10 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   - **Web half: narcis-vibed NV-419, deployed 2026-10-12** (`5027a73`, BUILD_ID `LIv6970Z1fEzcot8f6qy7`).
     `TipiPicker` folds č/š/ž with the module's `fold` and matches the note; every row already shows the
     note after the name. Owner-accepted in the preview.
-- **Shipped:** — built into **v1.11.0+21** (2026-10-12, archived `~/Releases/terenska-beleznica-1.11.0+21.aab`, signed with the upload key); **not yet uploaded**. Flips to `Done` when the rollout is confirmed.
+- **Shipped:** **v1.11.0+21**, archived `~/Releases/terenska-beleznica-1.11.0+21.aab` (signed with the upload key); **rolled out on the Play Closed testing track 2026-10-12** and checked on the A56 by the owner. Web half: narcis-vibed **NV-419**, deployed 2026-10-12.
 
 ### TB-45 · Logout silently discards unsynced records and walks
-`🐞 Bug` · `P1` · `Doing` (built into v1.11.0+21 2026-10-12; pending upload + rollout) · Reporter: Claude (found while planning the Postgres cutover, NV-259) · Updated: 2026-10-12
+`🐞 Bug` · `P1` · `Done` (shipped v1.11.0+21; rolled out on the Play Closed testing track 2026-10-12, confirmed on device) · Reporter: Claude (found while planning the Postgres cutover, NV-259) · Updated: 2026-10-12
 - **Problem:** *Odjava* on the Profil screen calls `state.logout()` straight away, with no confirmation
   ([`profile_screen.dart`](../lib/screens/profile_screen.dart) ~line 144). `AppState.logout()`
   ([`app_state.dart`](../lib/state/app_state.dart) ~line 148) then:
@@ -1533,8 +1533,9 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
       - without the send-first `syncAll`, *online: sends the queue first* fails;
       - without `scrollable`, the 320 dp / 1.6× text test fails on overflow.
     - Suite **159/159**; `flutter analyze` at the documented 10 pre-existing info lints.
-  - **Not verified on a device yet.**
-- **Shipped:** — built into **v1.11.0+21** (2026-10-12, archived `~/Releases/terenska-beleznica-1.11.0+21.aab`, signed with the upload key); **not yet uploaded**. Flips to `Done` when the rollout is confirmed.
+  - **Verified on device 2026-10-12** (owner, A56, v1.11.0+21): an offline record makes *Odjava* list
+    *zapisi: 1*, and *Prekliči* keeps it.
+- **Shipped:** **v1.11.0+21**, archived `~/Releases/terenska-beleznica-1.11.0+21.aab` (signed with the upload key); **rolled out on the Play Closed testing track 2026-10-12** and checked on the A56 by the owner.
 
 ### TB-46 · Move the app to the Postgres backend on the VPS (phone side of narcis-vibed NV-259)
 `🔧 Chore` · `P1` · `Todo` (decisions pending) · Reporter: Alexis (owner direction, 2026-10-12) · Updated: 2026-10-12
