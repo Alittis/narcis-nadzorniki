@@ -43,6 +43,15 @@
 ## 7. Architectural Decisions (Initial)
 - Flutter multi-platform project structure.
 - Client-first architecture in current repository.
+- **Planned, not built (owner decision 2026-10-12): the backend moves from Oracle/ORDS to Postgres on
+  the narcis-vibed VPS** (narcis-vibed NV-259, plan `project/NV-259-BELEZNICA-PLAN.md`; phone side
+  TB-46).
+  - The move is a pure copy, made before the server-side wishlist items (TB-36/38/39/42/43).
+  - The map-layer swap off the NarcIS GeoServer is a separate later release (TB-47). It reverses §10.2's
+    "does not depend on that deployment".
+  - Identity stays in NarcIS Oracle: login and per-request verification still go through ORDS
+    `vibed-auth`.
+  - Until the cutover, everything in §9–§17 describes production as it is.
 
 ## 8. Known Unknowns
 - Login handler still carries debug instrumentation (`narcis_auth_debug` table + per-request env dump). A56 real-device validation passed cleanly on 2026-04-25; credentials are now redacted in the dump (auth-bearing headers logged as `<REDACTED len=NN>`, `auth_hdr_prefix` reduced to `Basic ` for the conformant case), so the instrumentation is safe to keep on while we widen device/carrier coverage. Cleanup checklist, to run once we're satisfied with that coverage:

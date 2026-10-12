@@ -398,5 +398,13 @@
     ],
     "endpoints_redeploy_needed": false,
     "endpoints_redeploy_note": "disturbance/walks endpoint modules unchanged - pkg_tb_auth.authenticate signature is the same; only the package body + login module change"
+  },
+  "planned_backend_migration": {
+    "status": "PLANNED, NOT BUILT - owner decision 2026-10-12; D1-D9 of the plan await the owner",
+    "from": "Oracle/ORDS on narcis.gov.si (app-auth/, disturbances/, walks/; TB_* tables; TB_AUTH_TOKENS)",
+    "to": "Postgres schema beleznica in narcis_spike on the narcis-vibed VPS, served by Next.js at https://narcis.alittis.com/api/beleznica/app/v1/ (proposed path), vibed token auth",
+    "plan": "narcis-vibed project/NV-259-BELEZNICA-PLAN.md",
+    "items": ["narcis-vibed NV-259", "TB-45 (logout guard, ships first)", "TB-46 (phone side)", "TB-47 (GeoServer -> VPS layer swap, separate later release)"],
+    "identity_unchanged": "users, orgs and function grants stay in NarcIS Oracle; login and per-request verify still go through ORDS vibed-auth"
   }
 }

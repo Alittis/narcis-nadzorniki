@@ -1437,6 +1437,103 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   (ARCHITECTURE §8), so new explanations also need an app release.
 - **Shipped:** —
 
+### TB-45 · Logout silently discards unsynced records and walks
+`🐞 Bug` · `P1` · `Todo` · Reporter: Claude (found while planning the Postgres cutover, NV-259) · Updated: 2026-10-12
+- **Problem:** *Odjava* on the Profil screen calls `state.logout()` straight away, with no confirmation
+  ([`profile_screen.dart`](../lib/screens/profile_screen.dart) ~line 144). `AppState.logout()`
+  ([`app_state.dart`](../lib/state/app_state.dart) ~line 148) then:
+  - overwrites both local stores with empty lists (`_records = []`, `_walks = []`), **including rows
+    still marked `pendingSync` or `pendingDelete`**;
+  - stops and clears any active walk.
+  So a record or walk captured offline and not yet synced is gone the moment the warden logs out. Its
+  photo files stay on disk as orphans that nothing points at (the code comment says so), and a queued
+  delete never reaches the server. Nothing warns the user.
+- **Why the wipe exists, and why it must stay in some form:** it stops the next user on the same device
+  from seeing the previous user's data (the cross-account bleed fixed 2026-05-22). The defect is not the
+  wipe; it is wiping **unsent** work without asking.
+- **Why P1 now:** the Postgres cutover (NV-259) makes every user log in again on the new backend. "Log
+  out and back in" is the natural thing to try when sync looks stuck, and during the cutover window
+  writes are deliberately held back, so queues will be longer than usual. **This fix must ship before
+  the cutover**, in the release before it.
+- **Contrast — the 401 path is already safe:** `_handleSyncException` drops only the token and the
+  offline cache; queued records stay until the next online login. Only the explicit logout loses data.
+- **Fix shape:**
+  1. Before logging out, count pending work: `pendingSync`/`pendingDelete` records, `pendingSync`
+     walks, and the active walk.
+  2. If there is any and the device is online, run `syncAll` first and recount.
+  3. If work is still pending, show a dialog that says what would be lost (*N zapisov, M obhodov še ni
+     poslanih*). The default is *Prekliči*; a separate destructive action *Odjavi in zavrzi* remains,
+     because handing a device to someone else sometimes needs it.
+  4. No pending work: log out as today.
+  Test with the booted-`AppState` harness (`record_delete_test.dart`). Per TB-35, verify the guard by
+  removal.
+- **Related edge, unverified (STATUS: UNKNOWN – REQUIRES CONFIRMATION):** after a 401 the queue
+  survives, but if a *different* person then logs in on that device, `login()` does not appear to check
+  whether the user changed. The previous user's queued records would then be POSTed under the new
+  user's token, and the server stamps the author from the token. Confirm before deciding whether it
+  belongs here.
+- **Shipped:** —
+
+### TB-46 · Move the app to the Postgres backend on the VPS (phone side of narcis-vibed NV-259)
+`🔧 Chore` · `P1` · `Todo` (decisions pending) · Reporter: Alexis (owner direction, 2026-10-12) · Updated: 2026-10-12
+- **Decision (owner, 2026-10-12):** the field notebook's data leaves Oracle/ORDS for Postgres on the
+  VPS **before** the server-side wishlist items (TB-36, 38, 39, 42, 43), so each is built once, on the
+  new backend. The move is a **pure copy** — no new fields — and the map-layer swap is separate (TB-47).
+- **Plan:** narcis-vibed
+  [`project/NV-259-BELEZNICA-PLAN.md`](../../narcis-vibed/project/NV-259-BELEZNICA-PLAN.md). Its D1–D9
+  are the owner's decisions. The ones that shape the phone are D1 (freeze, not overlap sync), D3 (the
+  new API mirrors the ORDS wire contract) and D4 (the vibed token).
+- **What the phone needs, if D1/D3/D4 go as recommended:**
+  - **Base URL** from `--dart-define`, default `https://narcis.alittis.com/api/beleznica/app/v1/`.
+    Today it is hard-coded in `remote_api.dart` ~258/260 and `auth_service.dart` ~85.
+  - **Auth:**
+    - `Authorization: Bearer <vibed token>` replaces `X-Narcis-Auth`, and login goes to `prijava`.
+    - The `not_authorized` reason is rendered as guidance, which closes TB-28.
+    - An old stored TB token sends the user to login **without touching the queue**.
+  - **The first pull against the new backend never evicts** (a one-time flag). `_mergeRemoteIntoLocal`
+    otherwise deletes every synced local record the server does not list, so an incomplete migration
+    would wipe the phones' copies.
+  - **The sync engine stays untouched** — the point of mirroring the wire contract. The existing
+    `remote_api_test.dart` contract tests move to the new auth header and otherwise still apply.
+- **Ordering constraints:**
+  - **TB-45 ships first**, in the release before — testers will be told to log in again, and *Odjava*
+    currently wipes unsent work.
+  - This release is submitted with Play **managed publishing on**, approved, and **held** until the
+    server cutover (plan §11).
+  - Old builds are cut off server-side. Oracle writes are frozen with triggers, so they answer 500 and
+    keep their queue. They must never answer 401, 404 or an empty 200 (plan D1).
+- **Docs at ship time:**
+  - ARCHITECTURE §2, §9, §9bis, §12, §13, §16;
+  - DEPLOYMENT, OPERATIONS, and `STATE.json` `external_services` / `auth`;
+  - the **privacy policy**, which names Oracle/`TB_MOTNJE_FOTO` and the pre-token login; rewritten after
+    ARSO agrees (plan D9);
+  - Play Data Safety, and PLAY_CLOSED_TEST.
+- **Shipped:** —
+
+### TB-47 · Read the Območja layers from the VPS instead of the NarcIS GeoServer
+`✨ Enhancement` · `P2` · `Blocked` (on TB-46 / NV-259 cutover; spike first) · Reporter: Alexis (owner direction, 2026-10-12) · Updated: 2026-10-12
+- **Want:** drop the dependence on `narcis.gov.si/ows` (ARCHITECTURE §10.2) and draw the protected-area
+  layers from the data narcis-vibed already holds in Postgres. The web serves them as a static vector
+  tileset (`zos.pmtiles` via `/api/layers/zos-tiles`, NV-400) with legends and facets. Once TB-46 puts
+  the app's data on the VPS anyway, §10.2's reason for avoiding that host no longer holds.
+- **Deliberately separate from the data cutover.** A failed data move can lose records; a failed layer
+  swap can only make the map look wrong. In one release, a problem is harder to pin down and roll back,
+  and GeoServer is not causing trouble today.
+- **What has to change on the phone:**
+  - **Rendering:** WMS raster tiles become vector tiles drawn on the device.
+  - **Styling:** replace `zosSymbol`'s SLD mirror with the web's legend.
+  - **Tap-to-identify:** GetFeatureInfo is replaced by a lookup on the VPS (the web has
+    `/api/layers/detail/[id]` and `/api/zos/obmocje/[id]`).
+- **Spike first:**
+  - **The map library.** The app is on `flutter_map` **6.2.1**. Check which vector-tile / PMTiles plugin
+    exists for it, and whether the swap forces an upgrade to a current major (breaking changes across
+    every map screen).
+  - **Performance.** Does an A56 draw the dense layers smoothly? NVJ has ~14.7k points.
+- **Absorbs TB-37** (natural monuments): the web's ZO *Vrsta* facet (NV-84) already separates them, so
+  if this lands within weeks, TB-37 should not be built on GeoServer first.
+- **Stays external either way:** GURS parcels (WMS), the OSM and Esri basemaps.
+- **Shipped:** —
+
 ---
 
 ## Done
