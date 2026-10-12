@@ -1587,7 +1587,8 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   - ARCHITECTURE §2, §9, §9bis, §12, §13, §16;
   - DEPLOYMENT, OPERATIONS, and `STATE.json` `external_services` / `auth`;
   - the **privacy policy**, which names Oracle/`TB_MOTNJE_FOTO` and the pre-token login. ARSO agreed
-    on 2026-10-12 (plan D9); the rewrite names the VPS data-centre location, which is still unconfirmed;
+    on 2026-10-12 (plan D9); the rewrite names the new location: the VPS is in Frankfurt am Main, Germany
+    (EU), measured 2026-10-12;
   - Play Data Safety, and PLAY_CLOSED_TEST.
 - **Shipped:** —
 
