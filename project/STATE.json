@@ -400,7 +400,19 @@
     "endpoints_redeploy_note": "disturbance/walks endpoint modules unchanged - pkg_tb_auth.authenticate signature is the same; only the package body + login module change"
   },
   "planned_backend_migration": {
-    "status": "PLANNED, NOT BUILT - owner decision 2026-10-12; D1-D9 of the plan await the owner",
+    "status": "PLANNED, NOT BUILT - owner decision 2026-10-12; D1-D8 decided 2026-10-12; D9 ARSO agreed 2026-10-12; privacy policy rewrite + Data Safety re-check owed before the cutover",
+    "decisions": {
+      "decided_at": "2026-10-12",
+      "D1": "freeze, then switch; TB_AUTH_TOKENS never frozen (pkg_tb_auth turns any exception into 401)",
+      "D2": "own schema beleznica + role app_beleznica",
+      "D3": "mirror the ORDS wire contract, plus the additive X-Beleznica-Generation header on the list GETs",
+      "D4": "vibed token (Authorization: Bearer), login gated on TERENSKA-BELEZNICA",
+      "D5": "photos as bytea",
+      "D6": "nightly full dump + light dump (no photo bytes) every 3 h; phone guard = dataset generation: on a new generation the phone re-queues its own unlisted records instead of evicting them (replaces the one-time no-evict flag)",
+      "D7": "journal to Oracle",
+      "D8": "TB_* kept frozen and read-only; ORDS modules + TB_AUTH_TOKENS deleted when every tester is on the new build + 30 days",
+      "D9": "ARSO agreed (to the owner, 2026-10-12; no formal request). Still owed before the cutover: privacy policy rewrite, Play Data Safety re-check; VPS data-centre location STATUS: UNKNOWN - REQUIRES CONFIRMATION"
+    },
     "from": "Oracle/ORDS on narcis.gov.si (app-auth/, disturbances/, walks/; TB_* tables; TB_AUTH_TOKENS)",
     "to": "Postgres schema beleznica in narcis_spike on the narcis-vibed VPS, served by Next.js at https://narcis.alittis.com/api/beleznica/app/v1/ (proposed path), vibed token auth",
     "plan": "narcis-vibed project/NV-259-BELEZNICA-PLAN.md",

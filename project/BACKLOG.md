@@ -1542,24 +1542,38 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** **v1.11.0+21**, archived `~/Releases/terenska-beleznica-1.11.0+21.aab` (signed with the upload key); **rolled out on the Play Closed testing track 2026-10-12** and checked on the A56 by the owner.
 
 ### TB-46 · Move the app to the Postgres backend on the VPS (phone side of narcis-vibed NV-259)
-`🔧 Chore` · `P1` · `Todo` (decisions pending) · Reporter: Alexis (owner direction, 2026-10-12) · Updated: 2026-10-12
+`🔧 Chore` · `P1` · `Todo` (D1–D8 decided 2026-10-12; ARSO agreed, D9) · Reporter: Alexis (owner direction, 2026-10-12) · Updated: 2026-10-12
 - **Decision (owner, 2026-10-12):** the field notebook's data leaves Oracle/ORDS for Postgres on the
   VPS **before** the server-side wishlist items (TB-36, 38, 39, 42, 43), so each is built once, on the
   new backend. The move is a **pure copy** — no new fields — and the map-layer swap is separate (TB-47).
 - **Plan:** narcis-vibed
   [`project/NV-259-BELEZNICA-PLAN.md`](../../narcis-vibed/project/NV-259-BELEZNICA-PLAN.md). Its D1–D9
   are the owner's decisions. The ones that shape the phone are D1 (freeze, not overlap sync), D3 (the
-  new API mirrors the ORDS wire contract) and D4 (the vibed token).
-- **What the phone needs, if D1/D3/D4 go as recommended:**
+  new API mirrors the ORDS wire contract), D4 (the vibed token) and D6 (the dataset-generation guard).
+- **Decisions (owner, 2026-10-12):** D1–D8 as the plan recommends, recorded in its §4 table. D6 changed
+  the phone's guard (below). **D9: ARSO agreed** (to the owner, 2026-10-12; no formal request needed). The
+  privacy policy rewrite below is still owed before the cutover.
+- **What the phone needs (D1/D3/D4/D6 decided):**
   - **Base URL** from `--dart-define`, default `https://narcis.alittis.com/api/beleznica/app/v1/`.
     Today it is hard-coded in `remote_api.dart` ~258/260 and `auth_service.dart` ~85.
   - **Auth:**
     - `Authorization: Bearer <vibed token>` replaces `X-Narcis-Auth`, and login goes to `prijava`.
     - The `not_authorized` reason is rendered as guidance, which closes TB-28.
     - An old stored TB token sends the user to login **without touching the queue**.
-  - **The first pull against the new backend never evicts** (a one-time flag). `_mergeRemoteIntoLocal`
-    otherwise deletes every synced local record the server does not list, so an incomplete migration
-    would wipe the phones' copies.
+  - **The dataset-generation guard (D6).** `_mergeRemoteIntoLocal` deletes every synced local record the
+    server does not list, so an incomplete migration or a server restore would wipe the phones' copies.
+    - The list GETs send `X-Beleznica-Generation`. The phone persists the last value it saw. Oracle sends
+      none, so the cutover counts as the first change.
+    - On a value it has not seen, the phone **re-queues** (`pendingSync = true`) its own synced records
+      and walks that the server does not list, instead of evicting them. The idempotent POST puts them
+      back, photos included. "Own" is the existing `isAuthoredByCurrentUser` /
+      `isWalkAuthoredByCurrentUser`. Other users' rows are evicted as today.
+    - Then it stores the new value. Ordinary pulls are unchanged.
+    - This **replaces the draft's one-time no-evict flag**, which only delayed the eviction by one pull
+      and did not cover a restore.
+    - To verify while building: that a synced walk keeps its points locally, so it can be re-POSTed.
+    - Test: a restore on a scratch backend (new generation) is followed by the phone re-sending its own
+      lost records, while a teammate's are evicted.
   - **The sync engine stays untouched** — the point of mirroring the wire contract. The existing
     `remote_api_test.dart` contract tests move to the new auth header and otherwise still apply.
 - **Ordering constraints:**
@@ -1572,8 +1586,8 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Docs at ship time:**
   - ARCHITECTURE §2, §9, §9bis, §12, §13, §16;
   - DEPLOYMENT, OPERATIONS, and `STATE.json` `external_services` / `auth`;
-  - the **privacy policy**, which names Oracle/`TB_MOTNJE_FOTO` and the pre-token login; rewritten after
-    ARSO agrees (plan D9);
+  - the **privacy policy**, which names Oracle/`TB_MOTNJE_FOTO` and the pre-token login. ARSO agreed
+    on 2026-10-12 (plan D9); the rewrite names the VPS data-centre location, which is still unconfirmed;
   - Play Data Safety, and PLAY_CLOSED_TEST.
 - **Shipped:** —
 
