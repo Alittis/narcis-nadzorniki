@@ -496,6 +496,14 @@ Implemented across [lib/state/app_state.dart](../lib/state/app_state.dart), [lib
 - **Motnje mode**: existing speed-dial (Foto + Šifrant). FAB icon `+`, rotates to ✕ when expanded.
 - **Obhodi mode + no active walk**: single-tap `directions_walk` FAB → `AppState.startWalk()`. Generates a UUID, stamps `pendingSync=true`, persists the active-walk file, subscribes to `LocationService.watchPosition()` (5 m distance filter, same as the live-dot stream), starts buffering `WalkPoint`s.
 - **Obhodi mode + active walk**: single-tap `stop` FAB → `_EndWalkSheet` bottom sheet (optional name + notes, "Shrani" or "Zavrzi" with confirm). On Shrani the walk moves into `_walks` queued for push; on Zavrzi it's wiped via `cancelWalk()` (no upload, no local row).
+- **Pause / resume (TB-8)**: while a walk exists, a mini button above the `stop` FAB reads *Premor* (⏸) or *Nadaljuj* (▶).
+  - `AppState.pauseWalk()` stops the FGS, so the GPS stream and the "Snemanje obhoda" notification stop too. It re-reads `active_walk.json` for points the port never delivered, and saves the walk there with `Walk.pausedAt` set. The walk stays open: records captured during the pause still link to it, and the live track draws grey.
+  - `resumeWalk()` clears `pausedAt` in the file first, then restarts the FGS. The handler reloads the walk, points and all.
+  - `init()` leaves a paused walk paused: no service restart.
+  - `endWalk()` on a paused walk sets `endedAt` to `pausedAt`, not to the moment *Shrani* is tapped.
+  - `pausedAt` is local-only: `RemoteApi._walkPayload` builds the wire body and does not send it. The server keeps start and end only, so a walk's duration includes its pauses.
+  - The track across a pause follows the TB-22 rule below: a resume more than 200 m from the pause point leaves a hole, a shorter one draws a straight line. There is no pause marker in the stored points, so the web and the walk detail draw it the same way.
+  - Tests: [test/walk_pause_test.dart](../test/walk_pause_test.dart).
 
 Disturbances captured during a walk are linked automatically: `AppState.addRecord` stamps `record.obhodId = _activeWalk?.id` if one is running, regardless of which mode the user is in when they tap "+". Switching back to Motnje mode mid-walk preserves the link.
 

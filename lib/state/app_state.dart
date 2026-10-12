@@ -117,6 +117,7 @@ class AppState extends ChangeNotifier {
   Walk? get activeWalk => _activeWalk;
   List<WalkPoint> get activePoints => List.unmodifiable(_activePoints);
   bool get hasActiveWalk => _activeWalk != null;
+  bool get isWalkPaused => _activeWalk?.pausedAt != null;
 
   /// [confirmDiscard] is asked when the device holds unsent work captured by
   /// a different account (TB-48). Only that account can send it: the server
@@ -359,7 +360,12 @@ class AppState extends ChangeNotifier {
         _activeWalk = restored;
         _activePoints = restored.points;
         final isRunning = await FlutterForegroundTask.isRunningService;
-        if (isRunning) {
+        if (restored.pausedAt != null) {
+          // TB-8: paused on purpose - pauseWalk stopped the service before it
+          // saved the pause, so there is nothing to re-bind or restart.
+          debugPrint('[walk] resumed paused walk ${restored.id} '
+              '(${restored.points.length} buffered points)');
+        } else if (isRunning) {
           await _bindWalkServicePort();
           debugPrint('[walk] resumed active walk ${restored.id} '
               '(FGS still running, ${restored.points.length} buffered points)');
@@ -1017,12 +1023,15 @@ class AppState extends ChangeNotifier {
       return null;
     }
 
+    // A walk ended while paused (TB-8) ends where its recording stopped, not
+    // when the warden got round to tapping Shrani.
     final completed = active.copyWith(
-      endedAt: DateTime.now(),
+      endedAt: active.pausedAt ?? DateTime.now(),
       name: name,
       notes: notes,
       points: mergedPoints,
       pendingSync: true,
+      clearPausedAt: true,
     );
     _walks = [..._walks, completed];
     _activeWalk = null;
@@ -1050,6 +1059,46 @@ class AppState extends ChangeNotifier {
       }
     }
     return completed;
+  }
+
+  /// TB-8: stops recording without ending the walk — a warden between two
+  /// locations with other duties in between. The service and its GPS stream
+  /// stop (so does the "Snemanje obhoda" notification); the walk stays open,
+  /// keeps its points, and records captured meanwhile still link to it.
+  Future<void> pauseWalk() async {
+    final active = _activeWalk;
+    if (active == null || active.pausedAt != null) return;
+    // Stop the FGS first so the handler can't append after we read.
+    if (await FlutterForegroundTask.isRunningService) {
+      await FlutterForegroundTask.stopService();
+    }
+    await _walkServicePortSub?.cancel();
+    _walkServicePortSub = null;
+    // Same as endWalk: the file may hold points the port never delivered.
+    final fromDisk = await _walksStore.loadActive();
+    final paused = (fromDisk ?? active).copyWith(pausedAt: DateTime.now());
+    _activeWalk = paused;
+    _activePoints = paused.points;
+    await _walksStore.saveActive(paused);
+    debugPrint('[walk] pauseWalk ${paused.id}: '
+        '${paused.points.length} points so far');
+    notifyListeners();
+  }
+
+  /// TB-8: picks a paused walk back up. The handler reloads the walk, points
+  /// and all, from `active_walk.json`. How the track draws across the pause is
+  /// left to the TB-22 gap rule: more than 200 m between the last point before
+  /// the pause and the first after it leaves a hole, less draws a short line.
+  Future<void> resumeWalk() async {
+    final active = _activeWalk;
+    if (active == null || active.pausedAt == null) return;
+    final resumed = active.copyWith(clearPausedAt: true);
+    _activeWalk = resumed;
+    // Persist BEFORE starting the service, as startWalk does.
+    await _walksStore.saveActive(resumed);
+    await _startWalkService(resumed);
+    debugPrint('[walk] resumeWalk ${resumed.id}');
+    notifyListeners();
   }
 
   /// Discards the in-progress walk without saving. Used when the user

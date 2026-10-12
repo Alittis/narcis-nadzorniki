@@ -374,6 +374,19 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// TB-8: one tap either way; the stop button still ends the walk.
+  Future<void> _toggleWalkPause(AppState state) async {
+    if (state.isWalkPaused) {
+      await state.resumeWalk();
+      if (!mounted) return;
+      _showSnack('Snemanje obhoda se nadaljuje.');
+    } else {
+      await state.pauseWalk();
+      if (!mounted) return;
+      _showSnack('Obhod je v premoru. Pot se ne beleži.');
+    }
+  }
+
   void _collapseSpeedDial() {
     if (!_plusExpanded) return;
     setState(() {
@@ -585,6 +598,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   onPhotoTap: () => _startPhotoFlow(state),
                   onCodebookTap: () => _startCodebookFlow(state),
                 ),
+              if (_activeMode == AppMode.obhodi && state.hasActiveWalk)
+                _WalkPauseButton(
+                  color: _modeDefs[AppMode.obhodi]!.color,
+                  paused: state.isWalkPaused,
+                  onTap: () => _toggleWalkPause(state),
+                ),
             ],
           ),
         );
@@ -631,14 +650,16 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
     // Active walk (always rendered, regardless of Obhodi toggle, so the
-    // user sees their path drawing while it records).
+    // user sees their path drawing while it records). Grey while paused
+    // (TB-8), so a glance tells the warden it is not recording.
     if (state.hasActiveWalk) {
+      final color = state.isWalkPaused ? Colors.grey : Colors.green;
       for (final segment in polishTrackSegments(state.activePoints)) {
         if (segment.length < 2) continue;
         out.add(
           Polyline(
             points: segment,
-            color: Colors.green.withValues(alpha: 0.85),
+            color: color.withValues(alpha: 0.85),
             strokeWidth: 5,
           ),
         );
@@ -1351,6 +1372,42 @@ class _SpeedDialMiniFabs extends StatelessWidget {
                 onTap: onCodebookTap,
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// TB-8: pause or resume the walk, above the stop button in Obhodi mode. Sits
+/// where the speed dial's mini buttons do, which never show in this mode.
+class _WalkPauseButton extends StatelessWidget {
+  const _WalkPauseButton({
+    required this.color,
+    required this.paused,
+    required this.onTap,
+  });
+
+  final Color color;
+  final bool paused;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      right: 16,
+      bottom: 0,
+      child: SafeArea(
+        top: false,
+        minimum: const EdgeInsets.only(bottom: 8),
+        // Same lift as _SpeedDialMiniFabs.
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 94),
+          child: _MiniSpeedDialButton(
+            label: paused ? 'Nadaljuj' : 'Premor',
+            icon: paused ? Icons.play_arrow : Icons.pause,
+            color: color,
+            onTap: onTap,
           ),
         ),
       ),

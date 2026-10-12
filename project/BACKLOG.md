@@ -278,7 +278,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   signed with the upload key); rolled out on the Play Closed testing track 2026-06-24.
 
 ### TB-8 · Pause / resume an active patrol
-`✨ Enhancement` · `P2` · `Todo` · Reporter: Damjan Intihar · Updated: 2026-06-03
+`✨ Enhancement` · `P2` · `Done` (in source 2026-10-12; release pending) · Reporter: Damjan Intihar · Updated: 2026-10-12
 - **Problem:** A supervisor patrols several locations in one day with other duties in
   between; today the only controls are start and end. Damjan worked around it by recording
   several separate walks.
@@ -289,7 +289,36 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   just "stop appending track points while paused, keep the session open" in
   [`home_screen.dart`](../lib/screens/home_screen.dart) / [`app_state.dart`](../lib/state/app_state.dart).
   No backend change. Decide how a gap renders in the track polyline (break vs. straight line).
-- **Discussion:** —
+- **Decided (owner, 2026-10-12):**
+  - **Control:** a mini button above the stop button, one tap each way. Rejected: putting *Premor* in
+    the end sheet, which costs two taps.
+  - **Gap:** keep TB-22's 200 m rule. Rejected: a time-based break, which would change how every walk
+    draws, GPS dropouts included.
+- **Fixed (2026-10-12):** see ARCHITECTURE §17, *Pause / resume (TB-8)*.
+  - **Pausing stops the recording service.** No GPS and no notification while paused, and the
+    handler isolate is untouched. The walk stays open in `active_walk.json` with a local-only
+    `Walk.pausedAt`, which survives an app kill.
+  - **Records captured during a pause still link to the walk.**
+  - **A walk ended while paused ends at the pause.**
+  - **No wire change** (the "pure copy" rule for TB-46): `pausedAt` is never sent, so a walk's duration
+    still includes its pauses. A pause-free duration needs a server field, so it waits until after
+    the Postgres move.
+- **Verified:** `test/walk_pause_test.dart` (6 tests), on the real `AppState` with the foreground-service
+  channel faked:
+  - pausing stops the service and keeps every point, including ones that reached only the file;
+  - resuming restarts it on the same walk, with the file unpaused first;
+  - a paused walk stays paused across a restart, while a recording one is still restarted;
+  - a walk ended while paused has `endedAt = pausedAt`, and the POST body has no `pausedAt`;
+  - the local JSON round trip.
+- **Checked by removal:** each guard, removed alone, fails its test: the `init()` branch, `endWalk`'s
+  `endedAt`, `pauseWalk`'s file re-read, and `resumeWalk`'s save before starting. Full suite 196/196;
+  `flutter analyze` at the documented 10 info lints.
+- **Still to check on a device (A56):**
+  - the button's place above the stop button;
+  - that the notification goes away on pause and comes back on resume;
+  - that a pause survives the screen being off and the app being swiped away.
+- **Wording left as is:** the TB-45 and TB-48 dialogs list an open walk as *"obhod, ki se še snema"*,
+  which is slightly off for a paused one.
 - **Shipped:** —
 
 ### TB-9 · NULL entry — record a patrol with no disturbances

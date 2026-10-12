@@ -53,6 +53,7 @@ class WalkPoint {
 ///   [points] cleared on disk and lazy-fetched via /walks/:id/points only
 ///   when the user opens the detail screen — the bulk of the wire payload
 ///   doesn't need to live in memory or in `walks_store.json` for every walk.
+/// - [pausedAt] is set while the in-progress walk is paused (TB-8).
 class Walk {
   const Walk({
     required this.id,
@@ -65,6 +66,7 @@ class Walk {
     this.points = const [],
     this.pointCount,
     this.disturbanceCount,
+    this.pausedAt,
   });
 
   final String id;
@@ -83,6 +85,11 @@ class Walk {
   final int? pointCount;
   final int? disturbanceCount;
 
+  /// When the in-progress walk was paused, or null while it records (TB-8).
+  /// Persisted in `active_walk.json` so a pause survives an app kill; never
+  /// sent — `RemoteApi._walkPayload` builds the wire body.
+  final DateTime? pausedAt;
+
   Duration get duration => endedAt.difference(startedAt);
 
   /// Best-effort point count for display, falling back to the embedded list
@@ -99,6 +106,8 @@ class Walk {
     List<WalkPoint>? points,
     int? pointCount,
     int? disturbanceCount,
+    DateTime? pausedAt,
+    bool clearPausedAt = false,
   }) {
     return Walk(
       id: id,
@@ -111,6 +120,7 @@ class Walk {
       points: points ?? this.points,
       pointCount: pointCount ?? this.pointCount,
       disturbanceCount: disturbanceCount ?? this.disturbanceCount,
+      pausedAt: clearPausedAt ? null : (pausedAt ?? this.pausedAt),
     );
   }
 
@@ -125,6 +135,7 @@ class Walk {
         'points': points.map((p) => p.toJson()).toList(),
         'pointCount': pointCount,
         'disturbanceCount': disturbanceCount,
+        'pausedAt': pausedAt?.toIso8601String(),
       };
 
   factory Walk.fromJson(Map<String, dynamic> json) {
@@ -141,6 +152,9 @@ class Walk {
           .toList(),
       pointCount: (json['pointCount'] as num?)?.toInt(),
       disturbanceCount: (json['disturbanceCount'] as num?)?.toInt(),
+      pausedAt: json['pausedAt'] == null
+          ? null
+          : DateTime.parse(json['pausedAt'] as String),
     );
   }
 }
