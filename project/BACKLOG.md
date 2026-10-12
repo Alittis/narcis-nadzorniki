@@ -1403,6 +1403,8 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   *obstoječa vrednost*), so deploy order is free — but ship both, or the desktop edit cannot set it.
 - **Worth one sentence to Matjaž:** Ukrepanje is **single-select**, so a record cannot be both
   *Ustno opozorilo* and *Sanirano*. If that matters, *Sanirano* reads more as an outcome than an action.
+- **Reporter informed 2026-10-12** (mail to Matjaž, sent by Alexis): live on phone and desktop; Ukrepanje is
+  single-select, so a record cannot be both *Ustno opozorilo* and *Sanirano*.
 - **Shipped:** **v1.11.0+21**, archived `~/Releases/terenska-beleznica-1.11.0+21.aab` (signed with the upload key); **rolled out on the Play Closed testing track 2026-10-12** and checked on the A56 by the owner. Web half: narcis-vibed **NV-419**, deployed 2026-10-12.
 
 ### TB-42 · New field *Vplivi in posledice* (impacts and consequences)
@@ -1469,6 +1471,8 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   - **Web half: narcis-vibed NV-419, deployed 2026-10-12** (`5027a73`, BUILD_ID `LIv6970Z1fEzcot8f6qy7`).
     `TipiPicker` folds č/š/ž with the module's `fold` and matches the note; every row already shows the
     note after the name. Owner-accepted in the preview.
+- **Reporter informed 2026-10-12** (mail to Matjaž, sent by Alexis): live on phone and desktop; only ~15 of
+  172 types carry an explanation, and new ones need an app release (the phone codebook is hard-coded).
 - **Shipped:** **v1.11.0+21**, archived `~/Releases/terenska-beleznica-1.11.0+21.aab` (signed with the upload key); **rolled out on the Play Closed testing track 2026-10-12** and checked on the A56 by the owner. Web half: narcis-vibed **NV-419**, deployed 2026-10-12.
 
 ### TB-45 · Logout silently discards unsynced records and walks
