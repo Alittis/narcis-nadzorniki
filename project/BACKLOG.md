@@ -1387,9 +1387,9 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   ([`form_screen.dart`](../lib/screens/form_screen.dart)).
   - Test in [`form_preview_flow_test.dart`](../test/form_preview_flow_test.dart): choose it, preview,
     save, and `actionTaken == 'Sanirano'`. Verified by removal.
-  - **⚠️ The web half is still open:** narcis-vibed `ACTION_TAKEN` in `web/src/lib/beleznica/types.ts`.
-    Until it ships, the desktop editor shows *Sanirano* on such records as *obstoječa vrednost* and
-    cannot set it itself.
+  - **Web half: narcis-vibed NV-419, deployed 2026-10-12** (`5027a73`, BUILD_ID `LIv6970Z1fEzcot8f6qy7`).
+    `ACTION_TAKEN` now has *Sanirano* before *Drugo*, so the desktop editor offers and saves it.
+    Owner-accepted in the preview.
 - **Shipped:** — built into **v1.11.0+21** (2026-10-12, archived `~/Releases/terenska-beleznica-1.11.0+21.aab`, signed with the upload key); **not yet uploaded**. Flips to `Done` when the rollout is confirmed.
 
 ### TB-41 · Add *Sanirano* to the Ukrepanje options
@@ -1466,8 +1466,9 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
     only through its note would otherwise look unrelated.
   - Tests: a note-only match (*okostj* → Kadaver), folding (*zivalskih*), the widened every-hit
     invariant, and a widget test that the note is shown. Both new tests verified by removal.
-  - **⚠️ The web half is still open:** narcis-vibed `TipiPicker` (`MotnjaDetail.tsx`). Until it ships,
-    Matjaž's "already done" is true only on the phone.
+  - **Web half: narcis-vibed NV-419, deployed 2026-10-12** (`5027a73`, BUILD_ID `LIv6970Z1fEzcot8f6qy7`).
+    `TipiPicker` folds č/š/ž with the module's `fold` and matches the note; every row already shows the
+    note after the name. Owner-accepted in the preview.
 - **Shipped:** — built into **v1.11.0+21** (2026-10-12, archived `~/Releases/terenska-beleznica-1.11.0+21.aab`, signed with the upload key); **not yet uploaded**. Flips to `Done` when the rollout is confirmed.
 
 ### TB-45 · Logout silently discards unsynced records and walks
