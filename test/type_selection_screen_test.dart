@@ -14,6 +14,22 @@ void main() {
     expect(find.text('Kopalci'), findsOneWidget);
   });
 
+  testWidgets('a hit found through its explanation shows that explanation',
+      (tester) async {
+    // TB-44: the search matches notes too, so a result row must show the note
+    // — otherwise a type found only through it looks like an unrelated hit.
+    await tester.pumpWidget(const MaterialApp(
+      home: TypeSelectionScreen(initialSelections: []),
+    ));
+
+    await tester.enterText(find.byType(TextField), 'okostj');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Vključno z okostjem ali deli živalskih teles.'),
+        findsOneWidget);
+    expect(find.textContaining('Ni zadetkov'), findsNothing);
+  });
+
   testWidgets('typing filters to a flat results list', (tester) async {
     await tester.pumpWidget(const MaterialApp(
       home: TypeSelectionScreen(initialSelections: []),

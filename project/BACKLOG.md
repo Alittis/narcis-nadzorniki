@@ -1350,10 +1350,28 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   Postgres. A table built in Oracle now gets migrated by it later — not a blocker, but added scope there.
 - **Blocked on:** confirming phase 1 as the first cut, who holds the create right
   (`TERENSKA-BELEZNICA-ADMIN`?), and the picker-not-third-button UX.
+- **Built 2026-10-12:**
+  - [`map_layers_store.dart`](../lib/data/map_layers_store.dart): `MapLayers` is the basemap, the
+    Motnje / Obhodi / Parcele visibility and the Območja set; `MapLayersStore` keeps it in
+    `map_layers.json`, the same shape as `MapViewStore`.
+    - Tolerant parsing: a damaged file, or an unknown or missing value, falls back to the defaults one
+      field at a time.
+    - An all-off Območja set stays off.
+  - [`home_screen.dart`](../lib/screens/home_screen.dart): the fields start at `MapLayers.defaults`, and
+    `_restoreLayers` applies the saved choice on start. Every layer change goes through `_setLayers`,
+    which saves — grep confirms no other assignment site.
+  - **The Motnje filter is not persisted** (the reason is above); the field comment now says so.
+  - **Not cleared on logout — a change from the plan above.** Layer choices are device UI settings, not
+    user data, like the map viewport in `map_view.json`, which logout does not clear either.
+  - Tests: [`map_layers_store_test.dart`](../test/map_layers_store_test.dart), 6 tests, verified by
+    removal. The home-screen wiring has no widget test, for the same reason as TB-19 (the map needs live
+    tiles).
+  - Privacy policy: `map_layers.json` holds no personal data. Mention it next to `map_view.json` at
+    the TB-46 policy rewrite.
 - **Shipped:** —
 
 ### TB-40 · Remember map-layer settings across app restarts
-`✨ Enhancement` · `P2` · `Todo` (quick win) · Reporter: Matjaž · Updated: 2026-10-12
+`✨ Enhancement` · `P2` · `Done` (in source 2026-10-12; release pending) · Reporter: Matjaž · Updated: 2026-10-12
 - **Want:** the last-used layer setup (e.g. Natura 2000 off) survives a restart. Today every toggle is
   widget-local and resets: `_activeZos` defaults to N2k on (ARCHITECTURE §10.2), and the Motnje
   filter is explicitly not persisted (TB-6).
@@ -1365,10 +1383,17 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Client-only.** The app has no `shared_preferences` dependency, but it already persists JSON through
   `path_provider`, so a small settings file needs no new package. Clear it on logout with the other
   user state.
+- **Built 2026-10-12 (phone):** *Sanirano* sits before *Drugo* in the dropdown
+  ([`form_screen.dart`](../lib/screens/form_screen.dart)).
+  - Test in [`form_preview_flow_test.dart`](../test/form_preview_flow_test.dart): choose it, preview,
+    save, and `actionTaken == 'Sanirano'`. Verified by removal.
+  - **⚠️ The web half is still open:** narcis-vibed `ACTION_TAKEN` in `web/src/lib/beleznica/types.ts`.
+    Until it ships, the desktop editor shows *Sanirano* on such records as *obstoječa vrednost* and
+    cannot set it itself.
 - **Shipped:** —
 
 ### TB-41 · Add *Sanirano* to the Ukrepanje options
-`✨ Enhancement` · `P2` · `Todo` (quick win) · Reporter: Matjaž · Updated: 2026-10-12
+`✨ Enhancement` · `P2` · `Done` (in source 2026-10-12; release pending) · Reporter: Matjaž · Updated: 2026-10-12
 - **Want:** a new *Ukrepanje* value, *Sanirano*.
 - **No DB change.** `TB_MOTNJE.UKREPANJE` is `VARCHAR2(50)` with no CHECK and no codebook table
   ([`disturbance_schema.sql`](../tools/ords/disturbance_schema.sql)).
@@ -1424,7 +1449,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-44 · Search the šifrant by its explanation (*pojasnilo*), not only by name
-`✨ Enhancement` · `P3` · `Todo` (quick win) · Reporter: Matjaž · Updated: 2026-10-12
+`✨ Enhancement` · `P3` · `Done` (in source 2026-10-12; release pending) · Reporter: Matjaž · Updated: 2026-10-12
 - **⚠️ Matjaž's mail lists this as already done. It is not, in either app.**
   - Phone: TB-12 chose type + group name and explicitly left notes out
     ([`disturbance_type_search.dart`](../lib/data/disturbance_type_search.dart)).
@@ -1435,6 +1460,14 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Expectation to set:** only ~15 of 172 types carry an explanation today, so the gain is small until
   more are written. The phone codebook is hard-coded and kept in step with the seed by hand
   (ARCHITECTURE §8), so new explanations also need an app release.
+- **Built 2026-10-12 (phone):** `searchDisturbanceTypes` also matches `type.note`, accent-folded like
+  the rest ([`disturbance_type_search.dart`](../lib/data/disturbance_type_search.dart)).
+  - Search results now show the note under the group name, as the browse view already did. A hit found
+    only through its note would otherwise look unrelated.
+  - Tests: a note-only match (*okostj* → Kadaver), folding (*zivalskih*), the widened every-hit
+    invariant, and a widget test that the note is shown. Both new tests verified by removal.
+  - **⚠️ The web half is still open:** narcis-vibed `TipiPicker` (`MotnjaDetail.tsx`). Until it ships,
+    Matjaž's "already done" is true only on the phone.
 - **Shipped:** —
 
 ### TB-45 · Logout silently discards unsynced records and walks

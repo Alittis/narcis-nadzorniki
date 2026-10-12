@@ -20,11 +20,11 @@ String foldForSearch(String input) {
       .replaceAll('đ', 'd');
 }
 
-/// Returns the types whose name — or whose group's name — matches [query], in
-/// codebook order. A group-name match pulls in every type of that group (so
-/// "kopal" surfaces the whole Kopalci group). Matching is accent- and
-/// case-insensitive (see [foldForSearch]). An empty/whitespace query yields no
-/// matches — callers show the full grouped browse view instead.
+/// Returns the types whose name, explanation (`note`, TB-44) or group name
+/// matches [query], in codebook order. A group-name match pulls in every type
+/// of that group (so "kopal" surfaces the whole Kopalci group). Matching is
+/// accent- and case-insensitive (see [foldForSearch]). An empty/whitespace
+/// query yields no matches — callers show the full grouped browse view instead.
 List<DisturbanceTypeMatch> searchDisturbanceTypes(
   String query, {
   List<DisturbanceTypeGroup> groups = disturbanceTypeGroups,
@@ -35,7 +35,10 @@ List<DisturbanceTypeMatch> searchDisturbanceTypes(
   for (final group in groups) {
     final groupMatches = foldForSearch(group.name).contains(needle);
     for (final type in group.types) {
-      if (groupMatches || foldForSearch(type.name).contains(needle)) {
+      final note = type.note;
+      if (groupMatches ||
+          foldForSearch(type.name).contains(needle) ||
+          (note != null && foldForSearch(note).contains(needle))) {
         matches.add((group: group, type: type));
       }
     }

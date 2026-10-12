@@ -552,6 +552,7 @@ class _FormScreenState extends State<FormScreen> {
                       DropdownMenuItem(value: 'Svetovanje', child: Text('Svetovanje')),
                       DropdownMenuItem(value: 'Navodila', child: Text('Navodila')),
                       DropdownMenuItem(value: 'Potrebno nadaljnje spremljanje', child: Text('Potrebno nadaljnje spremljanje')),
+                      DropdownMenuItem(value: 'Sanirano', child: Text('Sanirano')),
                       DropdownMenuItem(value: 'Drugo', child: Text('Drugo')),
                     ],
                     onChanged: (value) {

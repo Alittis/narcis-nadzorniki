@@ -164,9 +164,19 @@ class _TypeSelectionScreenState extends State<TypeSelectionScreen> {
             value == true ? _selectionFor(group, type) : null,
           ),
           title: Text('${type.code}. ${type.name}'),
-          subtitle: Text(
-            group.name,
-            style: TextStyle(color: hue, fontWeight: FontWeight.w600),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                group.name,
+                style: TextStyle(color: hue, fontWeight: FontWeight.w600),
+              ),
+              // TB-44: the search also matches the explanation, so show it —
+              // otherwise a hit found only through its note looks unrelated.
+              if (type.note != null)
+                Text(type.note!, style: Theme.of(context).textTheme.bodySmall),
+            ],
           ),
         );
       },

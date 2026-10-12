@@ -47,15 +47,31 @@ void main() {
       expect(groupHits.any((m) => m.type.name == 'Fotograf'), isTrue);
     });
 
-    test('every hit matches on type name or group name', () {
-      const needle = 'kopal';
-      for (final m in searchDisturbanceTypes(needle)) {
-        expect(
-          foldForSearch(m.type.name).contains(needle) ||
-              foldForSearch(m.group.name).contains(needle),
-          isTrue,
-        );
+    test('every hit matches on type name, explanation or group name', () {
+      for (final needle in ['kopal', 'okostj']) {
+        for (final m in searchDisturbanceTypes(needle)) {
+          expect(
+            foldForSearch(m.type.name).contains(needle) ||
+                foldForSearch(m.type.note ?? '').contains(needle) ||
+                foldForSearch(m.group.name).contains(needle),
+            isTrue,
+          );
+        }
       }
+    });
+
+    test('matches a type by its explanation alone (TB-44)', () {
+      // "okostjem" appears only in a note ("Vključno z okostjem ali deli
+      // živalskih teles."), never in a type or group name — so before TB-44
+      // this query found nothing.
+      final hits = searchDisturbanceTypes('OKOSTJ');
+      expect(hits, isNotEmpty);
+      for (final m in hits) {
+        expect(foldForSearch(m.type.name).contains('okostj'), isFalse);
+        expect(foldForSearch(m.type.note!).contains('okostj'), isTrue);
+      }
+      // Accent-folded like everything else: "zivalskih" finds "živalskih".
+      expect(searchDisturbanceTypes('zivalskih teles'), isNotEmpty);
     });
 
     test('matches are returned in codebook order', () {

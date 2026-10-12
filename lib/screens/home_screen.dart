@@ -6,6 +6,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:narcis_nadzorniki/data/disturbance_filter.dart';
+import 'package:narcis_nadzorniki/data/map_layers_store.dart';
 import 'package:narcis_nadzorniki/data/map_view_store.dart';
 import 'package:narcis_nadzorniki/data/obmocja_store.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
@@ -88,6 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _locationService = LocationService();
   final _imagePicker = ImagePicker();
   final _mapViewStore = MapViewStore();
+  final _mapLayersStore = MapLayersStore();
   final _obmocjaStore = ObmocjaStore();
   LatLng _center = _sloveniaCenter;
   double _initialZoom = _sloveniaZoom;
@@ -97,18 +99,21 @@ class _HomeScreenState extends State<HomeScreen> {
   // halo around the user dot. Null until the first fix arrives.
   double? _userAccuracy;
   StreamSubscription<UserPosition>? _positionSub;
-  BasemapMode _basemapMode = BasemapMode.osm;
+  // Layer choices start at MapLayers.defaults and are restored from the last
+  // session in initState (TB-40).
+  BasemapMode _basemapMode = MapLayers.defaults.basemap;
   bool _locating = false;
 
   AppMode _activeMode = AppMode.motnje;
-  bool _showMotnje = true;
-  // Motnje-layer visibility filter (age / author / observed-date window, TB-6).
-  // Widget-local and not persisted, matching the other layer toggles.
+  bool _showMotnje = MapLayers.defaults.showMotnje;
+  // Motnje-layer visibility filter (author / observed-date window / status,
+  // TB-6). Deliberately NOT persisted, unlike the layers (TB-40): a window
+  // remembered from last week would silently hide every new record.
   MotnjeFilter _motnjeFilter = const MotnjeFilter.unfiltered();
-  bool _showObhodi = false;
-  bool _showParcele = false;
+  bool _showObhodi = MapLayers.defaults.showObhodi;
+  bool _showParcele = MapLayers.defaults.showParcele;
   // Active "Območja s statusom" sublayers; Natura 2000 on by default.
-  final Set<ZosKind> _activeZos = {ZosKind.n2k};
+  final Set<ZosKind> _activeZos = {...MapLayers.defaults.zos};
   // True while a tap's GetFeatureInfo identify is in flight.
   bool _identifying = false;
   // Last Območja identify tap; drives the buffer circle on the map.
@@ -123,6 +128,34 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _bootstrapView();
+    _restoreLayers();
+  }
+
+  /// TB-40: the layer setup the user left the map with.
+  Future<void> _restoreLayers() async {
+    final saved = await _mapLayersStore.load();
+    if (saved == null || !mounted) return;
+    setState(() {
+      _basemapMode = saved.basemap;
+      _showMotnje = saved.showMotnje;
+      _showObhodi = saved.showObhodi;
+      _showParcele = saved.showParcele;
+      _activeZos
+        ..clear()
+        ..addAll(saved.zos);
+    });
+  }
+
+  /// Applies a layer change and remembers it (TB-40).
+  void _setLayers(VoidCallback change) {
+    setState(change);
+    _mapLayersStore.save(MapLayers(
+      basemap: _basemapMode,
+      showMotnje: _showMotnje,
+      showObhodi: _showObhodi,
+      showParcele: _showParcele,
+      zos: {..._activeZos},
+    ));
   }
 
   @override
@@ -473,24 +506,24 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
                 onSearchTap: _openSearch,
                 onSyncTap: state.isSyncing ? null : state.syncAll,
-                onBasemapChanged: (m) => setState(() => _basemapMode = m),
+                onBasemapChanged: (m) => _setLayers(() => _basemapMode = m),
                 onMotnjeTap: () => showMotnjeFilterSheet(
                   context,
                   showMotnje: _showMotnje,
-                  onShowChanged: (v) => setState(() => _showMotnje = v),
+                  onShowChanged: (v) => _setLayers(() => _showMotnje = v),
                   filter: _motnjeFilter,
                   records: state.records,
                   currentUserEmail: state.currentUser,
                   onChanged: (f) => setState(() => _motnjeFilter = f),
                 ),
                 onObhodiToggle: () =>
-                    setState(() => _showObhodi = !_showObhodi),
+                    _setLayers(() => _showObhodi = !_showObhodi),
                 onParceleToggle: () =>
-                    setState(() => _showParcele = !_showParcele),
+                    _setLayers(() => _showParcele = !_showParcele),
                 onObmocjaToggle: () => showObmocjaPicker(
                   context,
                   active: _activeZos,
-                  onChanged: (k, on) => setState(() {
+                  onChanged: (k, on) => _setLayers(() {
                     if (on) {
                       _activeZos.add(k);
                     } else {

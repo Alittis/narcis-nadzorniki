@@ -137,6 +137,36 @@ void main() {
     expect(find.text('kolesar na zaprti poti, opozorjen'), findsOneWidget);
   });
 
+  testWidgets('Sanirano can be chosen and is what gets saved (TB-41)',
+      (tester) async {
+    final store = _FakeStore();
+    final state = await _openForm(tester, store);
+
+    await tester.scrollUntilVisible(
+      find.text('Brez ukrepa'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('Brez ukrepa'));
+    await tester.pumpAndSettle();
+    // Sixteen entries: Sanirano sits below the open menu's fold, and the
+    // menu builds lazily, so scroll the menu (the newest Scrollable) to it.
+    await tester.scrollUntilVisible(
+      find.text('Sanirano'),
+      100,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.text('Sanirano').last);
+    await tester.pumpAndSettle();
+
+    await _tapPreview(tester);
+    expect(find.text('Sanirano'), findsWidgets, reason: 'shown in the preview');
+    await tester.tap(find.text('Shrani zapis'));
+    await tester.pumpAndSettle();
+
+    expect(state.records.single.actionTaken, 'Sanirano');
+  });
+
   testWidgets('saving commits once and closes the form', (tester) async {
     final store = _FakeStore();
     final state = await _openForm(tester, store);
