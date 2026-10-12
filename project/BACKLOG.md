@@ -1643,7 +1643,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-48 · After a rejected session, a different user can send the previous user's queued records as their own
-`🐞 Bug` · `P2` · `Todo` · Reporter: Claude (split from TB-45, 2026-10-12) · Updated: 2026-10-12
+`🐞 Bug` · `P2` · `Done` (in source 2026-10-12; release pending) · Reporter: Claude (split from TB-45, 2026-10-12) · Updated: 2026-10-12
 - **Problem (confirmed by reading the code, not reproduced on a device):** a sync 401 drops the token
   but deliberately keeps the queue (`_handleSyncException`), so a cold start lands on the login screen
   with the previous user's records still in the local store. Then:
@@ -1660,6 +1660,39 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   different account while unsent work exists, do not sync. Ask instead:
   - log back in as the owner to send it; or
   - discard it — the TB-45 dialog, worded for this case.
+- **Decided (owner, 2026-10-12):** ask, naming the owner's e-mail, with *Prekliči* and *Zavrzi in
+  nadaljuj*. Rejected: hiding the e-mail (the new user would not know whom to ask), and refusing the
+  login with no discard (the device is unusable until the owner turns up).
+- **Fixed (2026-10-12):**
+  - **No new stored state.** Every record and walk has been stamped `createdBy` at creation since the
+    first release, so the owner of unsent work is read from the queue itself. `_unsentOwnerOtherThan`
+    covers exactly what `unsentWork` counts: unsent records, photo uploads, deletes, walks and a walk
+    still recording.
+  - **`login()`** asks a `confirmDiscard` callback after the credentials check, before it takes over the
+    session. `LoginScreen` answers with `showForeignUnsentDialog`.
+  - **Refusing undoes the login.** `AuthService.login` has already stored the new user's token and
+    offline credentials by then, and left in place the next cold start would restore that user over the
+    queue. So the token is revoked and `clearCache()` runs. No callback counts as a refusal.
+  - **Discarding** runs `_discardLocalData()`, the wipe `logout()` now shares, then completes the login.
+  - **`init()`** refuses to restore a stored session that does not own the queue, which covers the app
+    being killed while the dialog is open.
+- **Verified:** `test/login_owner_guard_test.dart` (8 tests, the real `login()` and `init()` against fake
+  auth, stores and server):
+  - the owner logging back in, with different case, is not asked and the queue is sent with their token;
+  - a different account is asked, with the owner and the counts; *Prekliči* sends nothing, keeps the
+    queue, revokes the new token and clears its stored session;
+  - with no callback the login is refused;
+  - *Zavrzi in nadaljuj* empties both stores and the photo files and sends nothing of the old queue;
+  - nothing unsent means no question;
+  - a cold start with a foreign stored session restores nothing and sends nothing;
+  - the dialog's two answers.
+- **Checked by removal:** without the owner check in `login()` three tests fail; without the cancel's
+  revoke and `clearCache()` the *Prekliči* test fails; without the `init()` check the cold-start test
+  fails. Full suite 190/190; `flutter analyze` at the documented 10 info lints.
+- **Not covered:** a row with no `createdBy` is not attributed to anyone. Every build has stamped it, so
+  none should exist.
+- **Still to check on a device:** the dialog, by forcing a 401 for one account (the operator revoke in
+  ARCHITECTURE §12bis) and logging in as another.
 - **Shipped:** —
 
 ### TB-49 · Photo files stay on the device after logout

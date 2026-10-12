@@ -368,6 +368,21 @@ is therefore a `LogoutTile` ([lib/widgets/logout_tile.dart](../lib/widgets/logou
 The row is disabled while the send runs. A sync 401 never reaches this path: it drops the token and
 keeps the queue.
 
+**Only the queue's own account can send it (TB-48).** That kept queue survives to the login screen, and
+the server files a POST under whoever's token carries it. So a different person logging in there would
+have filed the old queue as their own. Every record and walk is stamped `createdBy` when it is created,
+so the queue names its owner; `_unsentOwnerOtherThan` finds an author of `unsentWork` other than the
+given account (case-insensitive; an unstamped row is not held against anyone).
+- **`login()`**, after the credentials check and before taking over the session, asks its
+  `confirmDiscard` callback when that finds someone. `LoginScreen` answers with
+  `showForeignUnsentDialog`, which names the owner and lists what is unsent.
+  - *Prekliči*, a tap outside, or no callback: the login is refused. The token it minted is revoked and
+    `AuthService.clearCache()` removes the session it stored; the queue is untouched.
+  - *Zavrzi in nadaljuj*: `_discardLocalData()` (the same wipe `logout()` runs) and then the login.
+- **`init()`** does not restore a stored session that does not own the queue. That covers the app being
+  killed while the dialog is open, after `AuthService` had already stored the new session.
+- Tests: [test/login_owner_guard_test.dart](../test/login_owner_guard_test.dart).
+
 **`syncAll` (the sync icon's tap-target).** Single entry point that runs four phases under one `_isSyncing` flag:
 1. **Push pending records.** Drain `_records.where(pendingSync)` via POST `/disturbances/`. Server's idempotent-on-UUID semantics mean retries are safe. Rows also carrying `pendingDelete` are **skipped** — see the delete queue below.
 2. **Drain pending photo uploads.** For every record with a `pendingUpload` photo, read the local file and POST it to `/disturbances/:id/photos/:photoId`. Photos can't be uploaded before the parent record exists, hence the strict ordering.

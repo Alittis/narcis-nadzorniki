@@ -35,6 +35,15 @@ class _LoginScreenState extends State<LoginScreen> {
     final result = await context.read<AppState>().login(
       _emailController.text,
       _passwordController.text,
+      confirmDiscard: (owner, unsent) async {
+        if (!mounted) return false;
+        return showForeignUnsentDialog(
+          context,
+          owner: owner,
+          user: _emailController.text.trim(),
+          unsent: unsent,
+        );
+      },
     );
     if (result.success) {
       TextInput.finishAutofillContext();
@@ -217,4 +226,54 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
+}
+
+/// TB-48: the device holds work another account captured and the server does
+/// not have. Returns true only for *Zavrzi in nadaljuj*; *Prekliči* and a tap
+/// outside both keep the work and refuse the login.
+Future<bool> showForeignUnsentDialog(
+  BuildContext context, {
+  required String owner,
+  required String user,
+  required UnsentWork unsent,
+}) async {
+  final colors = Theme.of(context).colorScheme;
+  final discard = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      scrollable: true,
+      title: const Text('Neposlani podatki drugega uporabnika'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Na tej napravi so podatki uporabnika $owner, ki jih strežnik '
+              'še nima:'),
+          const SizedBox(height: 8),
+          if (unsent.records > 0) Text('• zapisi: ${unsent.records}'),
+          if (unsent.walks > 0) Text('• obhodi: ${unsent.walks}'),
+          if (unsent.deletes > 0) Text('• izbrisi: ${unsent.deletes}'),
+          if (unsent.activeWalk) const Text('• obhod, ki se še snema'),
+          const SizedBox(height: 12),
+          Text('Pošlje jih lahko le ta uporabnik, ko se prijavi. Če nadaljujete '
+              'kot $user, bodo izgubljeni.'),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: const Text('Prekliči'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: colors.error,
+            foregroundColor: colors.onError,
+          ),
+          onPressed: () => Navigator.of(ctx).pop(true),
+          child: const Text('Zavrzi in nadaljuj'),
+        ),
+      ],
+    ),
+  );
+  return discard == true;
 }

@@ -118,13 +118,40 @@ class AppState extends ChangeNotifier {
   List<WalkPoint> get activePoints => List.unmodifiable(_activePoints);
   bool get hasActiveWalk => _activeWalk != null;
 
-  Future<AuthResult> login(String email, String password) async {
+  /// [confirmDiscard] is asked when the device holds unsent work captured by
+  /// a different account (TB-48). Only that account can send it: the server
+  /// files a POST under whoever's token carries it, so syncing it now would
+  /// file someone else's records as this user's. True discards the work and
+  /// logs in; false, or no callback, refuses the login and leaves it all.
+  Future<AuthResult> login(
+    String email,
+    String password, {
+    Future<bool> Function(String owner, UnsentWork unsent)? confirmDiscard,
+  }) async {
     final result = await _authService.login(
       email,
       password,
       online: isOnline,
     );
     if (result.success) {
+      final owner = _unsentOwnerOtherThan(result.user ?? email);
+      if (owner != null) {
+        final discard = await confirmDiscard?.call(owner, unsentWork) ?? false;
+        if (!discard) {
+          // Undo the login. AuthService has already stored this user's token
+          // and offline credentials; left there, the next cold start would
+          // restore this user over the old queue.
+          final token = result.token;
+          if (token != null) unawaited(_authService.revokeToken(token));
+          await _authService.clearCache();
+          return AuthResult(
+            success: false,
+            message: 'Prijava preklicana. Neposlani podatki uporabnika '
+                '$owner ostajajo na napravi.',
+          );
+        }
+        await _discardLocalData();
+      }
       _currentUser = result.user;
       if (result.token != null) {
         // Online login minted a token: persistent, password not retained.
@@ -146,6 +173,29 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    await _discardLocalData();
+
+    // Revoke the token server-side (best-effort, fire-and-forget so logout
+    // stays snappy on a poor connection). revokeToken captures the token by
+    // value, so clearing the local copy below doesn't disturb the in-flight
+    // request; if it never lands, the token still expires on its own.
+    final token = _sessionToken;
+    if (token != null) {
+      unawaited(_authService.revokeToken(token));
+    }
+
+    _currentUser = null;
+    _sessionToken = null;
+    _sessionPassword = null;
+    await _authService.clearCache();
+    notifyListeners();
+  }
+
+  /// Everything on this device that belongs to the signed-in account: the walk
+  /// being recorded, both stores, the observer suggestions and the photo files.
+  /// Used by [logout], and by [login] when the user discards another account's
+  /// unsent work (TB-48).
+  Future<void> _discardLocalData() async {
     // Drop any in-progress walk: the user is signing out, the next user
     // would not own that data. Stop the FGS service, clear the file, and
     // unbind the port.
@@ -169,23 +219,29 @@ class AppState extends ChangeNotifier {
     await _localStore.save(_records);
     await _walksStore.save(_walks);
     await _photoStorage.deleteAll();
-
-    // Revoke the token server-side (best-effort, fire-and-forget so logout
-    // stays snappy on a poor connection). revokeToken captures the token by
-    // value, so clearing the local copy below doesn't disturb the in-flight
-    // request; if it never lands, the token still expires on its own.
-    final token = _sessionToken;
-    if (token != null) {
-      unawaited(_authService.revokeToken(token));
-    }
-
-    _currentUser = null;
-    _sessionToken = null;
-    _sessionPassword = null;
     _lastRemoteIds = null;
     _lastRemoteWalkIds = null;
-    await _authService.clearCache();
-    notifyListeners();
+  }
+
+  /// TB-48: the account that captured unsent work on this device, if that is
+  /// not [user]; otherwise null. "Unsent" is what [unsentWork] counts. Every
+  /// record and walk is stamped with its author when it is created, so the
+  /// queue names its own owner. An unstamped row cannot be attributed and is
+  /// not held against anyone.
+  String? _unsentOwnerOtherThan(String user) {
+    final me = user.trim().toLowerCase();
+    final authors = [
+      for (final r in _records)
+        if (r.pendingSync || r.hasPendingPhotoUploads || r.pendingDelete)
+          r.createdBy,
+      for (final w in _walks)
+        if (w.pendingSync) w.createdBy,
+      _activeWalk?.createdBy,
+    ];
+    for (final author in authors) {
+      if (author != null && author.trim().toLowerCase() != me) return author;
+    }
+    return null;
   }
 
   SyncCredentials? get _credentials {
@@ -324,8 +380,16 @@ class AppState extends ChangeNotifier {
       // expired token 401s and clears the session (_handleSyncException).
       final session = await _authService.readStoredSession();
       if (session != null) {
-        _currentUser = session.email;
-        _sessionToken = session.token;
+        if (_unsentOwnerOtherThan(session.email) == null) {
+          _currentUser = session.email;
+          _sessionToken = session.token;
+        } else {
+          // TB-48: a session that does not own the queue - the app was killed
+          // while login() was asking. Sending it would file the queue under
+          // this account, so go to the login screen, where login() asks again.
+          unawaited(_authService.revokeToken(session.token));
+          await _authService.clearCache();
+        }
       }
     } finally {
       // Reveal Home or Login now — don't make the splash wait for the network
