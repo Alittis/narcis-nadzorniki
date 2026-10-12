@@ -185,7 +185,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   rolled out on the Play Closed testing track 2026-06-22 (v1.3.1+12). (Committed earlier as `d9aec82`.)
 
 ### TB-4 · Default disturbance location to the device's current position
-`✨ Enhancement` · `P2` · `Done` (in source 2026-10-12; release pending) · Reporters: Tomaž, Matjaž · Updated: 2026-10-12
+`✨ Enhancement` · `P2` · `Doing` (built into v1.12.0+22 2026-10-12; pending upload + rollout) · Reporters: Tomaž, Matjaž · Updated: 2026-10-12
 - **Problem:** Setting an accurate location takes two manual steps — the app offers an
   approximate point, the satellite icon refines it (step 1), and a manual map tap gives the
   exact spot (step 2).
@@ -232,7 +232,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   old `_pickLocation` the first two fail. Full suite 182/182; `flutter analyze` at the documented 10
   info lints.
 - **Still to check on a device:** that the red marker and the blue dot coincide when *Karta* opens.
-- **Shipped:** —
+- **Shipped:** — built into **v1.12.0+22** (2026-10-12, archived `~/Releases/terenska-beleznica-1.12.0+22.aab`, signed with the upload key); **not yet uploaded**. Flips to `Done` when the rollout is confirmed.
 
 ### TB-6 · Filter the Motnje layer — age / author / observed-date window
 `✨ Enhancement` · `P2` · `Done` (shipped v1.5.0+14; rolled out on the Play Closed testing track 2026-06-24) · Reporters: Tomaž, Rudi · Updated: 2026-06-24
@@ -278,7 +278,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   signed with the upload key); rolled out on the Play Closed testing track 2026-06-24.
 
 ### TB-8 · Pause / resume an active patrol
-`✨ Enhancement` · `P2` · `Done` (in source 2026-10-12; release pending) · Reporter: Damjan Intihar · Updated: 2026-10-12
+`✨ Enhancement` · `P2` · `Doing` (built into v1.12.0+22 2026-10-12; pending upload + rollout) · Reporter: Damjan Intihar · Updated: 2026-10-12
 - **Problem:** A supervisor patrols several locations in one day with other duties in
   between; today the only controls are start and end. Damjan worked around it by recording
   several separate walks.
@@ -327,7 +327,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   - the reminder after saving a record during a pause, and its *Nadaljuj*.
 - **Wording left as is:** the TB-45 and TB-48 dialogs list an open walk as *"obhod, ki se še snema"*,
   which is slightly off for a paused one.
-- **Shipped:** —
+- **Shipped:** — built into **v1.12.0+22** (2026-10-12, archived `~/Releases/terenska-beleznica-1.12.0+22.aab`, signed with the upload key); **not yet uploaded**. Flips to `Done` when the rollout is confirmed.
 
 ### TB-9 · NULL entry — record a patrol with no disturbances
 `❓ Needs discussion` · `P3` · `Blocked` · Reporter: Rudi · Updated: 2026-06-03
@@ -1680,7 +1680,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-48 · After a rejected session, a different user can send the previous user's queued records as their own
-`🐞 Bug` · `P2` · `Done` (in source 2026-10-12; release pending) · Reporter: Claude (split from TB-45, 2026-10-12) · Updated: 2026-10-12
+`🐞 Bug` · `P2` · `Doing` (built into v1.12.0+22 2026-10-12; pending upload + rollout) · Reporter: Claude (split from TB-45, 2026-10-12) · Updated: 2026-10-12
 - **Problem (confirmed by reading the code, not reproduced on a device):** a sync 401 drops the token
   but deliberately keeps the queue (`_handleSyncException`), so a cold start lands on the login screen
   with the previous user's records still in the local store. Then:
@@ -1730,10 +1730,10 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   none should exist.
 - **Still to check on a device:** the dialog, by forcing a 401 for one account (the operator revoke in
   ARCHITECTURE §12bis) and logging in as another.
-- **Shipped:** —
+- **Shipped:** — built into **v1.12.0+22** (2026-10-12, archived `~/Releases/terenska-beleznica-1.12.0+22.aab`, signed with the upload key); **not yet uploaded**. Flips to `Done` when the rollout is confirmed.
 
 ### TB-49 · Photo files stay on the device after logout
-`🐞 Bug` · `P3` · `Done` (in source 2026-10-12; release pending) · Reporter: Claude (found while rewriting the privacy policy, 2026-10-12) · Updated: 2026-10-12
+`🐞 Bug` · `P3` · `Doing` (built into v1.12.0+22 2026-10-12; pending upload + rollout) · Reporter: Claude (found while rewriting the privacy policy, 2026-10-12) · Updated: 2026-10-12
 - **Problem:** `AppState.logout()` empties the record and walk stores, but leaves every file under
   `<docs>/disturbance_photos/` on disk. The code says so (*"Photo files … become orphans … sweeping them
   is a follow-up"*). The files are in app-private storage and nothing in the app points at them any
@@ -1754,10 +1754,10 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **At release:** in both policy versions (GHP-3), §2.3, §5 and §8 must say that logout deletes the
   photos. Change the live one only once the release has rolled out: until then testers still run
   builds that keep them.
-- **Shipped:** —
+- **Shipped:** — built into **v1.12.0+22** (2026-10-12, archived `~/Releases/terenska-beleznica-1.12.0+22.aab`, signed with the upload key); **not yet uploaded**. Flips to `Done` when the rollout is confirmed.
 
 ### TB-50 · Uploaded photos keep their EXIF metadata (GPS, phone make and model)
-`🐞 Bug` · `P2` · `Done` (in source 2026-10-12; release pending) · Reporter: Claude (found while rewriting the privacy policy, 2026-10-12) · Updated: 2026-10-12
+`🐞 Bug` · `P2` · `Doing` (built into v1.12.0+22 2026-10-12; pending upload + rollout) · Reporter: Claude (found while rewriting the privacy policy, 2026-10-12) · Updated: 2026-10-12
 - **Finding (read in the installed plugin source, not measured on a device):** every photo goes through
   `image_picker`'s resize, because `imageQuality: 85 < 100` makes `shouldScale` true. The resize then
   copies the original's EXIF onto the re-encoded file: `image_picker_android` 0.8.13+13,
@@ -1809,7 +1809,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   *"aplikacija jih pred shranjevanjem odstrani (ohrani le usmerjenost slike)"*, and the
   PLAY_CLOSED_TEST §4.11 note is updated to match. Change the live policy only once the release has
   rolled out.
-- **Shipped:** —
+- **Shipped:** — built into **v1.12.0+22** (2026-10-12, archived `~/Releases/terenska-beleznica-1.12.0+22.aab`, signed with the upload key); **not yet uploaded**. Flips to `Done` when the rollout is confirmed.
 
 ---
 
