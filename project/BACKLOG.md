@@ -1852,7 +1852,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   - **Checked by removal:** without the call in `savePicked` the storage test fails (`samsung`
     survives).
 - **Not covered:** a photo picked **before** the update and still queued uploads as it was saved,
-  with its EXIF. Photos already on the server keep theirs too. That could be cleaned at the NV-259
+  with its EXIF (once TB-51 ships, it uploads stripped too). Photos already on the server keep theirs too. That could be cleaned at the NV-259
   migration if wanted (not planned).
 - **Still to do on a device:** take a photo on the A56 with location tagging on, sync it, and check
   the server copy for EXIF (for example `exiftool`) — the fixtures are camera-like, not from a camera.
@@ -1864,6 +1864,49 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   metapodatki EXIF"*. The wording says photos saved before 1.12.0 *may* still carry EXIF, on the
   server too. §4.11 is updated.
 - **Shipped:** **v1.12.0+22**, archived `~/Releases/terenska-beleznica-1.12.0+22.aab` (signed with the upload key); **rolled out on the Play Closed testing track**, confirmed by the owner 2026-10-13.
+
+### TB-51 · A photo whose stripped copy could not be saved would upload with its EXIF
+`🐞 Bug` · `P3` · `Done` (in source, release pending) · Reporter: Claude (TB-50 follow-up, 2026-10-13) · Updated: 2026-10-13
+- **Problem:** TB-50 strips a photo in `PhotoStorage.savePicked`. Its only caller,
+  `AppState._materializePhotos`, catches any error from it and keeps the photo as the form built it:
+  `localPath` on `image_picker`'s temp file, `pendingUpload: true` (`form_screen.dart` `initState` and
+  `_addPhoto`). That temp file carries the EXIF `image_picker_android` copies across (TB-50), GPS and
+  make/model included, and `_drainPendingPhotos` would upload it as it is. The stripper never throws, so
+  only an I/O error in `savePicked` reaches this path: creating the folder or writing the copy, on a
+  full disk for example. Rare, but it contradicts the privacy policy (§1, §2.3, live since 2026-10-13),
+  which says photos are sent without EXIF.
+- **Options weighed:**
+  - *Strip the temp file in place.* It sits on the same storage as the stable copy, so the error that
+    stopped `savePicked` can stop this write too, and it would need its own fallback. A rewrite that
+    fails half-way can also truncate the only copy of the photo.
+  - *Write a stripped copy elsewhere.* Same disk, same failure, same need for a fallback.
+  - *Keep the original but hold its upload until a later materialisation succeeds.* Needs a new
+    persisted photo state and a retry trigger. While the error lasts the photo never uploads and nothing
+    tells the user, which is the silent drop this fix must avoid, only delayed.
+- **Chosen: strip again at the upload, in memory.** `_drainPendingPhotos` is the one place any photo is
+  read for upload. It now passes the bytes through `stripJpegMetadata` before `uploadPhoto`.
+  - It writes nothing, so a full disk cannot stop it, and it does not depend on how the file came to be
+    unstripped. The photo stays on the record and uploads clean. On an already clean file it changes
+    nothing (stripping is idempotent, TB-50's test).
+  - **Side effect:** a photo saved before 1.12.0 and still queued now uploads stripped too, which closes
+    the gap TB-50 lists as *Not covered*. Photos already on the server keep their EXIF, so the policy's
+    *"may still carry EXIF"* wording stays true. No policy change.
+  - **Unchanged:** in the failure path the photo's local file is still `image_picker`'s unstripped temp
+    file, in the app's private cache. The success path leaves that same temp file behind too, so nothing
+    new stays on the device. The temp path does not survive the cache being cleared. If it is cleared
+    before the upload, the photo is lost, because `_drainPendingPhotos` skips an unreadable file. That
+    risk predates this fix and is not addressed here.
+- **Verified:**
+  - `test/photo_upload_strip_test.dart` boots an online `AppState` against a `MockClient`. It gives the
+    real `PhotoStorage` a root under a plain file, so `savePicked` fails with a real I/O error rather
+    than a fake. `addRecord` then saves a photo made from the `exif_gps_le.jpg` fixture.
+  - The test checks three things. The failure path ran: the photo still points at the temp file. The
+    photo POST reached the mock (the TB-35 rule) and the photo was marked uploaded, not dropped. The body
+    holds no `samsung`, `SM-A566B` or `xmpmeta`.
+  - **Checked by removal:** without the strip in `_drainPendingPhotos` the test fails at the `samsung`
+    check (*Expected: false, Actual: <true>*).
+  - Full suite 200/200. `flutter analyze` is at the documented 10 info lints.
+- **Shipped:** — in source, release pending (batched with the next release).
 
 ---
 

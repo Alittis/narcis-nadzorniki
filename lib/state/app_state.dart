@@ -14,6 +14,7 @@ import 'package:narcis_nadzorniki/models/disturbance_photo.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
 import 'package:narcis_nadzorniki/models/walk.dart';
 import 'package:narcis_nadzorniki/services/auth_service.dart';
+import 'package:narcis_nadzorniki/services/jpeg_metadata.dart';
 import 'package:narcis_nadzorniki/services/photo_storage.dart';
 import 'package:narcis_nadzorniki/services/walk_task_handler.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -529,6 +530,8 @@ class AppState extends ChangeNotifier {
         );
         out.add(photo.copyWith(localPath: stable, pendingUpload: true));
       } catch (_) {
+        // Keep the photo on image_picker's unstripped temp file rather than
+        // lose it; _drainPendingPhotos strips whatever it sends (TB-51).
         out.add(photo);
       }
     }
@@ -731,7 +734,9 @@ class AppState extends ChangeNotifier {
         final path = photo.localPath;
         if (path == null) continue;
         try {
-          final bytes = await File(path).readAsBytes();
+          // Stripped again here, in memory, because the file need not be the
+          // clean copy: savePicked may have failed (TB-51) or predate TB-50.
+          final bytes = stripJpegMetadata(await File(path).readAsBytes());
           await _remoteApi.uploadPhoto(
             motnjaId: record.id,
             photoId: photo.id,
