@@ -2060,9 +2060,9 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   - `tools/ords/disturbance_schema.sql` §6, a header comment.
   - `tools/ords/disturbance_endpoints.sql`, inside the deployed photo-upload handler. Editing it would
     make the repo differ from the deployed handler source.
-- **Owner step, outside the repo:** the live Play listing still says ~200–500 KB. Paste the corrected
-  *Fotografije* / *Photos* bullet from PLAY_CLOSED_TEST.md §3.1 and §3.2 into Play Console → Main store
-  listing → Full description, for `sl` and `en-US`. Then delete the lag note at the top of §3.
+- **Owner step, outside the repo — done 2026-10-13:** the owner pasted the corrected *Fotografije* /
+  *Photos* bullet into the live Play listing (Full description, `sl` and `en-US`), and the lag note in
+  PLAY_CLOSED_TEST.md §3 was removed.
 - **Discussion:** open. This is an owner decision, and the capture settings stay as they are until it
   is taken.
 

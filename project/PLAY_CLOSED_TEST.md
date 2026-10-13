@@ -124,11 +124,6 @@ Walk through every section under **Policy → App content**. Answers in §4 belo
 
 ## 3. Store listing copy
 
-> **The live listing lags this text (2026-10-13, TB-54).** The *Fotografije* / *Photos* bullet in
-> both full descriptions below now gives the measured ~650–850 KB per photo. Play Console still shows
-> the old ~200–500 KB until the owner pastes the corrected bullet into Main store listing → Full
-> description, for `sl` and `en-US`. Delete this note once that is done.
-
 ### 3.1 Slovene (`sl`) — default
 
 **App name** (max 30 chars):
