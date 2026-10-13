@@ -1895,7 +1895,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
     file, in the app's private cache. The success path leaves that same temp file behind too, so nothing
     new stays on the device. The temp path does not survive the cache being cleared. If it is cleared
     before the upload, the photo is lost, because `_drainPendingPhotos` skips an unreadable file. That
-    risk predates this fix and is not addressed here.
+    risk predates this fix and is not addressed here; filed as TB-52.
 - **Verified:**
   - `test/photo_upload_strip_test.dart` boots an online `AppState` against a `MockClient`. It gives the
     real `PhotoStorage` a root under a plain file, so `savePicked` fails with a real I/O error rather
@@ -1907,6 +1907,40 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
     check (*Expected: false, Actual: <true>*).
   - Full suite 200/200. `flutter analyze` is at the documented 10 info lints.
 - **Shipped:** — in source, release pending (batched with the next release).
+
+### TB-52 · A photo left on image_picker's cache file can vanish before it uploads
+`🐞 Bug` · `P3` · `Blocked` (one decision) · Reporter: Claude (found during TB-51, 2026-10-13) · Updated: 2026-10-13
+- **Problem:** when `PhotoStorage.savePicked` fails (TB-51), `_materializePhotos` keeps the photo on
+  `image_picker`'s output file. `image_picker_android` 0.8.13+13 writes that file to the app's cache
+  directory (`ImageResizer` → `context.getCacheDir()`). Android may delete cache files when it needs
+  space, and a user can clear the cache from the app's settings. If either happens before the upload:
+  - `_drainPendingPhotos` cannot read the file, and its bare `catch (_)` skips the photo without a word.
+    The record has already been sent without it, so the photo is lost.
+  - The photo keeps `pendingUpload: true`, so `pendingPushCount` counts its record for good. The sync
+    badge never clears and no manual sync can clear it. The TB-45 logout dialog would also keep
+    reporting the record as unsynced.
+  - The comment on that `catch` says the user *"can re-attach if they care"*. They cannot: nothing in
+    `lib/` calls `AppState.updateRecord`, because editing on the phone (TB-32) is not built.
+  - The detail view draws the photo with `Image.file` and no `errorBuilder`. What a release build shows
+    for the missing file: **STATUS: UNKNOWN – REQUIRES CONFIRMATION**.
+- **Why it may be likelier than it looks (reasoning, not measured):** low storage is the likeliest
+  reason `savePicked` fails, and low storage is also when Android clears caches. The two conditions
+  tend to come together.
+- **Scope:** only the TB-51 failure path. Normally the photo lives under `<docs>/disturbance_photos/`,
+  which Android does not clear. The risk predates TB-50 and TB-51, and neither changed it.
+- **Fix shape (proposed):**
+  1. **Retry the save.** At the start of `_drainPendingPhotos`, re-run `savePicked` for any
+     `pendingUpload` photo whose `localPath` is outside the photo root, and repoint it on success. That
+     narrows the window to the next sync, but does not close it.
+  2. **Handle a missing file explicitly** instead of the bare `catch (_)`: once the file is gone, stop
+     counting the photo as pending and tell the user that a photo of the record was lost.
+  3. Optional: say so at save time when `savePicked` fails, while the photo still exists and the user
+     can free space.
+- **Discussion (the open decision, for step 2):** what happens to a lost photo on the record? Either
+  drop it with a one-time notice, or keep a visible placeholder in the detail view (e.g.
+  *"Fotografija ni bila shranjena"*) so the record shows it once had one.
+- **To verify when built:** as in TB-51, make the real `savePicked` fail, then delete the temp file
+  before the drain. Assert the badge clears and the user sees the decided state. Check by removal.
 
 ---
 
