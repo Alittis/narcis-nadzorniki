@@ -1894,8 +1894,9 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   - **Unchanged:** in the failure path the photo's local file is still `image_picker`'s unstripped temp
     file, in the app's private cache. The success path leaves that same temp file behind too, so nothing
     new stays on the device. The temp path does not survive the cache being cleared. If it is cleared
-    before the upload, the photo is lost, because `_drainPendingPhotos` skips an unreadable file. That
-    risk predates this fix and is not addressed here; filed as TB-52.
+    before the upload, the photo is lost: `_drainPendingPhotos` skips an unreadable file and the next
+    pull removes it from the record (TB-53). That risk predates this fix and is not addressed here;
+    filed as TB-52.
 - **Verified:**
   - `test/photo_upload_strip_test.dart` boots an online `AppState` against a `MockClient`. It gives the
     real `PhotoStorage` a root under a plain file, so `savePicked` fails with a real I/O error rather
@@ -1909,38 +1910,73 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** — in source, release pending (batched with the next release).
 
 ### TB-52 · A photo left on image_picker's cache file can vanish before it uploads
-`🐞 Bug` · `P3` · `Blocked` (one decision) · Reporter: Claude (found during TB-51, 2026-10-13) · Updated: 2026-10-13
+`🐞 Bug` · `P3` · `Todo` (decided 2026-10-13; build together with TB-53) · Reporter: Claude (found during TB-51, 2026-10-13) · Updated: 2026-10-13
 - **Problem:** when `PhotoStorage.savePicked` fails (TB-51), `_materializePhotos` keeps the photo on
   `image_picker`'s output file. `image_picker_android` 0.8.13+13 writes that file to the app's cache
   directory (`ImageResizer` → `context.getCacheDir()`). Android may delete cache files when it needs
   space, and a user can clear the cache from the app's settings. If either happens before the upload:
   - `_drainPendingPhotos` cannot read the file, and its bare `catch (_)` skips the photo without a word.
-    The record has already been sent without it, so the photo is lost.
-  - The photo keeps `pendingUpload: true`, so `pendingPushCount` counts its record for good. The sync
-    badge never clears and no manual sync can clear it. The TB-45 logout dialog would also keep
-    reporting the record as unsynced.
+  - **Corrected 2026-10-13:** this item first said the photo then stays pending for good and the sync
+    badge never clears. **That was wrong.** A probe (a temporary test, not kept) showed that the pull
+    at the end of the same `syncAll` removes the photo from the record, because `_mergePhotos` keeps
+    only the photos the server reports (TB-53). `pendingPushCount` goes to 0 and the badge clears. So
+    today the photo is already dropped, silently.
   - The comment on that `catch` says the user *"can re-attach if they care"*. They cannot: nothing in
     `lib/` calls `AppState.updateRecord`, because editing on the phone (TB-32) is not built.
-  - The detail view draws the photo with `Image.file` and no `errorBuilder`. What a release build shows
-    for the missing file: **STATUS: UNKNOWN – REQUIRES CONFIRMATION**.
 - **Why it may be likelier than it looks (reasoning, not measured):** low storage is the likeliest
   reason `savePicked` fails, and low storage is also when Android clears caches. The two conditions
   tend to come together.
 - **Scope:** only the TB-51 failure path. Normally the photo lives under `<docs>/disturbance_photos/`,
   which Android does not clear. The risk predates TB-50 and TB-51, and neither changed it.
-- **Fix shape (proposed):**
+- **Decided (owner, 2026-10-13): drop the photo with a one-time notice**, not a placeholder.
+  - When the drain finds the file gone, it removes the photo from the record itself, on purpose, rather
+    than leaving the pull to do it as a side effect. The record stops counting as pending.
+  - The user is told once that a photo of the record could not be kept. The form of the notice
+    (snackbar or dialog, and its wording) is settled when this is built.
+  - **Build together with TB-53.** Once the merge keeps pending photos, the pull no longer removes this
+    one, and the badge *would* then stick for good. This drop is what clears it, so TB-53 must not ship
+    without it.
+- **Fix shape:**
   1. **Retry the save.** At the start of `_drainPendingPhotos`, re-run `savePicked` for any
      `pendingUpload` photo whose `localPath` is outside the photo root, and repoint it on success. That
      narrows the window to the next sync, but does not close it.
-  2. **Handle a missing file explicitly** instead of the bare `catch (_)`: once the file is gone, stop
-     counting the photo as pending and tell the user that a photo of the record was lost.
+  2. **Drop a missing file deliberately**, as decided: once the file is gone, remove the photo from the
+     record, save, and raise the one-time notice. Replace the bare `catch (_)` and its comment.
   3. Optional: say so at save time when `savePicked` fails, while the photo still exists and the user
      can free space.
-- **Discussion (the open decision, for step 2):** what happens to a lost photo on the record? Either
-  drop it with a one-time notice, or keep a visible placeholder in the detail view (e.g.
-  *"Fotografija ni bila shranjena"*) so the record shows it once had one.
 - **To verify when built:** as in TB-51, make the real `savePicked` fail, then delete the temp file
-  before the drain. Assert the badge clears and the user sees the decided state. Check by removal.
+  before the drain. Assert the photo is gone from the record, the badge clears, and the notice is raised
+  exactly once. Check by removal.
+
+### TB-53 · A photo whose upload fails is dropped from its record by the next pull
+`🐞 Bug` · `P2` · `Todo` (build together with TB-52) · Reporter: Claude (found while recording the TB-52 decision, 2026-10-13) · Updated: 2026-10-13
+- **Problem:** for a record both sides know, `_mergeRemoteIntoLocal` takes the server's fields and calls
+  `_mergePhotos(local, remote)`. That returns the **server's** photo list and only copies cached
+  `localPath`s across. A local photo the server does not have yet (`pendingUpload: true`) is not in that
+  list, so the merge removes it. This dates from `d68a999` (2026-04-26), when photo sync was introduced.
+  - `syncAll` drains photos and then pulls. So if a photo's upload fails with anything but a 401 (a 5xx
+    or a timeout, say) and the GET that follows succeeds, the same sync removes the photo from its
+    record.
+  - Nothing tells the user. `pendingPushCount` drops to 0, so the sync badge turns green and the TB-45
+    logout dialog no longer lists the record. The file stays under
+    `<docs>/disturbance_photos/<motnja_id>/`, referenced by nothing, until the record is deleted or the
+    user logs out (TB-49).
+  - A 401 does not trigger it: `_handleSyncException` clears the credentials, so the pull is skipped. A
+    link that is down for both calls does not either, because the pull must succeed.
+- **Verified (probe, a temporary test not kept):** an online `AppState` booted against a `MockClient`.
+  The photo is stored normally, the photo POST answers 500, and the GET list reports the record without
+  photos. After `addRecord` the photo is pending. After one `syncAll` the record has no photos,
+  `pendingPushCount` is 0, and the file is still on disk.
+- **How often it happens in the field:** **STATUS: UNKNOWN – REQUIRES CONFIRMATION.** It needs a failed
+  photo POST followed by a successful GET in the same sync. No missing photo has been reported, but a
+  dropped photo leaves nothing the user would notice unless they look for it.
+- **Fix shape (proposed):** in `_mergePhotos`, also keep every local photo with `pendingUpload: true`
+  that the server's list lacks. The next drain then retries it. Server photos are handled as now.
+  - **Build together with TB-52.** Kept pending, a photo whose file is gone would stay pending for good;
+    TB-52's deliberate drop is what clears it.
+- **To verify when built:** turn the probe into a kept test. After the failed upload and the pull, the
+  photo is still on the record and pending; a later successful upload clears it. Assert the GET actually
+  reached the mock (TB-35), and check by removal.
 
 ---
 
