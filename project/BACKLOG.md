@@ -2020,6 +2020,52 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   though the file may still be on the phone until the record is deleted or the user logs out (TB-49).
 - **Shipped:** — built into **v1.13.0+23** (2026-10-13, archived `~/Releases/terenska-beleznica-1.13.0+23.aab`, signed with the upload key); **not yet uploaded**. Flips to `Done` when the rollout is confirmed.
 
+### TB-54 · Photos are ~650–850 KB, not ~200–500 KB — should they be smaller?
+`❓ Needs discussion` · `P3` · `Blocked` · Reporter: Claude (from the NV-259 P0 probe, 2026-10-13) · Updated: 2026-10-13
+- **Problem:** the docs said the phone compresses each photo to ~200–500 KB before upload. Production
+  says ~650–850 KB. The capture settings are unchanged: `image_picker` with `maxWidth: 1600,
+  imageQuality: 85` in [`form_screen.dart`](../lib/screens/form_screen.dart) (~177) and
+  [`home_screen.dart`](../lib/screens/home_screen.dart) (~442).
+- **Measured** (read-only probe on production Oracle, 2026-10-13 08:22 UTC; narcis-vibed
+  `ords/beleznica_p0_probe.sql` S4/S5, recorded in narcis-vibed `project/NV-259-BELEZNICA-PLAN.md` §3):
+  - `TB_MOTNJE_FOTO`: 1,071 photos, all `image/jpeg`, 961 MiB. Mean 919 KiB, median 892 KiB, largest
+    2,318 KiB; 306 are over 1 MiB. These totals include the legacy import.
+  - Monthly mean of photos the phone created: Jun 2026 642 KiB · Jul 739 · Aug 840 · Sep 786 · Oct 809.
+    May's 1,133 KiB is the legacy import of 2026-05-22, not phone output.
+  - Growth: 111 / 194 / 112 MiB of photos in Jul / Aug / Sep 2026. After the NV-259 move this lands
+    on the Postgres backend and in its backups.
+- **Unknowns:**
+  - Why the monthly mean rose from Jun to Aug: **STATUS: UNKNOWN – REQUIRES CONFIRMATION.**
+  - Nearly every measured photo predates v1.12.0+22, so it still carries its EXIF. TB-50's strip drops
+    metadata and keeps the image data, so it trims some bytes per photo. How many:
+    **STATUS: UNKNOWN – REQUIRES CONFIRMATION.** Re-running S4/S5 over photos created after the
+    v1.12.0+22 rollout would separate the two effects.
+- **What the decision weighs:**
+  - *For smaller photos:* faster uploads on weak field connections, which the old listing promised,
+    and slower storage and backup growth on the new backend.
+  - *Against, and the counterweight: evidence quality.* Photos back enforcement actions (*Zapisnik*,
+    *Plačilni nalog*, *Prijava inšpekciji*, *Prijava policiji*). The app keeps and uploads only the
+    resized copy, so what resizing loses is lost for good. A larger file costs bytes; an unreadable
+    detail cannot be recovered.
+  - No warden has reported slow photo uploads. The VPS had 42 GB free on 2026-10-05 (NV-259 §3).
+- **Options:**
+  1. Keep `1600 / 85`. The docs are now correct, and nothing else changes.
+  2. Lower `imageQuality`, `maxWidth`, or both.
+  - Neither the size nor the legibility effect of any setting is measured. Before choosing 2, shoot the
+    same test scenes on a field phone at each candidate setting and compare file size against
+    legibility of the details that matter (plates, signs, small objects).
+- **Done under this item (2026-10-13), docs only:** ARCHITECTURE §9.3, OPERATIONS (photo storage notes)
+  and the PLAY_CLOSED_TEST.md §3.1/§3.2 listing copy now give the measured ~650–850 KB. Two SQL comments
+  still say ~200–500 KB / < 500 KB and were left alone:
+  - `tools/ords/disturbance_schema.sql` §6, a header comment.
+  - `tools/ords/disturbance_endpoints.sql`, inside the deployed photo-upload handler. Editing it would
+    make the repo differ from the deployed handler source.
+- **Owner step, outside the repo:** the live Play listing still says ~200–500 KB. Paste the corrected
+  *Fotografije* / *Photos* bullet from PLAY_CLOSED_TEST.md §3.1 and §3.2 into Play Console → Main store
+  listing → Full description, for `sl` and `en-US`. Then delete the lag note at the top of §3.
+- **Discussion:** open. This is an owner decision, and the capture settings stay as they are until it
+  is taken.
+
 ---
 
 ## Done

@@ -189,10 +189,13 @@ of movement to be visible (≈6.6 m/px at zoom 14).
   LOB-level `COMPRESS LOW` / `DEDUPLICATE` were considered but raise
   ORA-00439 on this instance (Advanced Compression option not licensed),
   and JPEGs are already compressed so it's a small loss. The client
-  compresses to ~200–500 KB per photo before upload; the endpoint
-  hard-caps at 10 MB and rejects unknown MIME types.
+  re-encodes each photo at `maxWidth=1600, imageQuality=85`, which comes
+  to ~650–850 KB per photo (measured on production 2026-10-13, see
+  ARCHITECTURE §9.3; the earlier ~200–500 KB figure was wrong). The
+  endpoint hard-caps at 10 MB and rejects unknown MIME types.
 - Operators monitoring DB growth should track `SUM(VELIKOST)` in
-  `TB_MOTNJE_FOTO`. There is currently no rate-limit on photo upload —
+  `TB_MOTNJE_FOTO`. Measured 2026-10-13: 961 MiB over 1,071 photos;
+  111 / 194 / 112 MiB added in Jul / Aug / Sep 2026 (TB-54). There is currently no rate-limit on photo upload —
   STATUS: UNKNOWN – REQUIRES CONFIRMATION whether ORDS pool defaults are
   sufficient.
 - A user removing a photo from a synced record only deletes server-side

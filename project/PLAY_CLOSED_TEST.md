@@ -124,6 +124,11 @@ Walk through every section under **Policy → App content**. Answers in §4 belo
 
 ## 3. Store listing copy
 
+> **The live listing lags this text (2026-10-13, TB-54).** The *Fotografije* / *Photos* bullet in
+> both full descriptions below now gives the measured ~650–850 KB per photo. Play Console still shows
+> the old ~200–500 KB until the owner pastes the corrected bullet into Main store listing → Full
+> description, for `sl` and `en-US`. Delete this note once that is done.
+
 ### 3.1 Slovene (`sl`) — default
 
 **App name** (max 30 chars):
@@ -150,7 +155,7 @@ Aplikacija je razvita za uporabnike, ki delajo na zavarovanih in drugih naravova
 
 • Zemljevid s plastmi. Izberite med OpenStreetMap in satelitskim slojem (Esri). Prikažite svoje motnje, motnje sodelavcev iz iste organizacije in sledi obhodov.
 
-• Fotografije. Vgrajeni fotoaparat samodejno zmanjša velikost slike na ~200–500 KB pred prenosom — kakovost ostane primerna za dokazilo, prenos pa hiter tudi pri šibki povezavi.
+• Fotografije. Vgrajeni fotoaparat pred prenosom samodejno zmanjša velikost slike, običajno na ~650–850 KB — kakovost ostane primerna za dokazilo, datoteka pa je precej manjša od izvirne fotografije.
 
 • Delovanje brez omrežja. Vse zapise aplikacija shrani lokalno na napravi. Ko telefon ponovno dobi povezavo, sinhronizacija poteka samodejno; uporabnik lahko z eno potezo zažene tudi ročno sinhronizacijo.
 
@@ -200,7 +205,7 @@ The app is purpose-built for wardens working in protected and other nature-conse
 
 • Map with togglable layers. Choose between OpenStreetMap and Esri satellite imagery. Show your own disturbances, your organisation's disturbances and walk-around tracks.
 
-• Photos. The built-in capture flow auto-shrinks images to ~200–500 KB before upload — quality remains adequate for evidence, while upload stays fast on weak connections.
+• Photos. The built-in capture flow auto-shrinks images before upload, typically to ~650–850 KB — quality remains adequate for evidence, and the file is much smaller than the camera original.
 
 • Works offline. Every entry is saved locally on the device. When connectivity returns, sync runs automatically; the user can also trigger a manual sync.
 
