@@ -15,7 +15,7 @@
     "data_controller_url": "https://narcis.arso.gov.si",
     "privacy_policy_url": "https://alittis.github.io/terenska-beleznica/privacy/",
     "privacy_policy_source": "~/Developer/alittis.github.io/terenska-beleznica/privacy/index.html (Alittis/alittis.github.io, GitHub Pages from main)",
-    "privacy_policy_last_change": "2026-10-12 - rewritten for current production (GHP-3)",
+    "privacy_policy_last_change": "2026-10-13 - historical-records section removed (GHP-4); photos sent without EXIF and deleted at logout (TB-49/TB-50 live). 2026-10-12 - rewritten for current production (GHP-3)",
     "privacy_policy_post_cutover": "staged on branch ghp-3-post-cutover-policy of Alittis/alittis.github.io (not served); merge at the NV-259 T0 after filling in the [DATUM PREHODA] placeholders (TB-46)",
     "upload_keystore_path": "/Users/Alexis/keystores/narcis_nadzorniki_upload.jks",
     "upload_keystore_alias": "upload",

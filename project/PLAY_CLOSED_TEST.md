@@ -629,6 +629,8 @@ For **every** entry below: collection is **required for app functionality** (or 
 
 > **Note about photo metadata — corrected 2026-10-12 (TB-50).** The earlier note here said the `image_picker` re-encode *"does not preserve EXIF GPS"*. **That is wrong.** The installed `image_picker_android` 0.8.13+13 copies the original's EXIF onto the resized file (`ImageResizer.copyExif` → `ExifDataCopier`: `TAG_GPS_*`, `TAG_MAKE`, `TAG_MODEL`, …), and the app uploads that file as is. So a photo can carry GPS coordinates and the phone's make and model. The declared categories still cover it: **Precise location** and **Photos** are both already declared. The privacy policy discloses it (§2.3, 2026-10-12). Whether to strip EXIF is TB-50.
 >
+> **Since v1.12.0+22 (rolled out, confirmed 2026-10-13), TB-50 strips it.** Every new photo loses its Exif, XMP, IPTC and comment segments before it is stored and uploaded; only the Orientation tag stays. Photos saved by earlier versions may still carry EXIF, on the server too. The declared categories need no change: **Precise location** and **Photos** stay declared for the records themselves. Policy §1 and §2.3 say so since 2026-10-13.
+>
 > **Re-check at the NV-259 cutover (TB-46):** *"encrypted in transit"* then means HTTPS to `narcis.alittis.com` (and from there to `narcis.gov.si`), not only to `narcis.gov.si`. Alittis and Hostinger hold the data **on ARSO's behalf**, which Play counts as a service provider, not as sharing, so *Shared? No* stands. Also consider, at that review, whether the free-text description and walk notes belong under **App activity → Other user-generated content**, which this form has never declared.
 
 #### Children's data

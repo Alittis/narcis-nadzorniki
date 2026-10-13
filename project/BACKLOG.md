@@ -753,10 +753,12 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
     `Disturbance.fromJson`'s `photoPaths` fallback is an unrelated cached-row migration and stays.
   - `grep -i legacy` over `lib/`, `test/` and `pubspec.yaml` finds only that fallback and its test.
     Full suite 199/199; `flutter analyze` at the documented 10 info lints.
-  - **The app no longer contacts `nadzor.notranjski-park.si`.** Both privacy-policy versions (§2.7 and
-    §3) still describe that host and the 703 bundled records, and the store listing still advertises
-    the bundled archive. `PLAY_CLOSED_TEST.md`'s listing copy is corrected; the Play Console listing
-    and the policy are the owner's to change.
+  - **The app no longer contacts `nadzor.notranjski-park.si`.** The privacy policy still described
+    that host and the 703 bundled records (§2.7, §3), though no build since 2026-05-22 could open
+    one. **Removed 2026-10-13** on both versions (alittis.github.io GHP-4: `f45c9de` on `main`,
+    live; `a4295de` on the branch), with §2.8–§2.10 renumbered down by one.
+  - **The Play Console listing still advertises the bundled archive.** `PLAY_CLOSED_TEST.md`'s listing
+    copy is corrected; pasting it into the Play Console is the owner's step.
 - **Shipped:** — in source, release pending (batched with the next release).
 
 ### TB-24 · Pre-upload AAB check misses the signer certificate
@@ -1697,8 +1699,8 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
       layers, deletion and the web review.
     - Branch `ghp-3-post-cutover-policy`: the Postgres version — the data on the Alittis VPS in
       Frankfurt, with the journal and backups in NarcIS (plan D9; ARSO agreed 2026-10-12). **At T0:**
-      fill in its four `[DATUM PREHODA]` placeholders, re-check §2.1, §2.10 and §3 against what was
-      built, merge it to `main`, push.
+      fill in its four `[DATUM PREHODA]` placeholders, re-check §2.1, §2.9 (§2.10 before GHP-4)
+      and §3 against what was built, merge it to `main`, push.
     - Keep the two in step: a change to `main` before T0 is made on the branch too;
   - Play Data Safety, and PLAY_CLOSED_TEST.
 - **Shipped:** —
@@ -1801,7 +1803,8 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   suite 178/178; `flutter analyze` at the documented 10 info lints.
 - **At release:** in both policy versions (GHP-3), §2.3, §5 and §8 must say that logout deletes the
   photos. Change the live one only once the release has rolled out: until then testers still run
-  builds that keep them.
+  builds that keep them. **Done 2026-10-13** after the rollout, on both versions (alittis.github.io
+  `4a52e51` on `main`, live; `0bbcab6` on the post-cutover branch).
 - **Shipped:** **v1.12.0+22**, archived `~/Releases/terenska-beleznica-1.12.0+22.aab` (signed with the upload key); **rolled out on the Play Closed testing track**, confirmed by the owner 2026-10-13.
 
 ### TB-50 · Uploaded photos keep their EXIF metadata (GPS, phone make and model)
@@ -1856,7 +1859,10 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **At release:** in both policy versions (GHP-3), §2.3 changes from *"ostanejo v fotografiji"* to
   *"aplikacija jih pred shranjevanjem odstrani (ohrani le usmerjenost slike)"*, and the
   PLAY_CLOSED_TEST §4.11 note is updated to match. Change the live policy only once the release has
-  rolled out.
+  rolled out. **Done 2026-10-13** after the rollout, on both versions (alittis.github.io `4a52e51` on
+  `main`, live; `0bbcab6` on the branch). §1 changed too, since it listed photos *"skupaj z njihovimi
+  metapodatki EXIF"*. The wording says photos saved before 1.12.0 *may* still carry EXIF, on the
+  server too. §4.11 is updated.
 - **Shipped:** **v1.12.0+22**, archived `~/Releases/terenska-beleznica-1.12.0+22.aab` (signed with the upload key); **rolled out on the Play Closed testing track**, confirmed by the owner 2026-10-13.
 
 ---
