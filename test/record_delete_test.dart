@@ -19,6 +19,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:narcis_nadzorniki/data/dataset_generation_store.dart';
 import 'package:narcis_nadzorniki/data/local_store.dart';
 import 'package:narcis_nadzorniki/data/remote_api.dart';
 import 'package:narcis_nadzorniki/data/walks_local_store.dart';
@@ -185,6 +186,11 @@ class _Harness {
       connectivity: _FakeConnectivity(online),
       authService: _FakeAuth(),
       photoStorage: photos,
+      // TB-46: no documents directory under testWidgets; the store reads
+      // null and saves nothing, as on a device whose write fails.
+      generationStore: DatasetGenerationStore(
+        directory: () => Future.error(UnsupportedError('no documents dir')),
+      ),
     );
     await state.init();
     // Only when online: init() awaits its own syncAll, so nothing is left in
@@ -244,7 +250,7 @@ void main() {
       // local-row if the pull genuinely landed.
       final h = _Harness(online: true);
       await h.boot();
-      expect(h.requests, contains('GET /ords/narcis/disturbances/'));
+      expect(h.requests, contains('GET /api/beleznica/app/v1/disturbances'));
       expect(h.state.records, hasLength(1));
       expect(h.state.pendingCount, 0,
           reason: 'a swallowed pull leaves _lastRemoteIds null, which would '

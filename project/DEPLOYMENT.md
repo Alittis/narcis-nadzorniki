@@ -15,6 +15,17 @@ flutter test                    # unit/widget tests
 flutter analyze                 # static analysis
 ```
 
+**Against a scratch backend (TB-46).** The field-app API's base URL is a compile-time define, production by default. A
+debug build for the Android emulator, pointed at a narcis-vibed `next start` on this Mac (its runbook: narcis-vibed
+OPERATIONS §21.8):
+```bash
+flutter build apk --debug --dart-define=BELEZNICA_API=http://10.0.2.2:3101/api/beleznica/app/v1
+adb install -r build/app/outputs/flutter-apk/app-debug.apk     # installs si.terenska.beleznica.dev beside a store build
+```
+Plain HTTP works in **debug builds only**: `android/app/src/debug/res/xml/network_security_config.xml` permits cleartext to
+`10.0.2.2`, `127.0.0.1` and `localhost`, and release builds never merge it. Uninstall the dev app afterwards
+(`adb uninstall si.terenska.beleznica.dev`): its stores hold whatever the scratch backend served.
+
 ## 3. Android Release Pipeline (Play Console internal testing)
 
 ### 3.1 One-time setup (already done as of 2026-04-28)
@@ -47,7 +58,9 @@ These fingerprints are public (they're the public-key cert digest). Not the same
 
 ### 3.2 Per-release build
 
-Bump `version: X.Y.Z+B` in `pubspec.yaml` (Play requires monotonic `versionCode` = `+B`), then:
+Bump `version: X.Y.Z+B` in `pubspec.yaml` (Play requires monotonic `versionCode` = `+B`) **and `kAppBuild` in
+`lib/app_version.dart` to the same `B`** (TB-46: the app sends it as `X-App-Build` for the server's minimum-build check;
+`test/app_version_test.dart` fails while the two differ), then:
 
 ```bash
 flutter pub get
@@ -101,4 +114,7 @@ flutter build appbundle --release
 - **Lost upload keystore** → cannot publish updates. Mitigation: keep an encrypted offline backup of `narcis_nadzorniki_upload.jks` plus the passwords (separate location). Recovery via Play Console support is possible but slow.
 - **Bumping `applicationId`** → would create a *new app* on Play; existing installs cannot upgrade. The id is locked at `si.terenska.beleznica`.
 - **Re-adding background permissions later** → triggers a Play Console review form (1–3 weeks). Plan around it.
+- **Raising the server's minimum build too early (TB-46)** → narcis-vibed's `BELEZNICA_APP_MIN_BUILD` answers older builds 426
+  and a blocking update screen. Raised before the new build is downloadable in Play (review ~1–20 h), it locks testers out
+  with nothing to update to. **Raise it only after Play Console shows the build live;** their queue survives either way.
 - **Privacy policy URL drift** → if the policy URL ever 404s, Play can suspend the listing. Edits to the policy must keep the URL stable.

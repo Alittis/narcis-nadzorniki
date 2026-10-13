@@ -6,6 +6,8 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:narcis_nadzorniki/app_version.dart';
+import 'package:narcis_nadzorniki/data/remote_api.dart' show kBeleznicaApi;
 
 /// Outcome of an `AuthService.login` call.
 class AuthResult {
@@ -16,6 +18,8 @@ class AuthResult {
     this.wasOffline = false,
     this.rejectedByServer = false,
     this.token,
+    this.reason,
+    this.updateRequired = false,
   });
 
   final bool success;
@@ -26,10 +30,18 @@ class AuthResult {
   /// (i.e. no network round-trip succeeded).
   final bool wasOffline;
 
-  /// True when the server answered 401. Its one message covers a wrong
-  /// password and a missing TERENSKA-BELEZNICA right alike (TB-28), so the
-  /// login screen adds a hint about the right only in this case.
+  /// True when the server answered 401.
   final bool rejectedByServer;
+
+  /// Why the server refused a login whose password was right (TB-28 half 2):
+  /// `not_authorized` (no TERENSKA-BELEZNICA) or `no_org` (no organisation, so
+  /// nothing captured could be stored). Null for a wrong password, which keeps
+  /// the one generic message.
+  final String? reason;
+
+  /// The server answered 426: this build is below its minimum (TB-46). The
+  /// offline cache and any stored session are left as they are.
+  final bool updateRequired;
 
   /// Bearer session token minted by the server on a successful ONLINE login.
   /// Null when the login was served offline, or when the backend didn't mint
@@ -72,9 +84,10 @@ class _SecureStorageAdapter implements AuthCacheStore {
   Future<void> delete(String key) => _storage.delete(key: key);
 }
 
-/// Login service. Talks to ORDS over HTTPS using a custom `X-Narcis-Auth`
-/// header (the standard `Authorization` header is consumed by ORDS upstream
-/// of the handler PL/SQL — see ARCHITECTURE.md §9.1). Caches a PBKDF2 hash of
+/// Login service. Talks to the field-app API's `prijava` / `odjava`
+/// ([kBeleznicaApi], ARCHITECTURE.md §9.1) with the standard `Authorization`
+/// header (TB-46: ORDS swallowed it, which is why the old login used a custom
+/// `X-Narcis-Auth`; the narcis-vibed host does not). Caches a PBKDF2 hash of
 /// the credentials in flutter_secure_storage so subsequent logins can succeed
 /// while offline, up to [maxOfflineWindow] since the last successful online
 /// login.
@@ -87,8 +100,7 @@ class AuthService {
     Duration maxOfflineWindow = const Duration(days: 14),
     Random? random,
   })  : _client = client ?? http.Client(),
-        _endpoint = endpoint ??
-            Uri.parse('https://narcis.gov.si/ords/narcis/app-auth/login'),
+        _endpoint = endpoint ?? Uri.parse('$kBeleznicaApi/prijava'),
         _cache = cacheStore ?? _SecureStorageAdapter(),
         _clock = clock ?? DateTime.now,
         _maxOfflineWindow = maxOfflineWindow,
@@ -109,9 +121,14 @@ class AuthService {
   static const _kHash = 'narcis_auth_hash_b64';
   static const _kLastOnline = 'narcis_auth_last_online_at';
   static const _kAlgo = 'narcis_auth_algo';
-  // Bearer session token (plaintext). Lives in the same secure storage as the
-  // PBKDF2 cache; it is a revocable, expiring token, never the password.
-  static const _kToken = 'narcis_auth_token';
+  // Bearer session token (plaintext) — a vibed token minted by `prijava`
+  // (TB-46). Lives in the same secure storage as the PBKDF2 cache; it is a
+  // revocable, expiring token, never the password.
+  static const _kToken = 'narcis_vibed_token';
+  // The ORDS-era TB token (`TB_AUTH_TOKENS`), which the new API cannot verify.
+  // Found on the first start after the update: removed, and the user sent to
+  // the login screen with the queue untouched (TB-46).
+  static const _kLegacyToken = 'narcis_auth_token';
   static const _algoCurrent = 'pbkdf2_sha256_100k_v1';
   static const _pbkdf2Iters = 100000;
   static const _pbkdf2KeyBytes = 32;
@@ -155,6 +172,7 @@ class AuthService {
       _cache.delete(_kLastOnline),
       _cache.delete(_kAlgo),
       _cache.delete(_kToken),
+      _cache.delete(_kLegacyToken),
     ]);
   }
 
@@ -163,20 +181,27 @@ class AuthService {
   /// the first authenticated call — a revoked/expired token 401s, which clears
   /// the session.
   Future<StoredSession?> readStoredSession() async {
+    // TB-46: a token from the ORDS backend opens nothing on the new one, and
+    // sending it would be answered 401. Forget it; this call then finds no
+    // session, so the app opens on the login screen. The offline credential
+    // cache stays, and the stores are not touched, so the queue survives.
+    if (await _cache.read(_kLegacyToken) != null) {
+      await _cache.delete(_kLegacyToken);
+    }
     final email = await _cache.read(_kEmail);
     final token = await _cache.read(_kToken);
     if (email == null || token == null) return null;
     return StoredSession(email: email, token: token);
   }
 
-  /// Best-effort server-side revoke of a bearer token (POST /app-auth/logout).
+  /// Best-effort server-side revoke of a bearer token (POST `odjava`).
   /// Network errors are swallowed — the token still expires server-side and the
   /// caller clears the local session regardless.
   Future<void> revokeToken(String token) async {
     try {
       await _client.post(
-        _endpoint.resolve('logout'),
-        headers: {'X-Narcis-Auth': 'Bearer $token'},
+        _endpoint.resolve('odjava'),
+        headers: {'Authorization': 'Bearer $token', 'X-App-Build': '$kAppBuild'},
       ).timeout(const Duration(seconds: 10));
     } catch (_) {
       // Intentionally ignored.
@@ -191,14 +216,13 @@ class AuthService {
   Future<AuthResult?> _tryOnline(String email, String password) async {
     final credsB64 = base64Encode(utf8.encode('$email:$password'));
     try {
-      final response = await _client.get(
+      final response = await _client.post(
         _endpoint,
-        headers: {'X-Narcis-Auth': 'Basic $credsB64'},
+        headers: {'Authorization': 'Basic $credsB64', 'X-App-Build': '$kAppBuild'},
       ).timeout(const Duration(seconds: 15));
 
-      // Body parsing is lenient: ARCHITECTURE.md §9.1 notes that this ORDS
-      // returns Content-Type: text/html;charset=utf-8 even though the body is
-      // valid JSON. We parse by content, not by header.
+      // Body parsing is lenient (ORDS once answered JSON as text/html): parse
+      // by content, not by header.
       Map<String, dynamic> body = const <String, dynamic>{};
       if (response.body.isNotEmpty) {
         try {
@@ -218,6 +242,16 @@ class AuthService {
         return AuthResult(success: true, user: user, token: token);
       }
 
+      if (response.statusCode == 426) {
+        // Below the server's minimum build (TB-46): neither a rejection nor a
+        // network error. Nothing is wiped; the app asks for the update.
+        return const AuthResult(
+          success: false,
+          message: 'Ta različica aplikacije ni več podprta.',
+          updateRequired: true,
+        );
+      }
+
       if (response.statusCode == 401) {
         // Definite server rejection. Nuke any cached creds so a previously
         // authorized user who has since had TERENSKA-BELEZNICA revoked can no
@@ -227,11 +261,12 @@ class AuthService {
           success: false,
           message: (body['message'] as String?) ?? 'Prijava ni uspela.',
           rejectedByServer: true,
+          reason: body['reason'] as String?,
         );
       }
 
-      // 5xx or other unexpected status: treat as a network error and let
-      // the offline path try.
+      // 5xx or other unexpected status (503: NarcIS could not be asked): treat
+      // as a network error and let the offline path try.
       return null;
     } on TimeoutException {
       return null;

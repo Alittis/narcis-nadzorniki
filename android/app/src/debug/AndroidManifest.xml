@@ -4,4 +4,6 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- TB-46: plain HTTP to a scratch backend on this machine, debug only. -->
+    <application android:networkSecurityConfig="@xml/network_security_config"/>
 </manifest>

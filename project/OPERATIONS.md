@@ -55,6 +55,11 @@ flutter run -d <device_id>
   - 401 with `{"authenticated":false,"message":"Neveljavni podatki za prijavo."}` for all failure modes (no enumeration leak between "no creds", "bad password", "not authorized").
 
 ## 8. Authentication (Production)
+> **From the cutover (TB-46, built 2026-10-13):** login is `POST prijava` on `https://narcis.alittis.com/api/beleznica/app/v1/`
+> with `Authorization: Basic`, and every sync call sends `Authorization: Bearer <vibed token>` (ARCHITECTURE §9.0, §9bis). The
+> token is the web's vibed token (`VIBED_AUTH_TOKENS`), so the operator revoke below becomes narcis-vibed's: revoke the user's
+> `VIBED_AUTH_TOKENS` rows, or withdraw `TERENSKA-BELEZNICA` — re-checked within 60 s. After updating, every tester logs in once:
+> the ORDS-era token is dropped on start, the queue is kept. The bullets below describe the ORDS backend, production until T0.
 - Login wire format: `X-Narcis-Auth: Basic <base64(email:password)>` over HTTPS to `https://narcis.gov.si/ords/narcis/app-auth/login` (see ARCHITECTURE.md §9.1 for why a custom header). Server gates by email lookup → `pkg_narcis_uporabniki.preveri_geslo` → `TERENSKA-BELEZNICA` function authorization.
 - **Bearer-token sessions** (ARCHITECTURE §9.1b, §12bis, §9bis): a successful login mints an opaque token (stored server-side only as a SHA-256 hash in `TB_AUTH_TOKENS`); the client persists the token in `flutter_secure_storage` and sends it as `X-Narcis-Auth: Bearer <token>` on every subsequent call. The password is sent only at login, never persisted on the device.
 - **Sticky session**: the token is restored on app start, so the app no longer asks for login on every cold start (incl. an OS-killed background process — the Samsung One UI case). Sliding 30-day expiry, renewed on use. A revoked/expired token 401s and drops the user to the login screen.
@@ -81,6 +86,12 @@ valid for offline login until the configured max-offline window expires
   offline-capable cache in the first place.
 
 ## 10. Disturbance Sync — Operational Caveats
+> **From the cutover (TB-46):** two server answers are new to the sync engine.
+> - **A new dataset generation** (the cutover itself, or a narcis-vibed restore): the phone re-sends its own records, photos and
+>   walks the server lost instead of evicting them (ARCHITECTURE §13). Expect a burst of POSTs from every phone that synced
+>   after the last backup. A record deleted on the web inside the lost window comes back; delete it again.
+> - **426 `update_required`** below narcis-vibed's `BELEZNICA_APP_MIN_BUILD`: the app stops syncing and shows *Potrebna je
+>   posodobitev*; the queue waits for the update. Raise the minimum only after Play shows the new build live (DEPLOYMENT §5).
 The disturbance CRUD endpoints (ARCHITECTURE.md §9.3) authenticate every call
 with `X-Narcis-Auth` — a bearer token (preferred) or, as a fallback, the
 plaintext password held in memory for the session. With a persisted token the

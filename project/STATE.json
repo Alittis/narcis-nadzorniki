@@ -187,6 +187,14 @@
       ]
     },
     {
+      "name": "Field-app API on narcis.alittis.com (narcis-vibed NV-259; TB-46)",
+      "base_url": "https://narcis.alittis.com/api/beleznica/app/v1/ (kBeleznicaApi; --dart-define=BELEZNICA_API overrides)",
+      "status": "BUILT 2026-10-13, NOT LIVE: the app's backend from the cutover (T0). Server dormant (503 not_live) until narcis-vibed sets BELEZNICA_SOURCE=postgres at T0. Gate met on an Android emulator against a scratch backend; owner-accepted 2026-10-13. Until T0 the ORDS service above stays production.",
+      "auth": "POST prijava with Authorization: Basic -> vibed token; Authorization: Bearer on every other call; POST odjava revokes. 401 only for a rejected token (or no TERENSKA-BELEZNICA / no org); 503 when NarcIS auth is unreachable",
+      "contract": "mirrors ORDS disturbances/ + walks/ (same JSON, statuses, skip-if-exists POST, 204/404 DELETE); PUT 405; no trailing slash (308)",
+      "headers": "X-Beleznica-Generation on both list GETs (dataset-generation guard); X-App-Build sent on every call, 426 below BELEZNICA_APP_MIN_BUILD -> UpdateRequiredScreen"
+    },
+    {
       "name": "OpenStreetMap tile server",
       "base_url": "https://tile.openstreetmap.org/",
       "purpose": "OSM basemap tiles (BasemapMode.osm)",
@@ -272,6 +280,7 @@
   "env_required": [],
   "ci_detected": false,
   "auth": {
+    "tb46_from_cutover": "BUILT 2026-10-13, ships with the cutover: login POST prijava (Authorization: Basic) on the field-app API, a vibed token stored under narcis_vibed_token (an ORDS-era narcis_auth_token is deleted on start, queue untouched), Authorization: Bearer on sync calls, refusal reasons not_authorized / no_org rendered as hints naming admin@alittis.com (TB-28 half 2), 426 -> update screen. See ARCHITECTURE 9.0 / 9bis",
     "status": "production: Basic and bearer-token sessions both live on narcis.gov.si as of 2026-05-28 (deployed to ARSO prod via APEX SQL Workshop; smoke test 7/7 incl. mint, Bearer CRUD, logout revoke, revoked-token 401)",
     "endpoint": "https://narcis.gov.si/ords/narcis/app-auth/login",
     "logout_endpoint": "https://narcis.gov.si/ords/narcis/app-auth/logout (POST, X-Narcis-Auth: Bearer <token>, returns {\"revoked\":true})",

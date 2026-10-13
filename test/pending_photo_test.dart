@@ -213,7 +213,7 @@ void main() {
       );
       expect(
         h.requests.sublist(lastPhotoPost),
-        contains('GET /ords/narcis/disturbances/'),
+        contains('GET /api/beleznica/app/v1/disturbances'),
         reason: 'the pull must have run for this test to mean anything',
       );
       expect(h.photo, isNotNull, reason: 'the pull must not drop it');
@@ -271,7 +271,7 @@ void main() {
 
       expect(
         h.requests,
-        contains('POST /ords/narcis/disturbances/'),
+        contains('POST /api/beleznica/app/v1/disturbances'),
         reason: 'the sync must have run for this test to mean anything',
       );
       expect(h.photoPosts, 0);

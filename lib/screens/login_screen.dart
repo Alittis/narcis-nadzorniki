@@ -3,13 +3,29 @@ import 'package:flutter/services.dart';
 import 'package:narcis_nadzorniki/state/app_state.dart';
 import 'package:provider/provider.dart';
 
-/// Shown under the error after the server rejects a login (TB-28). Names the
-/// publisher, who provisions closed-test accounts; at production scale the
-/// addressee becomes the organisation's administrator.
+/// Shown under the server's message when it refused a right password for a
+/// missing TERENSKA-BELEZNICA right (TB-28; reason `not_authorized` since
+/// TB-46). Names the publisher, who provisions closed-test accounts; at
+/// production scale the addressee becomes the organisation's administrator —
+/// change this, [noOrgHintText] and both PLAY_CLOSED_TEST invite templates
+/// together.
 const accessHintText =
-    'Če je geslo pravilno, vaš račun morda nima pravice za Terensko '
-    'beležnico. Registracija v NarcIS ni dovolj: potrebna je tudi pravica '
+    'Registracija v NarcIS ni dovolj: potrebna je tudi pravica '
     'TERENSKA-BELEZNICA. Za dodelitev pišite na admin@alittis.com.';
+
+/// The same, for an account with no organisation (reason `no_org`, TB-46):
+/// every record is stored under its author's organisation.
+const noOrgHintText =
+    'Račun mora biti v NarcIS povezan z organizacijo. Za ureditev pišite na '
+    'admin@alittis.com.';
+
+/// The hint for a server refusal's [reason]; null for a wrong password, which
+/// the server now tells apart (TB-28 half 2).
+String? hintForReason(String? reason) => switch (reason) {
+      'not_authorized' => accessHintText,
+      'no_org' => noOrgHintText,
+      _ => null,
+    };
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -24,7 +40,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _submitting = false;
   String? _error;
-  bool _accessHint = false;
+  String? _hint;
 
   @override
   void dispose() {
@@ -40,7 +56,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       _submitting = true;
       _error = null;
-      _accessHint = false;
+      _hint = null;
     });
     final result = await context.read<AppState>().login(
       _emailController.text,
@@ -62,7 +78,9 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       _submitting = false;
       _error = result.success ? null : (result.message ?? 'Prijava ni uspela.');
-      _accessHint = !result.success && result.rejectedByServer;
+      _hint = !result.success && result.rejectedByServer
+          ? hintForReason(result.reason)
+          : null;
     });
   }
 
@@ -212,9 +230,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                           ],
-                          // TB-28: the server's 401 reads the same for a
-                          // wrong password and a missing app right.
-                          if (_accessHint) ...[
+                          // TB-28: whom to ask, when the server said why a
+                          // right password was refused.
+                          if (_hint != null) ...[
                             const SizedBox(height: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(
@@ -225,9 +243,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                 color: Colors.black.withValues(alpha: 0.6),
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: const Text(
-                                accessHintText,
-                                style: TextStyle(
+                              child: Text(
+                                _hint!,
+                                style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 13,
                                 ),

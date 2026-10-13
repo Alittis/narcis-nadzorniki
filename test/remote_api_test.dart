@@ -12,13 +12,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:intl/intl.dart';
+import 'package:narcis_nadzorniki/app_version.dart';
 import 'package:narcis_nadzorniki/data/remote_api.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
+import 'package:narcis_nadzorniki/models/walk.dart';
 
 const _creds = SyncCredentials.token('test-bearer-token-abc123');
 
-final _baseUrl = Uri.parse('https://narcis.gov.si/ords/narcis/disturbances/');
+final _apiBase = Uri.parse('https://narcis.alittis.com/api/beleznica/app/v1');
+final _baseUrl = Uri.parse('$_apiBase/disturbances');
 
 Disturbance _sample({String id = '11111111-2222-3333-4444-555555555555'}) {
   return Disturbance(
@@ -48,14 +51,14 @@ Disturbance _sample({String id = '11111111-2222-3333-4444-555555555555'}) {
 RemoteApi _api(Future<http.Response> Function(http.Request) respond) {
   return RemoteApi(
     client: MockClient(respond),
-    baseUrl: _baseUrl,
+    apiBase: _apiBase,
     timeout: const Duration(seconds: 1),
   );
 }
 
 void main() {
   group('createRecord', () {
-    test('POSTs JSON to base URL with X-Narcis-Auth Bearer header', () async {
+    test('POSTs JSON to base URL with an Authorization Bearer header', () async {
       late http.Request captured;
       final api = _api((req) async {
         captured = req;
@@ -66,7 +69,8 @@ void main() {
 
       expect(captured.method, 'POST');
       expect(captured.url, _baseUrl);
-      expect(captured.headers['X-Narcis-Auth'], 'Bearer test-bearer-token-abc123');
+      expect(captured.headers['Authorization'], 'Bearer test-bearer-token-abc123');
+      expect(captured.headers.containsKey('X-Narcis-Auth'), isFalse);
       expect(
         captured.headers['Content-Type'],
         startsWith('application/json'),
@@ -147,7 +151,7 @@ void main() {
 
       expect(captured.method, 'PUT');
       expect(captured.url.toString(),
-          '${_baseUrl}11111111-2222-3333-4444-555555555555');
+          '$_baseUrl/11111111-2222-3333-4444-555555555555');
     });
 
     test('non-200 raises', () async {
@@ -230,7 +234,7 @@ void main() {
           reason: '${entry.key} must not declare a Content-Type — ORDS would '
               'try to parse the empty body as JSON and 400 before the handler',
         );
-        expect(req.headers['X-Narcis-Auth'], isNotNull,
+        expect(req.headers['Authorization'], isNotNull,
             reason: '${entry.key} still authenticates');
       }
     });
@@ -291,18 +295,18 @@ void main() {
       final result = await api.fetchRecords(_creds);
       expect(captured.method, 'GET');
       expect(captured.url, _baseUrl);
-      expect(captured.headers['X-Narcis-Auth'], isNotNull);
-      expect(result, hasLength(1));
-      expect(result.first.id, 'rec-1');
-      expect(result.first.photos, hasLength(1));
-      expect(result.first.photos.first.id, 'p-1');
-      expect(result.first.photos.first.localPath, isNull);
+      expect(captured.headers['Authorization'], isNotNull);
+      expect(result.items, hasLength(1));
+      expect(result.items.first.id, 'rec-1');
+      expect(result.items.first.photos, hasLength(1));
+      expect(result.items.first.photos.first.id, 'p-1');
+      expect(result.items.first.photos.first.localPath, isNull);
     });
 
     test('also accepts a bare array body', () async {
       final api = _api((_) async => http.Response('[]', 200));
       final result = await api.fetchRecords(_creds);
-      expect(result, isEmpty);
+      expect(result.items, isEmpty);
     });
 
     test('401 surfaces as unauthorized', () async {
@@ -332,7 +336,7 @@ void main() {
         credentials: _creds,
       );
       expect(captured.method, 'POST');
-      expect(captured.url.toString(), '${_baseUrl}rec-1/photos/p-1');
+      expect(captured.url.toString(), '$_baseUrl/rec-1/photos/p-1');
       expect(captured.headers['Content-Type'], 'image/jpeg');
       expect(captured.bodyBytes, Uint8List.fromList([1, 2, 3, 4]));
     });
@@ -421,7 +425,7 @@ void main() {
             headers: {'content-type': 'application/json; charset=utf-8'},
           ));
 
-      final rec = (await api.fetchRecords(_creds)).single;
+      final rec = (await api.fetchRecords(_creds)).items.single;
       expect(rec.observedAt.isUtc, isTrue);
       expect(rec.observedAt, DateTime.utc(2026, 4, 25, 12, 0, 0));
     });
@@ -471,7 +475,7 @@ void main() {
             headers: {'content-type': 'application/json; charset=utf-8'},
           ));
       final result = await api.fetchRecords(_creds);
-      return result.single;
+      return result.items.single;
     }
 
     test('reviewedBy / reviewedAt parse, and reviewedAt is a UTC instant',
@@ -541,6 +545,126 @@ void main() {
       final after = Disturbance.fromJson(legacy);
       expect(after.reviewedBy, isNull);
       expect(after.reviewedAt, isNull);
+    });
+  });
+
+  // TB-46: the field-app API on the narcis-vibed host (narcis-vibed NV-259).
+  group('the field-app API wire (TB-46)', () {
+    test('every call goes to its path under the API base, never with a '
+        'trailing slash (the host 308s one, and a POST does not follow)',
+        () async {
+      final seen = <String>[];
+      final api = _api((req) async {
+        seen.add('${req.method} ${req.url}');
+        if (req.method == 'GET' && req.url.path.endsWith('/disturbances')) {
+          return http.Response('{"records":[]}', 200);
+        }
+        if (req.method == 'GET' && req.url.path.endsWith('/walks')) {
+          return http.Response('{"walks":[]}', 200);
+        }
+        if (req.url.path.endsWith('/points')) {
+          return http.Response('{"obhodId":"w-1","points":[]}', 200);
+        }
+        return http.Response(
+          '',
+          switch (req.method) { 'DELETE' => 204, 'GET' => 200, _ => 201 },
+        );
+      });
+      final walk = Walk(
+        id: 'w-1',
+        startedAt: DateTime.utc(2026, 10, 13, 8),
+        endedAt: DateTime.utc(2026, 10, 13, 9),
+        pendingSync: true,
+      );
+      await api.fetchRecords(_creds);
+      await api.createRecord(_sample(id: 'm-1'), _creds);
+      await api.deleteRecord('m-1', _creds);
+      await api.uploadPhoto(
+        motnjaId: 'm-1',
+        photoId: 'p-1',
+        bytes: Uint8List.fromList([1]),
+        mimeType: 'image/jpeg',
+        credentials: _creds,
+      );
+      await api.downloadPhoto(motnjaId: 'm-1', photoId: 'p-1', credentials: _creds);
+      await api.deletePhoto(motnjaId: 'm-1', photoId: 'p-1', credentials: _creds);
+      await api.fetchWalks(_creds);
+      await api.createWalk(walk, _creds);
+      await api.deleteWalk('w-1', _creds);
+      await api.fetchWalkPoints('w-1', _creds);
+      const b = 'https://narcis.alittis.com/api/beleznica/app/v1';
+      expect(seen, [
+        'GET $b/disturbances',
+        'POST $b/disturbances',
+        'DELETE $b/disturbances/m-1',
+        'POST $b/disturbances/m-1/photos/p-1',
+        'GET $b/disturbances/m-1/photos/p-1',
+        'DELETE $b/disturbances/m-1/photos/p-1',
+        'GET $b/walks',
+        'POST $b/walks',
+        'DELETE $b/walks/w-1',
+        'GET $b/walks/w-1/points',
+      ]);
+    });
+
+    test('every call names this build (X-App-Build) and nothing else '
+        'from ORDS', () async {
+      final builds = <String?>[];
+      final legacy = <String>[];
+      final api = _api((req) async {
+        builds.add(req.headers['X-App-Build']);
+        if (req.headers.containsKey('X-Narcis-Auth')) legacy.add(req.url.path);
+        if (req.method == 'GET' && req.url.path.endsWith('/disturbances')) {
+          return http.Response('{"records":[]}', 200);
+        }
+        return http.Response('', req.method == 'GET' ? 200 : 201);
+      });
+      await api.fetchRecords(_creds);
+      await api.createRecord(_sample(), _creds);
+      await api.uploadPhoto(
+        motnjaId: 'm-1',
+        photoId: 'p-1',
+        bytes: Uint8List.fromList([1]),
+        mimeType: 'image/jpeg',
+        credentials: _creds,
+      );
+      await api.downloadPhoto(motnjaId: 'm-1', photoId: 'p-1', credentials: _creds);
+      expect(builds, everyElement('$kAppBuild'));
+      expect(builds, hasLength(4));
+      expect(legacy, isEmpty);
+    });
+
+    test('426 is update-required, not unauthorized', () async {
+      final api = _api((_) async => http.Response(
+          '{"error":"update_required","minBuild":99}', 426));
+      try {
+        await api.fetchRecords(_creds);
+        fail('expected throw');
+      } on RemoteApiException catch (e) {
+        expect(e.isUpdateRequired, isTrue);
+        expect(e.isUnauthorized, isFalse);
+      }
+    });
+
+    test('both list GETs hand back X-Beleznica-Generation', () async {
+      final api = _api((req) async => http.Response(
+            req.url.path.endsWith('/walks')
+                ? '{"walks":[]}'
+                : '{"records":[]}',
+            200,
+            headers: {'x-beleznica-generation': 'gen-7'},
+          ));
+      expect((await api.fetchRecords(_creds)).generation, 'gen-7');
+      expect((await api.fetchWalks(_creds)).generation, 'gen-7');
+    });
+
+    test('a list without the header has no generation', () async {
+      final api = _api((_) async => http.Response('{"records":[]}', 200));
+      expect((await api.fetchRecords(_creds)).generation, isNull);
+    });
+
+    test('the default base is production, overridable by --dart-define', () {
+      expect(kBeleznicaApi, 'https://narcis.alittis.com/api/beleznica/app/v1');
     });
   });
 }

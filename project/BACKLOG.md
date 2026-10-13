@@ -789,7 +789,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   which was corrected in the same pass: it had the merged-manifest path as `android/app/build/…`.
 
 ### TB-28 · Login says "wrong credentials" when the real problem is a missing TERENSKA-BELEZNICA authorization
-`✨ Enhancement` · `P1` · `Doing` (half 1 built into v1.13.0+23 2026-10-13, pending upload + rollout; half 2 moves to [TB-46](#tb-46--move-the-app-to-the-postgres-backend-on-the-vps-phone-side-of-narcis-vibed-nv-259)) · Maintainer-initiated · Updated: 2026-10-13
+`✨ Enhancement` · `P1` · `Doing` (half 1 built into v1.13.0+23 2026-10-13, pending upload + rollout; **half 2 built in [TB-46](#tb-46--move-the-app-to-the-postgres-backend-on-the-vps-phone-side-of-narcis-vibed-nv-259) 2026-10-13** — the server's `reason` picks the hint; ships with the cutover) · Maintainer-initiated · Updated: 2026-10-13
 
 - **Problem:** Registration in NarcIS is **not enough** to use Terenska beležnica. The account
   must additionally hold the `TERENSKA-BELEZNICA` function authorization, granted by an
@@ -1648,7 +1648,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** **v1.11.0+21**, archived `~/Releases/terenska-beleznica-1.11.0+21.aab` (signed with the upload key); **rolled out on the Play Closed testing track 2026-10-12** and checked on the A56 by the owner.
 
 ### TB-46 · Move the app to the Postgres backend on the VPS (phone side of narcis-vibed NV-259)
-`🔧 Chore` · `P1` · `Todo` (D1–D8 decided 2026-10-12; ARSO agreed, D9) · Reporter: Alexis (owner direction, 2026-10-12) · Updated: 2026-10-12
+`🔧 Chore` · `P1` · `Doing` (built 2026-10-13, P4 gate met and owner-accepted on an emulator; ships with the cutover) · Reporter: Alexis (owner direction, 2026-10-12) · Updated: 2026-10-13
 - **Decision (owner, 2026-10-12):** the field notebook's data leaves Oracle/ORDS for Postgres on the
   VPS **before** the server-side wishlist items (TB-36, 38, 39, 42, 43), so each is built once, on the
   new backend. The move is a **pure copy** — no new fields — and the map-layer swap is separate (TB-47).
@@ -1703,6 +1703,31 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
       and §3 against what was built, merge it to `main`, push.
     - Keep the two in step: a change to `main` before T0 is made on the branch too;
   - Play Data Safety, and PLAY_CLOSED_TEST.
+- **Built 2026-10-13 (narcis-vibed NV-259 P4).** Server side, runbook and the gate's measurements: narcis-vibed
+  OPERATIONS §21.8. Here:
+  - **The wire** (ARCHITECTURE §9.0): `kBeleznicaApi` from `--dart-define=BELEZNICA_API`, default production, URLs built
+    without a trailing slash (the host 308s one); `Authorization` replaces `X-Narcis-Auth`; login `POST prijava`, logout
+    `POST odjava`. `fetchRecords`/`fetchWalks` return `RemoteList` with the generation.
+  - **The token** under `narcis_vibed_token`; the ORDS-era `narcis_auth_token` is deleted on start, the queue untouched.
+  - **TB-28 half 2:** the server's `reason` (`not_authorized`, `no_org`) picks the hint; a wrong password gets none.
+  - **The generation guard** (ARCHITECTURE §13): only on a generation not merged yet, own unlisted records and walks are
+    re-queued and own photos the server lost go back with them (owner, 2026-10-13, on a surviving record too); stored only
+    once both lists merged. *To verify while building* — a synced walk keeps its points locally: yes, `copyWith` keeps them
+    and the merge preserves `local.points`; a walk without local points is re-sent without them, so its records can link.
+  - **Minimum build (owner, 2026-10-13):** `X-App-Build` = `kAppBuild` (`lib/app_version.dart`, held equal to pubspec by a
+    test); 426 → `UpdateRequiredScreen` at the root, sync stopped, session and queue kept.
+  - **Debug builds** may reach a scratch backend over HTTP (`src/debug` network config only).
+  - **Tests:** suite **228/228** (204 before; +24); `flutter analyze` at the documented 10 infos. New:
+    `dataset_generation_test.dart` (8, the real `AppState` against a stateful fake server), `app_version_test.dart`, and
+    field-API cases in `remote_api_test` / `auth_service_test` / `login_access_hint_test`. **Checked by removal:** no
+    re-queue → 2 red; the generation stored after the walks alone → 3 red; the surviving record's photo not re-sent → 1
+    red; 426 not stopping sync → 1 red.
+  - **Gate on an Android emulator** (debug build `si.terenska.beleznica.dev`) against narcis-vibed's scratch copy: queue
+    drained; first pull under a new generation evicted 0 of 1,373; after a restore, the own lost record came back with a
+    byte-identical photo and a colleague's was evicted; 426 → the update screen. **Owner-accepted 2026-10-13.**
+  - **Found:** TB-55 (a record on a discarded walk can never be sent).
+- **Before the release:** bump pubspec **and `kAppBuild`**; build per `flutter-release`; submit with managed publishing on,
+  held until T0 (plan §11). Leave narcis-vibed's `BELEZNICA_APP_MIN_BUILD` unset at T0.
 - **Shipped:** —
 
 ### TB-47 · Read the Območja layers from the VPS instead of the NarcIS GeoServer
@@ -2065,6 +2090,19 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   PLAY_CLOSED_TEST.md §3 was removed.
 - **Discussion:** open. This is an owner decision, and the capture settings stay as they are until it
   is taken.
+
+### TB-55 · A record captured during a walk that is then discarded can never be sent
+`🐞 Bug` · `P2` · `Triage` · Reporter: Claude (found in the NV-259 P4 gate, 2026-10-13) · Updated: 2026-10-13
+- **Problem:** `addRecord` stamps a record with the active walk's id (`obhodId: record.obhodId ?? _activeWalk?.id`,
+  [`app_state.dart`](../lib/state/app_state.dart) ~491). If that walk is then discarded — *Zavrzi* in the end-walk sheet, or
+  the automatic *Obhod brez točk — zavržen* when GPS gave no points — `cancelWalk()` drops the walk but leaves the id on the
+  record. The walk never reaches the server, so the record's POST fails the walk FK: **500 for ever**, on Oracle (ORA-02291)
+  and on the new backend alike. It stays in the queue, counted as unsent, until a logout discards it.
+- **Seen:** on the emulator during the P4 gate. The emulator's fused location gave the walk service no points, the walk was
+  auto-discarded, and the record made during it stayed queued with `motnja_obhod_id_fkey` errors on every sync.
+- **Fix shape (to decide):** when a walk is discarded, clear `obhodId` on the records that carry it (they stay as ordinary
+  records), or ask whether to keep them. Test with the booted-`AppState` harness; verify by removal.
+- **Discussion:** open.
 
 ---
 

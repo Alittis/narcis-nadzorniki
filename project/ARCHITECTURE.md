@@ -68,6 +68,25 @@
 
 ## 9. Backend Endpoints
 
+### 9.0 The field-app API on narcis.alittis.com (TB-46 — built 2026-10-13, live from the cutover)
+From the TB-46 build on, the app calls **`https://narcis.alittis.com/api/beleznica/app/v1/`** (narcis-vibed NV-259; server
+rules and runbook in narcis-vibed `project/OPERATIONS.md` §21.8). §9.1–§9.4 below stay the **production backend until the
+cutover (T0)**, and the shape of every call is theirs: the new API mirrors them handler for handler (the same JSON, statuses,
+skip-if-exists creates, 204 deletes, 404 = done), so the sync engine is unchanged. What differs:
+- **Base URL** from `--dart-define=BELEZNICA_API=…` (`kBeleznicaApi`, `lib/data/remote_api.dart`), default production. **No
+  trailing slash** on any path: that host answers `…/disturbances/` with a 308, which a POST does not follow.
+- **Auth:** the standard `Authorization` header (ORDS swallowed it; this host does not). Login is `POST prijava` with
+  `Authorization: Basic …` → `{authenticated, user, token, expiresAt}`, the token a vibed token (30 days sliding, the web's).
+  Logout is `POST odjava` with `Authorization: Bearer …` → `{revoked:true}`. Every other call: `Authorization: Bearer <token>`.
+- **A right password can still be refused, with a reason** (TB-28 half 2): 401 `reason: "not_authorized"` (no
+  TERENSKA-BELEZNICA) or `"no_org"` (no organisation — nothing could be stored). A wrong password keeps the generic 401.
+  NarcIS unreachable at login → 503, which the client treats as a network error (offline path, cache kept).
+- **A 401 means the token was rejected and nothing else.** NarcIS's auth being unreachable is a 503 (retry, session kept).
+- **`X-Beleznica-Generation`** on both list GETs: the dataset generation (§13, *the dataset-generation guard*).
+- **`X-App-Build`** on every call (`kAppBuild`, `lib/app_version.dart`); below the server's minimum the answer is **426** and
+  the app shows `UpdateRequiredScreen` (§13).
+- PUT is not served (405): neither `updateRecord` nor `updateWalk` has a caller in the app.
+
 ### 9.1 `GET https://narcis.gov.si/ords/narcis/app-auth/login` (production login)
 - Auth: `X-Narcis-Auth: Basic <base64(email:password)>` over HTTPS only. (Custom header, not the standard `Authorization` — see note below.)
 - ORDS module: `narcis_app_auth`, base path `app-auth/`, template `login`.
@@ -198,6 +217,15 @@ A walk-around (Slovene "obhod") is a continuous GPS-tracked field session. Distu
 
 Implemented in [lib/services/auth_service.dart](../lib/services/auth_service.dart), driven by [lib/state/app_state.dart](../lib/state/app_state.dart).
 
+**TB-46 (built 2026-10-13, ships with the cutover):** the steps below hold with `POST prijava` and `Authorization` in place of
+`GET app-auth/login` and `X-Narcis-Auth` (§9.0). Three additions:
+- The token is stored under **`narcis_vibed_token`**. An ORDS-era token under `narcis_auth_token` is deleted on start and no
+  session is restored, so the user lands on the login screen **with the queue untouched** and the offline cache kept.
+- A 401 carrying `reason` gets its own hint under the server's message (`hintForReason`, `login_screen.dart`):
+  `accessHintText` for `not_authorized`, `noOrgHintText` for `no_org`, both naming admin@alittis.com. A 401 without a reason
+  is a wrong password and gets no hint.
+- A 426 returns `AuthResult.updateRequired`; nothing stored is touched and the app shows the update screen.
+
 **Online path** (when `AppState.isOnline`):
 1. Build `X-Narcis-Auth: Basic <base64(email:password)>` and GET §9.1.
 2. On HTTP 200 with `authenticated:true`: persist the PBKDF2 cache (schema below) **and** the returned bearer token (`narcis_auth_token`), and return success carrying the token. If the response had no `token` (older backend), the caller keeps the password in memory for that session only (Basic fallback) — nothing extra is persisted.
@@ -307,6 +335,10 @@ Until 2026-05-22 the app bundled 703 historical records from Notranjski regijski
   - `legacy_photos_upload.py`: photos → the photo endpoint.
 
 ## 12. Disturbance Schema (Oracle, prefix `TB_`)
+*From the cutover (TB-46) these tables are frozen and the data lives in narcis-vibed's Postgres schema `beleznica`, the
+same tables in the same shape (narcis-vibed plan NV-259 §6); every rule below — client UUIDs, org stamping, the walk FK —
+holds there too.*
+
 Defined in [tools/ords/disturbance_schema.sql](../tools/ords/disturbance_schema.sql). All tables prefixed `TB_` for "Terenska beležka" so the app's tables are easy to distinguish from other tables in the shared `narcis` schema.
 
 **Tables:**
@@ -373,6 +405,28 @@ given account (case-insensitive; an unstamped row is not held against anyone).
 - **`init()`** does not restore a stored session that does not own the queue. That covers the app being
   killed while the dialog is open, after `AuthService` had already stored the new session.
 - Tests: [test/login_owner_guard_test.dart](../test/login_owner_guard_test.dart).
+
+**The dataset-generation guard (TB-46, narcis-vibed NV-259 D6).** A pull evicts every synced local row the server does not
+list, so a server whose data set was REPLACED — the cutover from Oracle, or a restore that lost the last hours — would make
+every phone delete its copies of exactly what the server lost. The server mints a new generation on each replacement and
+sends it as `X-Beleznica-Generation` on both list GETs; `DatasetGenerationStore` keeps the last one merged
+(`dataset_generation.txt`).
+- On a generation not merged yet, the pulls **re-queue** instead of evicting: this user's own synced records and walks the
+  server no longer lists go back to `pendingSync`, with every photo whose file is still on the device marked
+  `pendingUpload`; on a record the server still lists, own photos it lost go back the same way (owner, 2026-10-13). The
+  idempotent POSTs put them back; a follow-up `syncAll` sends them at once. Other users' rows are evicted as always.
+- **The new generation is stored only after BOTH lists were merged under it.** The walks pull runs first; storing after it
+  alone would let the records pull see no change and evict what it must re-send. Stored last, so a crash repeats a re-queue,
+  never an eviction. A list without the header changes nothing.
+- The cost, accepted in D6: a record or photo deleted on the web inside the window the replacement lost comes back.
+- Tests: [test/dataset_generation_test.dart](../test/dataset_generation_test.dart), each guard proven by removal; on an
+  emulator against a scratch backend, a restore's lost record came back with a byte-identical photo (narcis-vibed
+  OPERATIONS §21.8).
+
+**The minimum build (TB-46).** `X-App-Build` carries `kAppBuild`; a 426 sets `AppState.updateRequired`, which stops sync
+(`canSync` false) without touching the session or the queue, and `main.dart` shows `UpdateRequiredScreen` at the root only
+— a form open above it can still be saved, and the record is queued for the updated build. Not persisted: the server says it
+again. `kAppBuild` must equal pubspec's `+N` ([test/app_version_test.dart](../test/app_version_test.dart) fails otherwise).
 
 **`syncAll` (the sync icon's tap-target).** Single entry point that runs four phases under one `_isSyncing` flag:
 1. **Push pending records.** Drain `_records.where(pendingSync)` via POST `/disturbances/`. Server's idempotent-on-UUID semantics mean retries are safe. Rows also carrying `pendingDelete` are **skipped** — see the delete queue below.
@@ -470,6 +524,8 @@ Many target devices (e.g. Samsung A56) reserve a strip at the bottom of the scre
 - N/A (full-bleed map + Scaffold-managed FAB whose default location respects view padding): `home_screen.dart`, `location_picker_screen.dart`.
 
 ## 16. Walk-around Schema (Oracle, prefix `TB_OBHOD*`)
+*From the cutover (TB-46): `beleznica.obhod` / `obhod_tocka` in narcis-vibed's Postgres, the same shape and FK rules (§12).*
+
 Defined in [tools/ords/walks_schema.sql](../tools/ords/walks_schema.sql). Same `TB_` prefix family as the disturbance schema (§12).
 
 **Tables:**

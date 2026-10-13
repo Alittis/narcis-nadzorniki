@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:narcis_nadzorniki/screens/home_screen.dart';
 import 'package:narcis_nadzorniki/screens/login_screen.dart';
+import 'package:narcis_nadzorniki/screens/update_required_screen.dart';
 import 'package:narcis_nadzorniki/state/app_state.dart';
 import 'package:provider/provider.dart';
 
@@ -60,6 +61,9 @@ class MotenjApp extends StatelessWidget {
             // While init() restores any persisted session, show a brief splash
             // instead of flashing the login screen on every cold start.
             if (state.isBootstrapping) return const _SplashScreen();
+            // TB-46: at the root only — a form open above it can still be
+            // saved, and the record is queued for the updated build.
+            if (state.updateRequired) return const UpdateRequiredScreen();
             return state.isAuthenticated
                 ? const HomeScreen()
                 : const LoginScreen();

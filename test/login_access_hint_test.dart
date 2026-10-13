@@ -1,8 +1,7 @@
-// TB-28: the server's 401 says "Neveljavni podatki za prijavo." both for a
-// wrong password and for an account without the TERENSKA-BELEZNICA right, so
-// after that answer the login screen also says the right is needed and whom to
-// ask. Other failures (offline, a refused TB-48 login) never reached the
-// server's check and get no hint.
+// TB-28: a login refused with the right password says why, and whom to ask.
+// Since TB-46 the server tells the cases apart — `reason` not_authorized (no
+// TERENSKA-BELEZNICA right) or no_org — so the hint follows the reason. A
+// wrong password (401, no reason) and the offline failures get no hint.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -38,7 +37,43 @@ Future<void> _submit(WidgetTester tester, AuthResult result) async {
 }
 
 void main() {
-  testWidgets('a server 401 shows the hint under the error', (tester) async {
+  testWidgets('not_authorized: the server says why, the hint says whom to ask',
+      (tester) async {
+    await _submit(
+      tester,
+      const AuthResult(
+        success: false,
+        message: 'Geslo je pravilno, vendar vaš račun nima pravice za '
+            'Terensko beležnico (TERENSKA-BELEZNICA).',
+        rejectedByServer: true,
+        reason: 'not_authorized',
+      ),
+    );
+
+    expect(find.textContaining('nima pravice'), findsOneWidget);
+    expect(find.text(accessHintText), findsOneWidget);
+    expect(accessHintText, contains('TERENSKA-BELEZNICA'));
+    expect(accessHintText, contains('admin@alittis.com'));
+  });
+
+  testWidgets('no_org: its own hint', (tester) async {
+    await _submit(
+      tester,
+      const AuthResult(
+        success: false,
+        message: 'Geslo je pravilno, vendar vaš račun ni povezan z nobeno '
+            'organizacijo, zato zapisov ni mogoče shraniti.',
+        rejectedByServer: true,
+        reason: 'no_org',
+      ),
+    );
+
+    expect(find.text(noOrgHintText), findsOneWidget);
+    expect(find.text(accessHintText), findsNothing);
+    expect(noOrgHintText, contains('admin@alittis.com'));
+  });
+
+  testWidgets('a wrong password: the generic error, no hint', (tester) async {
     await _submit(
       tester,
       const AuthResult(
@@ -49,9 +84,8 @@ void main() {
     );
 
     expect(find.text('Neveljavni podatki za prijavo.'), findsOneWidget);
-    expect(find.text(accessHintText), findsOneWidget);
-    expect(accessHintText, contains('TERENSKA-BELEZNICA'));
-    expect(accessHintText, contains('admin@alittis.com'));
+    expect(find.text(accessHintText), findsNothing);
+    expect(find.text(noOrgHintText), findsNothing);
   });
 
   testWidgets('an offline failure shows the error but no hint',

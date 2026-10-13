@@ -3,27 +3,49 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
+import 'package:narcis_nadzorniki/app_version.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
 import 'package:narcis_nadzorniki/models/disturbance_photo.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
 import 'package:narcis_nadzorniki/models/walk.dart';
 
-/// Carrier for the `X-Narcis-Auth` credential sent on every disturbance/walk
+/// The field-app API on the narcis-vibed host (TB-46, narcis-vibed NV-259),
+/// without a trailing slash: that host redirects `…/disturbances/` with a 308,
+/// which a POST does not follow. A debug build can point at a scratch backend:
+/// `--dart-define=BELEZNICA_API=http://127.0.0.1:3101/api/beleznica/app/v1`.
+const String kBeleznicaApi = String.fromEnvironment(
+  'BELEZNICA_API',
+  defaultValue: 'https://narcis.alittis.com/api/beleznica/app/v1',
+);
+
+/// Carrier for the `Authorization` credential sent on every disturbance/walk
 /// CRUD call. See ARCHITECTURE.md §9bis.
 class SyncCredentials {
-  /// Preferred: a bearer session token minted by `/app-auth/login`. Sent as
-  /// `X-Narcis-Auth: Bearer <token>` so the user's password is never re-sent.
+  /// Preferred: a bearer session token minted by `prijava`. Sent as
+  /// `Authorization: Bearer <token>` so the user's password is never re-sent.
   const SyncCredentials.token(String token) : authHeaderValue = 'Bearer $token';
 
-  /// Fallback for a backend that didn't mint a token (older ORDS deploy): the
-  /// password is held in memory for the session only and sent as
-  /// `X-Narcis-Auth: Basic <base64(email:password)>`. Never persisted.
+  /// Fallback for a backend that didn't mint a token: the password is held in
+  /// memory for the session only and sent as
+  /// `Authorization: Basic <base64(email:password)>`. Never persisted. The
+  /// field-app API mints on every login and accepts only Bearer, so this is
+  /// unreachable there; it stays for the shape of the session code.
   SyncCredentials.basic({required String email, required String password})
       : authHeaderValue =
             'Basic ${base64Encode(utf8.encode('$email:$password'))}';
 
-  /// The full `X-Narcis-Auth` header value (scheme + credential).
+  /// The full `Authorization` header value (scheme + credential).
   final String authHeaderValue;
+}
+
+/// A list GET's items plus the dataset generation it was served under
+/// (`X-Beleznica-Generation`, narcis-vibed NV-259 D6). Null when the server
+/// sent none.
+class RemoteList<T> {
+  const RemoteList(this.items, this.generation);
+
+  final List<T> items;
+  final String? generation;
 }
 
 /// Thrown for any non-success response from the disturbance endpoints, plus
@@ -38,6 +60,9 @@ class RemoteApiException implements Exception {
   final Object? cause;
 
   bool get isUnauthorized => statusCode == 401;
+
+  /// 426: this build is below the server's minimum (TB-46).
+  bool get isUpdateRequired => statusCode == 426;
   bool get isNotFound => statusCode == 404;
   bool get isNetwork => statusCode == null;
 
@@ -245,29 +270,38 @@ class RemoteWalk {
   }
 }
 
-/// HTTP client for the disturbance + walk-around CRUD endpoints at
-/// `https://narcis.gov.si/ords/narcis/`. See ARCHITECTURE.md §9.3 and §9.4.
+/// HTTP client for the disturbance + walk-around CRUD endpoints of the
+/// field-app API ([kBeleznicaApi]). See ARCHITECTURE.md §9.3 and §9.4.
 class RemoteApi {
   RemoteApi({
     http.Client? client,
-    Uri? baseUrl,
-    Uri? walksBaseUrl,
+    Uri? apiBase,
     Duration? timeout,
   })  : _client = client ?? http.Client(),
-        _baseUrl = baseUrl ??
-            Uri.parse('https://narcis.gov.si/ords/narcis/disturbances/'),
-        _walksBaseUrl = walksBaseUrl ??
-            Uri.parse('https://narcis.gov.si/ords/narcis/walks/'),
+        _apiBase = apiBase ?? Uri.parse(kBeleznicaApi),
         _timeout = timeout ?? const Duration(seconds: 30);
 
   final http.Client _client;
-  final Uri _baseUrl;
-  final Uri _walksBaseUrl;
+  final Uri _apiBase;
   final Duration _timeout;
 
-  Future<List<RemoteDisturbance>> fetchRecords(SyncCredentials credentials) async {
+  /// `<apiBase>/<segments…>`, each segment encoded; never a trailing slash.
+  Uri _at(List<String> segments) => _apiBase.replace(pathSegments: [
+        ..._apiBase.pathSegments.where((s) => s.isNotEmpty),
+        ...segments,
+      ]);
+
+  Uri get _recordsUrl => _at(['disturbances']);
+  Uri get _walksUrl => _at(['walks']);
+
+  static String? _generationOf(http.Response response) =>
+      response.headers['x-beleznica-generation'];
+
+  Future<RemoteList<RemoteDisturbance>> fetchRecords(
+    SyncCredentials credentials,
+  ) async {
     final response = await _send(
-      () => _client.get(_baseUrl, headers: _authHeaders(credentials)),
+      () => _client.get(_recordsUrl, headers: _authHeaders(credentials)),
     );
     _ensureStatus(response, const {200});
     final decoded = jsonDecode(response.body);
@@ -282,9 +316,12 @@ class RemoteApi {
         body: response.body,
       );
     }
-    return records
-        .map((e) => RemoteDisturbance.fromJson(e as Map<String, dynamic>))
-        .toList();
+    return RemoteList(
+      records
+          .map((e) => RemoteDisturbance.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      _generationOf(response),
+    );
   }
 
   Future<void> createRecord(
@@ -293,7 +330,7 @@ class RemoteApi {
   ) async {
     final response = await _send(
       () => _client.post(
-        _baseUrl,
+        _recordsUrl,
         headers: _jsonHeaders(credentials),
         body: jsonEncode(_payload(disturbance)),
       ),
@@ -339,7 +376,8 @@ class RemoteApi {
       () => _client.post(
         _photoUri(motnjaId, photoId),
         headers: {
-          'X-Narcis-Auth': credentials.authHeaderValue,
+          'Authorization': credentials.authHeaderValue,
+          'X-App-Build': '$kAppBuild',
           'Content-Type': mimeType,
           'Accept': 'application/json',
         },
@@ -358,7 +396,8 @@ class RemoteApi {
       () => _client.get(
         _photoUri(motnjaId, photoId),
         headers: {
-          'X-Narcis-Auth': credentials.authHeaderValue,
+          'Authorization': credentials.authHeaderValue,
+          'X-App-Build': '$kAppBuild',
           'Accept': '*/*',
         },
       ),
@@ -381,9 +420,11 @@ class RemoteApi {
     _ensureStatus(response, const {200, 204, 404});
   }
 
-  Future<List<RemoteWalk>> fetchWalks(SyncCredentials credentials) async {
+  Future<RemoteList<RemoteWalk>> fetchWalks(
+    SyncCredentials credentials,
+  ) async {
     final response = await _send(
-      () => _client.get(_walksBaseUrl, headers: _authHeaders(credentials)),
+      () => _client.get(_walksUrl, headers: _authHeaders(credentials)),
     );
     _ensureStatus(response, const {200});
     final decoded = jsonDecode(response.body);
@@ -396,9 +437,10 @@ class RemoteApi {
         body: response.body,
       );
     }
-    return walks
-        .map((e) => RemoteWalk.fromJson(e as Map<String, dynamic>))
-        .toList();
+    return RemoteList(
+      walks.map((e) => RemoteWalk.fromJson(e as Map<String, dynamic>)).toList(),
+      _generationOf(response),
+    );
   }
 
   Future<List<WalkPoint>> fetchWalkPoints(
@@ -422,7 +464,7 @@ class RemoteApi {
   Future<void> createWalk(Walk walk, SyncCredentials credentials) async {
     final response = await _send(
       () => _client.post(
-        _walksBaseUrl,
+        _walksUrl,
         headers: _jsonHeaders(credentials),
         body: jsonEncode(_walkPayload(walk)),
       ),
@@ -453,9 +495,8 @@ class RemoteApi {
     _ensureStatus(response, const {200, 204, 404});
   }
 
-  Uri _walkUri(String id) => _walksBaseUrl.resolve(Uri.encodeComponent(id));
-  Uri _walkPointsUri(String id) =>
-      _walksBaseUrl.resolve('${Uri.encodeComponent(id)}/points');
+  Uri _walkUri(String id) => _at(['walks', id]);
+  Uri _walkPointsUri(String id) => _at(['walks', id, 'points']);
 
   Map<String, dynamic> _walkPayload(Walk w) => {
         'id': w.id,
@@ -466,12 +507,10 @@ class RemoteApi {
         'points': w.points.map((p) => p.toJson()).toList(),
       };
 
-  Uri _recordUri(String id) => _baseUrl.resolve(Uri.encodeComponent(id));
+  Uri _recordUri(String id) => _at(['disturbances', id]);
 
   Uri _photoUri(String motnjaId, String photoId) =>
-      _baseUrl.resolve(
-        '${Uri.encodeComponent(motnjaId)}/photos/${Uri.encodeComponent(photoId)}',
-      );
+      _at(['disturbances', motnjaId, 'photos', photoId]);
 
   /// Headers for a request that carries NO body: GET and DELETE.
   ///
@@ -488,7 +527,8 @@ class RemoteApi {
   /// TB-2, and `tools/ords/test_disturbances.sh` only adds Content-Type when it
   /// actually sends a body, so the endpoint's own smoke test always passed.
   Map<String, String> _authHeaders(SyncCredentials credentials) => {
-        'X-Narcis-Auth': credentials.authHeaderValue,
+        'Authorization': credentials.authHeaderValue,
+        'X-App-Build': '$kAppBuild',
         'Accept': 'application/json',
       };
 

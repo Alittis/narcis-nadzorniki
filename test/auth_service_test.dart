@@ -17,6 +17,7 @@ import 'dart:math';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:narcis_nadzorniki/app_version.dart';
 import 'package:narcis_nadzorniki/services/auth_service.dart';
 
 class _InMemoryStore implements AuthCacheStore {
@@ -71,8 +72,12 @@ void main() {
     test('200 with authenticated:true succeeds', () async {
       final svc = _service(
         respond: (req) async {
-          // Verify the wire format: X-Narcis-Auth: Basic <base64(email:pw)>.
-          final header = req.headers['X-Narcis-Auth'];
+          // The wire format (TB-46): POST prijava with
+          // Authorization: Basic <base64(email:pw)>.
+          expect(req.method, 'POST');
+          expect(req.url.path, '/api/beleznica/app/v1/prijava');
+          expect(req.headers.containsKey('X-Narcis-Auth'), isFalse);
+          final header = req.headers['Authorization'];
           expect(header, startsWith('Basic '));
           final decoded = utf8.decode(base64Decode(header!.substring(6)));
           expect(decoded, 'alice@example.com:hunter2');
@@ -338,7 +343,7 @@ void main() {
       expect(await svc.readStoredSession(), isNull);
     });
 
-    test('revokeToken POSTs to /app-auth/logout with a Bearer header',
+    test('revokeToken POSTs to odjava with an Authorization Bearer header',
         () async {
       late http.Request captured;
       final svc = _service(
@@ -349,8 +354,126 @@ void main() {
       );
       await svc.revokeToken('tok-xyz');
       expect(captured.method, 'POST');
-      expect(captured.url.path, endsWith('/app-auth/logout'));
-      expect(captured.headers['X-Narcis-Auth'], 'Bearer tok-xyz');
+      expect(captured.url.path, '/api/beleznica/app/v1/odjava');
+      expect(captured.headers['Authorization'], 'Bearer tok-xyz');
+    });
+  });
+
+  // TB-46: the field-app API's login (narcis-vibed NV-259 P4).
+  group('the field-app login (TB-46)', () {
+    http.Response refused(String reason) => http.Response(
+        jsonEncode({
+          'authenticated': false,
+          'reason': reason,
+          'message': 'Geslo je pravilno, vendar …',
+        }),
+        401,
+        // As the server sends it; package:http reads such JSON as UTF-8.
+        headers: {'content-type': 'application/json'});
+
+    test('a refusal of a right password carries its reason (TB-28 half 2)',
+        () async {
+      for (final reason in ['not_authorized', 'no_org']) {
+        final store = _InMemoryStore();
+        final result = await _service(
+          respond: (_) async => refused(reason),
+          store: store,
+        ).login('alice@example.com', 'hunter2', online: true);
+        expect(result.success, isFalse);
+        expect(result.rejectedByServer, isTrue);
+        expect(result.reason, reason);
+        expect(result.message, 'Geslo je pravilno, vendar …');
+        expect(store._data, isEmpty, reason: 'a 401 still wipes the cache');
+      }
+    });
+
+    test('a wrong password has no reason', () async {
+      final result = await _service(respond: (_) async => _unauthorized())
+          .login('alice@example.com', 'x', online: true);
+      expect(result.rejectedByServer, isTrue);
+      expect(result.reason, isNull);
+    });
+
+    test('503 (NarcIS could not be asked) falls back to the offline cache '
+        'and keeps it', () async {
+      final store = _InMemoryStore();
+      await _service(
+        respond: (_) async => _okWithToken('alice@example.com', 'tok-1'),
+        store: store,
+      ).login('alice@example.com', 'hunter2', online: true);
+
+      final result = await _service(
+        respond: (_) async => http.Response(
+            '{"authenticated":false,"message":"…ni dosegljiv…"}', 503,
+            headers: {'content-type': 'application/json'}),
+        store: store,
+      ).login('alice@example.com', 'hunter2', online: true);
+      expect(result.success, isTrue);
+      expect(result.wasOffline, isTrue);
+      expect(store._data['narcis_auth_email'], 'alice@example.com');
+    });
+
+    test('login and logout name this build (X-App-Build)', () async {
+      final builds = <String?>[];
+      final svc = _service(respond: (req) async {
+        builds.add(req.headers['X-App-Build']);
+        return _okWithToken('alice@example.com', 'tok-1');
+      });
+      await svc.login('alice@example.com', 'hunter2', online: true);
+      await svc.revokeToken('tok-1');
+      expect(builds, ['$kAppBuild', '$kAppBuild']);
+    });
+
+    test('426 asks for the update and touches nothing stored', () async {
+      final store = _InMemoryStore();
+      await _service(
+        respond: (_) async => _okWithToken('alice@example.com', 'tok-1'),
+        store: store,
+      ).login('alice@example.com', 'hunter2', online: true);
+      final before = Map.of(store._data);
+
+      final result = await _service(
+        respond: (_) async => http.Response(
+            '{"error":"update_required","minBuild":99}', 426,
+            headers: {'content-type': 'application/json'}),
+        store: store,
+      ).login('alice@example.com', 'hunter2', online: true);
+      expect(result.success, isFalse);
+      expect(result.updateRequired, isTrue);
+      expect(result.rejectedByServer, isFalse);
+      expect(result.wasOffline, isFalse, reason: 'no offline fallback');
+      expect(store._data, before);
+    });
+
+    test('the token is stored under the new key', () async {
+      final store = _InMemoryStore();
+      await _service(
+        respond: (_) async => _okWithToken('alice@example.com', 'tok-1'),
+        store: store,
+      ).login('alice@example.com', 'hunter2', online: true);
+      expect(store._data['narcis_vibed_token'], 'tok-1');
+      expect(store._data.containsKey('narcis_auth_token'), isFalse);
+    });
+
+    test('an ORDS-era token is forgotten on start: no session, the offline '
+        'cache kept', () async {
+      final store = _InMemoryStore();
+      await _service(
+        respond: (_) async => _okWithToken('alice@example.com', 'tok-new'),
+        store: store,
+      ).login('alice@example.com', 'hunter2', online: true);
+      // What the last ORDS build left: the TB token under the old key.
+      store._data.remove('narcis_vibed_token');
+      store._data['narcis_auth_token'] = 'a' * 64;
+
+      final svc = _service(store: store);
+      expect(await svc.readStoredSession(), isNull);
+      expect(store._data.containsKey('narcis_auth_token'), isFalse);
+      expect(store._data['narcis_auth_email'], 'alice@example.com');
+      // …so an offline login still works until the user is back online.
+      final offline =
+          await svc.login('alice@example.com', 'hunter2', online: false);
+      expect(offline.success, isTrue);
     });
   });
 }

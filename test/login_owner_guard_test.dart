@@ -144,7 +144,7 @@ class _Harness {
   Future<void> boot() async {
     final client = MockClient((req) async {
       requests.add('${req.method} ${req.url.path} '
-          '${req.headers['X-Narcis-Auth'] ?? ''}');
+          '${req.headers['Authorization'] ?? ''}');
       if (req.method == 'GET') {
         return req.url.path.contains('/walks')
             ? _json({'walks': <dynamic>[]})

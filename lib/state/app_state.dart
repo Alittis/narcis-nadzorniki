@@ -5,6 +5,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:narcis_nadzorniki/data/dataset_generation_store.dart';
 import 'package:narcis_nadzorniki/data/disturbance_types.dart';
 import 'package:narcis_nadzorniki/data/local_store.dart';
 import 'package:narcis_nadzorniki/data/remote_api.dart';
@@ -28,12 +29,14 @@ class AppState extends ChangeNotifier {
     Connectivity? connectivity,
     AuthService? authService,
     PhotoStorage? photoStorage,
+    DatasetGenerationStore? generationStore,
   })  : _localStore = localStore ?? LocalStore(),
         _walksStore = walksStore ?? WalksLocalStore(),
         _remoteApi = remoteApi ?? RemoteApi(),
         _connectivity = connectivity ?? Connectivity(),
         _authService = authService ?? AuthService(),
-        _photoStorage = photoStorage ?? PhotoStorage();
+        _photoStorage = photoStorage ?? PhotoStorage(),
+        _generationStore = generationStore ?? DatasetGenerationStore();
 
   final LocalStore _localStore;
   final WalksLocalStore _walksStore;
@@ -41,6 +44,7 @@ class AppState extends ChangeNotifier {
   final Connectivity _connectivity;
   final AuthService _authService;
   final PhotoStorage _photoStorage;
+  final DatasetGenerationStore _generationStore;
   final _uuid = const Uuid();
 
   List<Disturbance> _records = [];
@@ -57,7 +61,7 @@ class AppState extends ChangeNotifier {
   // Bearer session token: the primary sync credential. Minted by the server on
   // a successful ONLINE login (see AuthService), persisted in secure storage,
   // and restored on app start for a sticky session across cold starts. Sent as
-  // X-Narcis-Auth: Bearer <token> on every CRUD call - the password is never
+  // Authorization: Bearer <token> on every CRUD call - the password is never
   // stored or re-sent. Cleared on logout and on a sync 401 (revoked/expired).
   String? _sessionToken;
   // Fallback credential: the plaintext password, held in memory ONLY for the
@@ -91,6 +95,21 @@ class AppState extends ChangeNotifier {
   StreamSubscription<dynamic>? _walkServicePortSub;
   Set<String>? _lastRemoteWalkIds;
 
+  // TB-46 (narcis-vibed NV-259 D6): the dataset generation the last complete
+  // pull was served under. A list served under another one means the server's
+  // data set was replaced — the cutover (the ORDS backend sent none) or a
+  // restore — so that pull RE-QUEUES this user's own records, photos and walks
+  // the server no longer lists, instead of evicting them, and the idempotent
+  // POSTs put them back. Other users' rows are evicted as always; their own
+  // phones re-send them. Stored once both lists were merged under it.
+  String? _knownGeneration;
+  // What the current sync re-queued; anything sends in a second pass at once.
+  int _requeued = 0;
+  // TB-46: the server answered 426 — this build is below its minimum. Sync
+  // stops (canSync), main.dart shows UpdateRequiredScreen at the root, and the
+  // queue stays for the updated build. Not persisted: the server says it again.
+  bool _updateRequired = false;
+
   /// TB-2: rows queued for deletion are hidden here, so the map, the lists and
   /// the counters all behave as though the delete already happened. Sync code
   /// works off `_records` directly and still sees them.
@@ -102,7 +121,10 @@ class AppState extends ChangeNotifier {
   String? get currentUser => _currentUser;
   bool get isAuthenticated => _currentUser != null;
   bool get canSync =>
-      _currentUser != null && (_sessionToken != null || _sessionPassword != null);
+      _currentUser != null &&
+      (_sessionToken != null || _sessionPassword != null) &&
+      !_updateRequired;
+  bool get updateRequired => _updateRequired;
   bool get isBootstrapping => _bootstrapping;
 
   List<Walk> get walks => List.unmodifiable(_walks);
@@ -126,6 +148,10 @@ class AppState extends ChangeNotifier {
       password,
       online: isOnline,
     );
+    if (result.updateRequired) {
+      _updateRequired = true;
+      notifyListeners();
+    }
     if (result.success) {
       final owner = _unsentOwnerOtherThan(result.user ?? email);
       if (owner != null) {
@@ -353,6 +379,7 @@ class AppState extends ChangeNotifier {
         _lastObservers = _records.last.observers;
       }
       _walks = await _walksStore.load();
+      _knownGeneration = await _generationStore.load();
       // Resume any in-progress walk. The FGS background isolate is the
       // source of truth for points; if its FGS is still running (Samsung
       // Freecess froze main but kept the FGS alive), just rebuild the
@@ -650,6 +677,7 @@ class AppState extends ChangeNotifier {
       return;
     }
     _isSyncing = true;
+    _requeued = 0;
     notifyListeners();
     try {
       // 1. Walks first. The disturbance FK on TB_MOTNJE.OBHOD_ID requires
@@ -701,13 +729,32 @@ class AppState extends ChangeNotifier {
       // fetched moments earlier.
       await _drainPendingDeletes();
       // Pull remote list to surface any IDs the device doesn't have locally.
-      await _pullRemoteWalks();
+      final walksGeneration = await _pullRemoteWalks();
       await _prefetchAllWalkPoints();
-      await _pullRemote();
+      final recordsGeneration = await _pullRemote();
+      // D6: remember a new generation only once BOTH lists were merged under
+      // it. Stored after the walks alone, the records pull would see no change
+      // and evict exactly what the guard is there to re-send. Stored last, so a
+      // crash before it only repeats a re-queue, never an eviction.
+      if (walksGeneration != null &&
+          walksGeneration == recordsGeneration &&
+          walksGeneration != _knownGeneration) {
+        debugPrint('[sync] dataset generation $_knownGeneration → '
+            '$walksGeneration ($_requeued re-queued)');
+        _knownGeneration = walksGeneration;
+        await _generationStore.save(walksGeneration);
+      }
     } finally {
       _isSyncing = false;
       notifyListeners();
       debugPrint('[sync] syncAll() exit');
+    }
+    // The re-queued rows go now, not at the next trigger. A second pass
+    // re-queues nothing new: the generation is known by then, and a row that
+    // is already pending is not counted again.
+    if (_requeued > 0) {
+      _requeued = 0;
+      unawaited(syncAll());
     }
   }
 
@@ -845,23 +892,68 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _pullRemote() async {
+  /// Returns the generation the list was served under, or null when the pull
+  /// failed (or the server sent none).
+  Future<String?> _pullRemote() async {
     final creds = _credentials;
-    if (creds == null) return;
+    if (creds == null) return null;
     try {
       final remote = await _remoteApi.fetchRecords(creds);
-      _lastRemoteIds = remote.map((r) => r.id).toSet();
-      _records = _mergeRemoteIntoLocal(remote);
+      _lastRemoteIds = remote.items.map((r) => r.id).toSet();
+      final renewed = _isNewGeneration(remote.generation);
+      final onDisk = renewed
+          ? await _unlistedOwnPhotosOnDisk(remote.items)
+          : const <String>{};
+      _records = _mergeRemoteIntoLocal(
+        remote.items,
+        renewed: renewed,
+        photosOnDisk: onDisk,
+      );
       await _localStore.save(_records);
       notifyListeners();
+      return remote.generation;
     } on RemoteApiException catch (e) {
       _handleSyncException(e);
       // Network/5xx: leave _lastRemoteIds alone so the divergence indicator
       // reflects whatever the most recent successful pull saw.
+      return null;
     }
   }
 
-  List<Disturbance> _mergeRemoteIntoLocal(List<RemoteDisturbance> remote) {
+  /// D6: a list served under a generation this device has not merged yet. A
+  /// list with no generation tells nothing, and is merged as always.
+  bool _isNewGeneration(String? generation) =>
+      generation != null && generation != _knownGeneration;
+
+  /// D6: the photos of this user's own synced records that the server does not
+  /// list and whose file is still on the device — the ones a re-queue can send
+  /// back. A photo with no file here cannot go back.
+  Future<Set<String>> _unlistedOwnPhotosOnDisk(
+    List<RemoteDisturbance> remote,
+  ) async {
+    final listed = {
+      for (final r in remote)
+        for (final p in r.photos) p.id,
+    };
+    final out = <String>{};
+    for (final r in _records) {
+      if (r.pendingSync || r.pendingDelete || !isAuthoredByCurrentUser(r)) {
+        continue;
+      }
+      for (final p in r.photos) {
+        final path = p.localPath;
+        if (p.pendingUpload || path == null || listed.contains(p.id)) continue;
+        if (await File(path).exists()) out.add(p.id);
+      }
+    }
+    return out;
+  }
+
+  List<Disturbance> _mergeRemoteIntoLocal(
+    List<RemoteDisturbance> remote, {
+    bool renewed = false,
+    Set<String> photosOnDisk = const {},
+  }) {
     final remoteIds = remote.map((r) => r.id).toSet();
     // Seed with local records that are either (a) still claimed by the
     // server or (b) queued for push (pendingSync). This evicts non-pending
@@ -869,11 +961,24 @@ class AppState extends ChangeNotifier {
     // caller's org changed (e.g. same device, different tester account).
     // Without this gate, the previous session's records render on the map
     // for the new user (cross-account bleed).
-    final byId = <String, Disturbance>{
-      for (final r in _records)
-        if (r.pendingSync || r.pendingDelete || remoteIds.contains(r.id))
-          r.id: r,
-    };
+    final byId = <String, Disturbance>{};
+    for (final r in _records) {
+      if (r.pendingSync || r.pendingDelete || remoteIds.contains(r.id)) {
+        byId[r.id] = r;
+      } else if (renewed && isAuthoredByCurrentUser(r)) {
+        // D6 (TB-46): the server's data set was replaced and lost this record.
+        // Send it again, with every photo whose file is still here.
+        byId[r.id] = r.copyWith(
+          pendingSync: true,
+          photos: [
+            for (final p in r.photos)
+              if (photosOnDisk.contains(p.id)) p.copyWith(pendingUpload: true),
+          ],
+        );
+        _requeued++;
+        debugPrint('[sync] re-queued own record ${r.id} (new generation)');
+      }
+    }
     for (final remoteRec in remote) {
       final local = byId[remoteRec.id];
       if (local == null) {
@@ -899,9 +1004,19 @@ class AppState extends ChangeNotifier {
         // record fields, but preserve any localPaths we already cached for
         // photos so we don't re-download.
         final mergedPhotos = _mergePhotos(local.photos, remoteRec.photos);
+        // D6 (TB-46; owner, 2026-10-13): the record survived the replacement
+        // but a photo of it did not — this user's own photo goes back too.
+        final lost = renewed && isAuthoredByCurrentUser(local)
+            ? [
+                for (final p in local.photos)
+                  if (photosOnDisk.contains(p.id))
+                    p.copyWith(pendingUpload: true),
+              ]
+            : const <DisturbancePhoto>[];
+        _requeued += lost.length;
         byId[remoteRec.id] = remoteRec.toLocal().copyWith(
               types: _resolveTypeNames(remoteRec.types),
-              photos: mergedPhotos,
+              photos: [...mergedPhotos, ...lost],
             );
       }
     }
@@ -1307,17 +1422,24 @@ class AppState extends ChangeNotifier {
     return true;
   }
 
-  Future<void> _pullRemoteWalks() async {
+  /// Returns the generation the list was served under, or null when the pull
+  /// failed (or the server sent none).
+  Future<String?> _pullRemoteWalks() async {
     final creds = _credentials;
-    if (creds == null) return;
+    if (creds == null) return null;
     try {
       final remote = await _remoteApi.fetchWalks(creds);
-      _lastRemoteWalkIds = remote.map((r) => r.id).toSet();
-      _walks = _mergeRemoteWalksIntoLocal(remote);
+      _lastRemoteWalkIds = remote.items.map((r) => r.id).toSet();
+      _walks = _mergeRemoteWalksIntoLocal(
+        remote.items,
+        renewed: _isNewGeneration(remote.generation),
+      );
       await _walksStore.save(_walks);
       notifyListeners();
+      return remote.generation;
     } on RemoteApiException catch (e) {
       _handleSyncException(e);
+      return null;
     }
   }
 
@@ -1352,14 +1474,27 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  List<Walk> _mergeRemoteWalksIntoLocal(List<RemoteWalk> remote) {
+  List<Walk> _mergeRemoteWalksIntoLocal(
+    List<RemoteWalk> remote, {
+    bool renewed = false,
+  }) {
     final remoteIds = remote.map((w) => w.id).toSet();
     // Same cross-account-bleed eviction as _mergeRemoteIntoLocal — keep
     // pendingSync walks plus anything the server still claims.
-    final byId = <String, Walk>{
-      for (final w in _walks)
-        if (w.pendingSync || remoteIds.contains(w.id)) w.id: w,
-    };
+    final byId = <String, Walk>{};
+    for (final w in _walks) {
+      if (w.pendingSync || remoteIds.contains(w.id)) {
+        byId[w.id] = w;
+      } else if (renewed && isWalkAuthoredByCurrentUser(w)) {
+        // D6 (TB-46): re-sent with the points this device holds. They are all
+        // here for a walk recorded on it, or prefetched by an earlier sync; a
+        // walk sent without them still lets its records link to it again.
+        byId[w.id] = w.copyWith(pendingSync: true);
+        _requeued++;
+        debugPrint('[sync] re-queued own walk ${w.id} '
+            '(${w.points.length} points, new generation)');
+      }
+    }
     for (final r in remote) {
       final local = byId[r.id];
       if (local == null) {
@@ -1388,6 +1523,11 @@ class AppState extends ChangeNotifier {
   // -------------------------------------------------------------------------
 
   void _handleSyncException(RemoteApiException e) {
+    if (e.isUpdateRequired && !_updateRequired) {
+      // TB-46: keep the session and the queue; the updated build sends it.
+      _updateRequired = true;
+      notifyListeners();
+    }
     if (e.isUnauthorized) {
       // Token (or password) no longer accepted: drop the sync credential and
       // wipe the persisted token + offline cache so the next cold start lands
