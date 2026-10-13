@@ -759,7 +759,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   which was corrected in the same pass: it had the merged-manifest path as `android/app/build/…`.
 
 ### TB-28 · Login says "wrong credentials" when the real problem is a missing TERENSKA-BELEZNICA authorization
-`✨ Enhancement` · `P1` · `Todo` · Maintainer-initiated · Updated: 2026-08-29
+`✨ Enhancement` · `P1` · `Done` (half 1 in source, release pending; half 2 moves to [TB-46](#tb-46--move-the-app-to-the-postgres-backend-on-the-vps-phone-side-of-narcis-vibed-nv-259)) · Maintainer-initiated · Updated: 2026-10-13
 
 - **Problem:** Registration in NarcIS is **not enough** to use Terenska beležnica. The account
   must additionally hold the `TERENSKA-BELEZNICA` function authorization, granted by an
@@ -825,7 +825,27 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Discussion:** Contact addressee, per the bullet above — publisher (`admin@alittis.com`, today's
   closed-test answer) vs. the organisation's administrator (the production answer). Half 1 cannot
   ship until this is settled, since the whole point is naming someone.
-- **Shipped:** —
+  **RESOLVED 2026-10-13 (owner):** `admin@alittis.com`, the closed-test answer, so the two invite
+  templates in `PLAY_CLOSED_TEST.md` need no change. When the addressee becomes the organisation's
+  administrator, change the hint (`accessHintText`) and both templates together.
+- **Half 2 is not built on ORDS.** TB-46's `prijava` route already answers `reason: "not_authorized"`
+  for this branch (NV-259 plan §7), and TB-46 renders it as guidance. An ORDS re-publish now would be
+  retired at the cutover.
+- **Built 2026-10-13 (half 1, phone only, no server change):**
+  - `AuthResult.rejectedByServer` ([`auth_service.dart`](../lib/services/auth_service.dart)) is set only on
+    the online 401. Offline failures, network errors and TB-48's refused login never reached the server's
+    function check, so they get no hint.
+  - [`login_screen.dart`](../lib/screens/login_screen.dart) shows `accessHintText` in a dark box under the
+    red error: if the password is right, the account may lack the right for Terenska beležnica;
+    registration in NarcIS is not enough; `TERENSKA-BELEZNICA` is needed; write to `admin@alittis.com`.
+    *"morda nima"* covers both "not assigned yet" and "no longer assigned".
+  - Tests: [`login_access_hint_test.dart`](../test/login_access_hint_test.dart) (a server 401 shows the hint;
+    an offline failure shows the error without it), plus `rejectedByServer` assertions on the 401, the
+    no-cache network error and the offline wrong password in `auth_service_test.dart`.
+  - **Checked by removal:** without `rejectedByServer: true` on the 401 path, the auth test fails; with
+    the hint keyed on any failure, the offline test fails; with the hint never set, the 401 test fails.
+    Full suite 199/199; `flutter analyze` at the documented 10 info lints.
+- **Shipped:** — in source, release pending (batched with the next release).
 
 ### TB-29 · Retire age colouring end to end — the walk map, and the Starost filter with it
 `🔧 Chore` · `P2` · `Done` (shipped v1.7.0+16; rolled out on the Play Closed testing track 2026-08-31) · Reporter: maintainer (on the v1.6.0+15 rollout) · Updated: 2026-08-31

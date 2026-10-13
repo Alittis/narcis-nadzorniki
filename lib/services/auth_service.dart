@@ -14,6 +14,7 @@ class AuthResult {
     this.user,
     this.message,
     this.wasOffline = false,
+    this.rejectedByServer = false,
     this.token,
   });
 
@@ -24,6 +25,11 @@ class AuthResult {
   /// True when a successful login was served from the local PBKDF2 cache
   /// (i.e. no network round-trip succeeded).
   final bool wasOffline;
+
+  /// True when the server answered 401. Its one message covers a wrong
+  /// password and a missing TERENSKA-BELEZNICA right alike (TB-28), so the
+  /// login screen adds a hint about the right only in this case.
+  final bool rejectedByServer;
 
   /// Bearer session token minted by the server on a successful ONLINE login.
   /// Null when the login was served offline, or when the backend didn't mint
@@ -220,6 +226,7 @@ class AuthService {
         return AuthResult(
           success: false,
           message: (body['message'] as String?) ?? 'Prijava ni uspela.',
+          rejectedByServer: true,
         );
       }
 

@@ -105,6 +105,7 @@ void main() {
           await svc.login('alice@example.com', 'hunter2', online: true);
       expect(result.success, false);
       expect(result.message, contains('Neveljavni'));
+      expect(result.rejectedByServer, isTrue, reason: 'TB-28 hint keys on it');
       // Cache must be wiped so a revoked user cannot fall back offline.
       expect(store._data.isEmpty, true);
     });
@@ -138,6 +139,7 @@ void main() {
           await svc.login('alice@example.com', 'hunter2', online: true);
       expect(result.success, false);
       expect(result.message, contains('Brez povezave'));
+      expect(result.rejectedByServer, isFalse);
     });
   });
 
@@ -170,6 +172,7 @@ void main() {
           await svc.login('alice@example.com', 'WRONG', online: false);
       expect(result.success, false);
       expect(result.message, contains('napačno geslo'));
+      expect(result.rejectedByServer, isFalse);
     });
 
     test('different email against valid cache fails', () async {

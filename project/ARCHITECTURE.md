@@ -74,7 +74,7 @@
 - ORDS module: `narcis_app_auth`, base path `app-auth/`, template `login`.
 - Server logic: email → `app_user` lookup (case-insensitive, whitespace-tolerant), then `pkg_narcis_uporabniki.preveri_geslo`, then `pkg_narcis_authorization.has_function_by_id('TERENSKA-BELEZNICA', app_user)`. Any failure → 401 with a single generic message (no enumeration).
 - 200: `{"authenticated":true,"user":"<email>","token":"<64-hex>","expiresAt":"<iso-8601 UTC>"}`. `token`/`expiresAt` are present when minting succeeds (see §12bis); the client sends the token as `X-Narcis-Auth: Bearer <token>` on subsequent calls. If minting fails the handler still returns a tokenless 200 (the client falls back to its in-memory Basic path), so login never hard-fails on a token-store fault. Older clients ignore the extra keys.
-- 401: `{"authenticated":false,"message":"Neveljavni podatki za prijavo."}`
+- 401: `{"authenticated":false,"message":"Neveljavni podatki za prijavo."}`. The client adds a hint about the TERENSKA-BELEZNICA right under it (TB-28, §9bis); the server message stays generic.
 - CORS: inherited from ORDS pool (`Access-Control-Allow-Origin: *`, confirmed live).
 - Source: [tools/ords/auth_login.sql](../tools/ords/auth_login.sql).
 - Status: deployed and smoke-tested (2026-04-25). All four probes pass: no header → 401, bad creds → 401, empty password → 401, valid creds → 200 with `{"authenticated":true,"user":"..."}`. A56 real-device validation also passed on the same date. Currently still carries debug instrumentation (`narcis_auth_debug` table + per-request env dump); credentials redacted as of 2026-04-25, see §8 for cleanup checklist gating.
@@ -201,7 +201,7 @@ Implemented in [lib/services/auth_service.dart](../lib/services/auth_service.dar
 **Online path** (when `AppState.isOnline`):
 1. Build `X-Narcis-Auth: Basic <base64(email:password)>` and GET §9.1.
 2. On HTTP 200 with `authenticated:true`: persist the PBKDF2 cache (schema below) **and** the returned bearer token (`narcis_auth_token`), and return success carrying the token. If the response had no `token` (older backend), the caller keeps the password in memory for that session only (Basic fallback) — nothing extra is persisted.
-3. On HTTP 401: **wipe** the offline cache **and** the stored token, and return failure. This propagates server-side TERENSKA-BELEZNICA revocation to the device on the next online attempt.
+3. On HTTP 401: **wipe** the offline cache **and** the stored token, and return failure with `rejectedByServer = true`. This propagates server-side TERENSKA-BELEZNICA revocation to the device on the next online attempt. The login screen then shows `accessHintText` under the error: the one 401 message covers a wrong password and a missing TERENSKA-BELEZNICA right alike, so the hint says the right is needed and names `admin@alittis.com` (TB-28). No other failure shows it.
 4. On network error / timeout / 5xx: fall through to the offline path.
 
 **Offline path** (used as primary when `AppState.isOnline` is false, or as fallback after a network error):

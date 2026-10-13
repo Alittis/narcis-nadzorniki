@@ -3,6 +3,14 @@ import 'package:flutter/services.dart';
 import 'package:narcis_nadzorniki/state/app_state.dart';
 import 'package:provider/provider.dart';
 
+/// Shown under the error after the server rejects a login (TB-28). Names the
+/// publisher, who provisions closed-test accounts; at production scale the
+/// addressee becomes the organisation's administrator.
+const accessHintText =
+    'Če je geslo pravilno, vaš račun morda nima pravice za Terensko '
+    'beležnico. Registracija v NarcIS ni dovolj: potrebna je tudi pravica '
+    'TERENSKA-BELEZNICA. Za dodelitev pišite na admin@alittis.com.';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -16,6 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _submitting = false;
   String? _error;
+  bool _accessHint = false;
 
   @override
   void dispose() {
@@ -31,6 +40,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       _submitting = true;
       _error = null;
+      _accessHint = false;
     });
     final result = await context.read<AppState>().login(
       _emailController.text,
@@ -52,6 +62,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       _submitting = false;
       _error = result.success ? null : (result.message ?? 'Prijava ni uspela.');
+      _accessHint = !result.success && result.rejectedByServer;
     });
   }
 
@@ -198,6 +209,28 @@ class _LoginScreenState extends State<LoginScreen> {
                                 _error!,
                                 style: const TextStyle(color: Colors.white),
                                 textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ],
+                          // TB-28: the server's 401 reads the same for a
+                          // wrong password and a missing app right.
+                          if (_accessHint) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 10,
+                                horizontal: 14,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.6),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Text(
+                                accessHintText,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                ),
                               ),
                             ),
                           ],
