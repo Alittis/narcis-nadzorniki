@@ -69,6 +69,18 @@ class PhotoStorage {
     return dest.path;
   }
 
+  /// Whether the photo's stable copy exists (TB-52). False for one still on
+  /// image_picker's temp file because [savePicked] failed (TB-51).
+  Future<bool> isStored({
+    required String motnjaId,
+    required String photoId,
+    required String mimeType,
+  }) async {
+    final root = await _root();
+    final ext = extensionForMime(mimeType);
+    return File('${root.path}/$motnjaId/$photoId.$ext').exists();
+  }
+
   /// Writes raw bytes (e.g. from a server download) to the canonical path.
   Future<String> saveBytes({
     required String motnjaId,

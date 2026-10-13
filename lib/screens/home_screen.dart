@@ -20,6 +20,7 @@ import 'package:narcis_nadzorniki/services/place_search_service.dart';
 import 'package:narcis_nadzorniki/services/track_polish.dart';
 import 'package:narcis_nadzorniki/state/app_state.dart';
 import 'package:narcis_nadzorniki/widgets/basemap.dart';
+import 'package:narcis_nadzorniki/widgets/lost_photos_dialog.dart';
 import 'package:narcis_nadzorniki/widgets/motnje_filter_sheet.dart';
 import 'package:narcis_nadzorniki/widgets/obmocja_picker.dart';
 import 'package:narcis_nadzorniki/widgets/obmocje_sheet.dart';
@@ -121,12 +122,28 @@ class _HomeScreenState extends State<HomeScreen> {
   // Location stamped at the moment the user declared intent (tapped "+"),
   // so a downstream camera or type-selection step can't drift the GPS.
   LatLng? _capturedLocation;
+  late final AppState _appState;
 
   @override
   void initState() {
     super.initState();
     _bootstrapView();
     _restoreLayers();
+    // TB-52: a photo dropped during a sync is announced once, over whatever
+    // screen is open. Checked after the first frame too, for one dropped
+    // before this screen existed.
+    _appState = context.read<AppState>()..addListener(_tellLostPhotos);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _tellLostPhotos());
+  }
+
+  void _tellLostPhotos() {
+    if (!mounted) return;
+    final lost = _appState.takeLostPhotos();
+    if (lost.isEmpty) return;
+    // After the frame: AppState may notify while the tree is building.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) showLostPhotosDialog(context, lost);
+    });
   }
 
   /// TB-40: the layer setup the user left the map with.
@@ -158,6 +175,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _appState.removeListener(_tellLostPhotos);
     _positionSub?.cancel();
     super.dispose();
   }

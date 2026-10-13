@@ -1910,7 +1910,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** — in source, release pending (batched with the next release).
 
 ### TB-52 · A photo left on image_picker's cache file can vanish before it uploads
-`🐞 Bug` · `P3` · `Todo` (decided 2026-10-13; build together with TB-53) · Reporter: Claude (found during TB-51, 2026-10-13) · Updated: 2026-10-13
+`🐞 Bug` · `P3` · `Done` (in source, release pending; built with TB-53) · Reporter: Claude (found during TB-51, 2026-10-13) · Updated: 2026-10-13
 - **Problem:** when `PhotoStorage.savePicked` fails (TB-51), `_materializePhotos` keeps the photo on
   `image_picker`'s output file. `image_picker_android` 0.8.13+13 writes that file to the app's cache
   directory (`ImageResizer` → `context.getCacheDir()`). Android may delete cache files when it needs
@@ -1944,12 +1944,42 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
      record, save, and raise the one-time notice. Replace the bare `catch (_)` and its comment.
   3. Optional: say so at save time when `savePicked` fails, while the photo still exists and the user
      can free space.
-- **To verify when built:** as in TB-51, make the real `savePicked` fail, then delete the temp file
-  before the drain. Assert the photo is gone from the record, the badge clears, and the notice is raised
-  exactly once. Check by removal.
+- **Fixed (2026-10-13)** in `_drainPendingPhotos`, before a pending photo is read:
+  - **Retry:** `PhotoStorage.isStored` says whether the photo's stable copy exists. If it does not,
+    `savePicked` runs again from the photo's current path, and on success the photo is repointed to the
+    copy. Any error leaves the photo as it was.
+  - **Drop:** if the file the photo points at no longer exists, `_dropLostPhoto` removes it from the
+    record and notes it for `AppState.takeLostPhotos`, which hands the drops over once. The bare
+    `catch (_)` and its *"can re-attach"* comment are gone. A file that exists but cannot be read
+    stays pending.
+  - **Notice:** `HomeScreen` listens to `AppState` and, after the frame, shows `showLostPhotosDialog`
+    ([`lost_photos_dialog.dart`](../lib/widgets/lost_photos_dialog.dart)). `HomeScreen` stays mounted
+    under every pushed screen, so the dialog appears over whatever is open. It also checks once after
+    its first frame, for a drop made before it existed.
+  - **Wording (one photo):** title *"Fotografije ni bilo mogoče poslati"*, then *"Fotografije ni bilo
+    več v telefonu, ko jo je aplikacija poskušala poslati, zato je ni mogoče obnoviti. Zapis je shranjen
+    brez nje:"*, each record as `dd.MM.yyyy HH:mm · types`, and a *Razumem* button. A plural form
+    (*"Nekaj fotografij …"*) covers several photos.
+  - **Not built:** step 3, the notice at save time (optional).
+- **Verified:** in `test/pending_photo_test.dart`.
+  - *A photo whose copy failed is copied once storage works again.* The real `savePicked` fails on a
+    root under a plain file. The file is removed before the sync, and the photo ends up under the root
+    and uploaded.
+  - *A photo whose file is gone is dropped and announced once, and nothing is sent.* The copy fails and
+    the temp file is deleted before the sync. The record POST reaches the mock, no photo POST is sent,
+    the record has no photos and `pendingPushCount` is 0. `takeLostPhotos` returns that one photo on
+    that record, and nothing on a second call.
+  - *The notice names the record:* the dialog's title, the record line and its dismissal.
+  - **Checked by removal:** without the retry the photo stays on the temp path (*Actual:
+    '…/image_picker_temp.jpg'*). Without the drop it stays on the record (*Expected: empty, Actual:
+    [Instance of 'DisturbancePhoto']*).
+  - **Not run by any test:** the `HomeScreen` listener that opens the dialog. No test pumps
+    `HomeScreen` (map, location and tile plugins), so that wiring was checked by reading only.
+  - Full suite 204/204. `flutter analyze` is at the documented 10 info lints.
+- **Shipped:** — in source, release pending (batched with the next release).
 
 ### TB-53 · A photo whose upload fails is dropped from its record by the next pull
-`🐞 Bug` · `P2` · `Todo` (build together with TB-52) · Reporter: Claude (found while recording the TB-52 decision, 2026-10-13) · Updated: 2026-10-13
+`🐞 Bug` · `P2` · `Done` (in source, release pending; built with TB-52) · Reporter: Claude (found while recording the TB-52 decision, 2026-10-13) · Updated: 2026-10-13
 - **Problem:** for a record both sides know, `_mergeRemoteIntoLocal` takes the server's fields and calls
   `_mergePhotos(local, remote)`. That returns the **server's** photo list and only copies cached
   `localPath`s across. A local photo the server does not have yet (`pendingUpload: true`) is not in that
@@ -1974,9 +2004,21 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   that the server's list lacks. The next drain then retries it. Server photos are handled as now.
   - **Build together with TB-52.** Kept pending, a photo whose file is gone would stay pending for good;
     TB-52's deliberate drop is what clears it.
-- **To verify when built:** turn the probe into a kept test. After the failed upload and the pull, the
-  photo is still on the record and pending; a later successful upload clears it. Assert the GET actually
-  reached the mock (TB-35), and check by removal.
+- **Fixed (2026-10-13):** `_mergePhotos` returns the server's photos, with cached `localPath`s as before,
+  plus every local photo with `pendingUpload: true` whose id the server does not report. A photo the
+  server does report comes back as the server's version, so an upload whose response was lost settles
+  as uploaded.
+- **Verified:** `test/pending_photo_test.dart`, *a photo whose upload fails stays on its record through
+  the pull, and uploads later*.
+  - Two uploads fail, and the test asserts that a GET ran after the second one (TB-35). The photo is
+    still on the record and pending, and `pendingPushCount` is 1.
+  - With uploads answering 201, the next sync uploads it and the server's list reports it. It is no
+    longer pending, and the count is 0.
+  - **Checked by removal:** without keeping pending photos, the photo is gone after the pull
+    (*Expected: not null, Actual: <null>*).
+- **Not recovered:** photos already lost this way stay lost. Their record no longer points at them,
+  though the file may still be on the phone until the record is deleted or the user logs out (TB-49).
+- **Shipped:** — in source, release pending (batched with the next release).
 
 ---
 

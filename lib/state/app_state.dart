@@ -44,6 +44,10 @@ class AppState extends ChangeNotifier {
   final _uuid = const Uuid();
 
   List<Disturbance> _records = [];
+  // TB-52: photos dropped because their file was gone, not yet shown to the
+  // user. Handed over once by [takeLostPhotos].
+  int _lostPhotoCount = 0;
+  final List<Disturbance> _lostPhotoRecords = [];
   bool _offlineOverride = false;
   bool _isSyncing = false;
   ConnectivityResult _connectivityResult = ConnectivityResult.none;
@@ -300,6 +304,18 @@ class AppState extends ChangeNotifier {
     return missing;
   }
 
+  /// TB-52: the photos dropped since the last call, so the user is told once.
+  /// A second call returns nothing until another photo is lost.
+  LostPhotos takeLostPhotos() {
+    final lost = LostPhotos(
+      photos: _lostPhotoCount,
+      records: List.unmodifiable(_lostPhotoRecords),
+    );
+    _lostPhotoCount = 0;
+    _lostPhotoRecords.clear();
+    return lost;
+  }
+
   /// TB-45: the same work as [pendingPushCount], broken down for the logout
   /// warning, plus a walk still being recorded — which is not in `_walks` yet,
   /// so the badge never counts it, but [logout] discards it all the same.
@@ -531,7 +547,8 @@ class AppState extends ChangeNotifier {
         out.add(photo.copyWith(localPath: stable, pendingUpload: true));
       } catch (_) {
         // Keep the photo on image_picker's unstripped temp file rather than
-        // lose it; _drainPendingPhotos strips whatever it sends (TB-51).
+        // lose it; _drainPendingPhotos retries the copy (TB-52) and strips
+        // whatever it sends (TB-51).
         out.add(photo);
       }
     }
@@ -731,8 +748,13 @@ class AppState extends ChangeNotifier {
     for (final record in candidates) {
       for (final photo in record.photos) {
         if (!photo.pendingUpload) continue;
-        final path = photo.localPath;
+        var path = photo.localPath;
         if (path == null) continue;
+        path = await _retryPhotoCopy(record.id, photo, path);
+        if (!await File(path).exists()) {
+          _dropLostPhoto(record.id, photo.id);
+          continue;
+        }
         try {
           // Stripped again here, in memory, because the file need not be the
           // clean copy: savePicked may have failed (TB-51) or predate TB-50.
@@ -750,13 +772,66 @@ class AppState extends ChangeNotifier {
           if (!canSync) return;
           // Network / 5xx: leave pendingUpload true for next tick.
         } catch (_) {
-          // File read failed (deleted from disk?) - skip; the user will see
-          // the photo missing in the detail view and can re-attach if they
-          // care.
+          // The file exists but could not be read: leave it pending for the
+          // next drain. A file that is gone was dropped above (TB-52).
         }
       }
     }
     await _localStore.save(_records);
+  }
+
+  /// TB-52: a photo whose stable copy could not be written (TB-51) is still
+  /// on image_picker's cache file, which Android may clear. Tries the copy
+  /// again and returns the path to upload from.
+  Future<String> _retryPhotoCopy(
+    String motnjaId,
+    DisturbancePhoto photo,
+    String path,
+  ) async {
+    try {
+      if (await _photoStorage.isStored(
+        motnjaId: motnjaId,
+        photoId: photo.id,
+        mimeType: photo.mimeType,
+      )) {
+        return path;
+      }
+      final stable = await _photoStorage.savePicked(
+        motnjaId: motnjaId,
+        photoId: photo.id,
+        sourcePath: path,
+        mimeType: photo.mimeType,
+      );
+      _records = _records.map((r) {
+        if (r.id != motnjaId) return r;
+        return r.copyWith(
+          photos: r.photos
+              .map((p) => p.id == photo.id ? p.copyWith(localPath: stable) : p)
+              .toList(),
+        );
+      }).toList(growable: false);
+      return stable;
+    } catch (_) {
+      return path;
+    }
+  }
+
+  /// TB-52: the photo's file is gone, so it can never upload. Owner decision
+  /// 2026-10-13: drop it from the record, so the record stops counting as
+  /// unsynced, and tell the user once (see [takeLostPhotos]).
+  void _dropLostPhoto(String motnjaId, String photoId) {
+    _records = _records.map((r) {
+      if (r.id != motnjaId) return r;
+      return r.copyWith(
+        photos: r.photos.where((p) => p.id != photoId).toList(),
+      );
+    }).toList(growable: false);
+    final record = _records.firstWhere((r) => r.id == motnjaId);
+    _lostPhotoCount++;
+    _lostPhotoRecords
+      ..removeWhere((r) => r.id == motnjaId)
+      ..add(record);
+    notifyListeners();
   }
 
   void _markPhotoSynced(String motnjaId, String photoId) {
@@ -840,13 +915,20 @@ class AppState extends ChangeNotifier {
     List<DisturbancePhoto> remote,
   ) {
     final localById = {for (final p in local) p.id: p};
-    return remote.map((r) {
-      final cached = localById[r.id];
-      if (cached?.localPath != null) {
-        return r.copyWith(localPath: cached!.localPath);
-      }
-      return r;
-    }).toList();
+    final remoteIds = {for (final p in remote) p.id};
+    return [
+      ...remote.map((r) {
+        final cached = localById[r.id];
+        if (cached?.localPath != null) {
+          return r.copyWith(localPath: cached!.localPath);
+        }
+        return r;
+      }),
+      // TB-53: a photo the server does not have yet is still on its way.
+      // Dropping it here lost every photo whose upload failed in a sync whose
+      // pull then succeeded.
+      ...local.where((p) => p.pendingUpload && !remoteIds.contains(p.id)),
+    ];
   }
 
   List<SelectedDisturbanceType> _resolveTypeNames(
@@ -1349,6 +1431,19 @@ class UnsentWork {
 
   bool get isEmpty =>
       records == 0 && deletes == 0 && walks == 0 && !activeWalk;
+}
+
+/// Photos dropped because their file was gone before they uploaded (TB-52).
+/// See [AppState.takeLostPhotos].
+class LostPhotos {
+  const LostPhotos({required this.photos, required this.records});
+
+  final int photos;
+
+  /// The records they belonged to, as they are after the drop.
+  final List<Disturbance> records;
+
+  bool get isEmpty => photos == 0;
 }
 
 extension<T> on Iterable<T> {
