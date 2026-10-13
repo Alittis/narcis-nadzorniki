@@ -197,7 +197,7 @@ Color recordMarkerColorForStatus(String caseStatus) {
 }
 
 /// Tap-target diameter for record markers on the home map. The visible disc is
-/// far smaller — [RecordMarker]/[LegacyRecordMarker] `Center` an ~11–18 px dot,
+/// far smaller — [RecordMarker] `Center`s an 18 px dot,
 /// so the rest of this box is invisible tappable margin, making an isolated
 /// marker easy to hit (TB-19). 44 matches the walk-detail map and sits just
 /// under Material's 48 dp minimum: deliberately not larger, to limit how much
@@ -248,42 +248,6 @@ class RecordMarker extends StatelessWidget {
                     color: Colors.white,
                   ),
                 ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Smaller, deep-purple variant for legacy pre-app records. Same halo /
-/// shadow treatment as [RecordMarker] for visual consistency.
-class LegacyRecordMarker extends StatelessWidget {
-  const LegacyRecordMarker({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        width: 11,
-        height: 11,
-        decoration: const BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Color(0x40000000),
-              blurRadius: 2,
-              offset: Offset(0, 1),
-            ),
-          ],
-        ),
-        alignment: Alignment.center,
-        child: Container(
-          width: 8,
-          height: 8,
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.deepPurple,
-          ),
         ),
       ),
     );

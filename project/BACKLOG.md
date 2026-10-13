@@ -711,7 +711,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   signed with the upload key); committed `d5ff149`. Rolled out on the Play Closed testing track 2026-06-24 (confirmed installing + working).
 
 ### TB-23 · Remove the vestigial `showLegacy` legacy-overlay layer (dead code)
-`🔧 Chore` · `P3` · `Triage` · Reporter: Claude (found during TB-6, 2026-06-24)
+`🔧 Chore` · `P3` · `Done` (in source, release pending) · Reporter: Claude (found during TB-6, 2026-06-24) · Updated: 2026-10-13
 - **Problem:** The bundled-legacy overlay is **dead code**. The "Zgodovina" chip was removed 2026-05-22
   (commit `1430a5a`) when its 703 records were migrated into `TB_MOTNJE`, and the comment in
   [`home_screen.dart`](../lib/screens/home_screen.dart) flagged full removal as a follow-up. `showLegacy`
@@ -729,7 +729,35 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   backend/DB change.
 - **Discussion:** **Verify the 703 legacy records are all present in `TB_MOTNJE`** for the relevant org(s)
   before dropping the asset; if any are missing, that's a data-migration gap to close first.
-- **Shipped:** —
+  **Checked 2026-10-13, against the import rather than the live table:**
+  - The asset held 703 records. 2 are by the observer *"test test"*, which `DROP_OBSERVERS` in
+    [`legacy_to_tb_motnje_csv.py`](../tools/legacy_to_tb_motnje_csv.py) skips on purpose.
+  - That leaves 701, exactly the count `1430a5a` records as loaded into `TB_MOTNJE` (org 152). The 703
+    `uuid5` keys are distinct, so no two records collapsed into one row.
+  - **Not re-checked against `TB_MOTNJE` today:** the prod DB is unreachable from this workstation.
+    **STATUS: UNKNOWN – REQUIRES CONFIRMATION** that none of the 701 has since been deleted, which
+    would have been a deliberate delete, not a migration gap.
+  - Removing the asset loses nothing users could reach: the layer had not rendered since 2026-05-22.
+    The file stays in git history (`git show 10324ca:assets/legacy/notranjski_park_2025.json`).
+- **Built 2026-10-13 (phone only, no server change):**
+  - Deleted `legacy_detail_screen.dart`, `legacy_records.dart`, `legacy_disturbance.dart`,
+    `LegacyRecordMarker` and the asset, and dropped `assets/legacy/` from `pubspec.yaml`.
+  - Removed from `AppState`: the `legacyLoader` constructor parameter, `_legacyRecords`/`legacyRecords`,
+    `_showLegacy`/`showLegacy`/`setShowLegacy`, and the load in `init()`. Every cold start parsed the
+    409 KB JSON for a layer nothing showed.
+  - Removed from `HomeScreen`: `_openLegacyDetail`, the legacy branch in `_buildMarkers`, and
+    `_TopChrome`'s `showLegacy`/`onLegacyToggle`.
+  - Five test harnesses lose their `_FakeLegacy` loader.
+  - **Kept:** the import tooling in `tools/` (`import_notranjski_csv.py`, `legacy_to_tb_motnje_csv.py`,
+    `legacy_photos_upload.py`), which the 1430a5a commit keeps for the next park's export.
+    `Disturbance.fromJson`'s `photoPaths` fallback is an unrelated cached-row migration and stays.
+  - `grep -i legacy` over `lib/`, `test/` and `pubspec.yaml` finds only that fallback and its test.
+    Full suite 199/199; `flutter analyze` at the documented 10 info lints.
+  - **The app no longer contacts `nadzor.notranjski-park.si`.** Both privacy-policy versions (§2.7 and
+    §3) still describe that host and the 703 bundled records, and the store listing still advertises
+    the bundled archive. `PLAY_CLOSED_TEST.md`'s listing copy is corrected; the Play Console listing
+    and the policy are the owner's to change.
+- **Shipped:** — in source, release pending (batched with the next release).
 
 ### TB-24 · Pre-upload AAB check misses the signer certificate
 `🔧 Chore` · `P2` · `Done` · Updated: 2026-08-06

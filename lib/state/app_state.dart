@@ -6,14 +6,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:narcis_nadzorniki/data/disturbance_types.dart';
-import 'package:narcis_nadzorniki/data/legacy_records.dart';
 import 'package:narcis_nadzorniki/data/local_store.dart';
 import 'package:narcis_nadzorniki/data/remote_api.dart';
 import 'package:narcis_nadzorniki/data/walks_local_store.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
 import 'package:narcis_nadzorniki/models/disturbance_photo.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
-import 'package:narcis_nadzorniki/models/legacy_disturbance.dart';
 import 'package:narcis_nadzorniki/models/walk.dart';
 import 'package:narcis_nadzorniki/services/auth_service.dart';
 import 'package:narcis_nadzorniki/services/photo_storage.dart';
@@ -28,14 +26,12 @@ class AppState extends ChangeNotifier {
     RemoteApi? remoteApi,
     Connectivity? connectivity,
     AuthService? authService,
-    LegacyRecordsLoader? legacyLoader,
     PhotoStorage? photoStorage,
   })  : _localStore = localStore ?? LocalStore(),
         _walksStore = walksStore ?? WalksLocalStore(),
         _remoteApi = remoteApi ?? RemoteApi(),
         _connectivity = connectivity ?? Connectivity(),
         _authService = authService ?? AuthService(),
-        _legacyLoader = legacyLoader ?? LegacyRecordsLoader(),
         _photoStorage = photoStorage ?? PhotoStorage();
 
   final LocalStore _localStore;
@@ -43,17 +39,10 @@ class AppState extends ChangeNotifier {
   final RemoteApi _remoteApi;
   final Connectivity _connectivity;
   final AuthService _authService;
-  final LegacyRecordsLoader _legacyLoader;
   final PhotoStorage _photoStorage;
   final _uuid = const Uuid();
 
   List<Disturbance> _records = [];
-  List<LegacyDisturbance> _legacyRecords = [];
-  // Legacy overlay disabled: its data now lives in TB_MOTNJE proper (per the
-  // 2026-05-22 Notranjski backfill, commit 1430a5a) and would duplicate the
-  // regular disturbance markers. Field + loader + detail screen kept for a
-  // follow-up full removal.
-  bool _showLegacy = false;
   bool _offlineOverride = false;
   bool _isSyncing = false;
   ConnectivityResult _connectivityResult = ConnectivityResult.none;
@@ -102,8 +91,6 @@ class AppState extends ChangeNotifier {
   /// works off `_records` directly and still sees them.
   List<Disturbance> get records =>
       List.unmodifiable(_records.where((r) => !r.pendingDelete));
-  List<LegacyDisturbance> get legacyRecords => List.unmodifiable(_legacyRecords);
-  bool get showLegacy => _showLegacy;
   bool get offlineOverride => _offlineOverride;
   bool get isSyncing => _isSyncing;
   List<String> get lastObservers => List.unmodifiable(_lastObservers);
@@ -375,11 +362,6 @@ class AppState extends ChangeNotifier {
               '(FGS restarted, ${restored.points.length} buffered points)');
         }
       }
-      try {
-        _legacyRecords = await _legacyLoader.load();
-      } catch (_) {
-        _legacyRecords = const [];
-      }
       // Restore a persisted bearer-token session so the user stays logged in
       // across cold starts (including OS-killed background processes). The
       // token is validated lazily by the first sync call below; a revoked or
@@ -437,11 +419,6 @@ class AppState extends ChangeNotifier {
     if (isOnline) {
       syncAll();
     }
-  }
-
-  void setShowLegacy(bool value) {
-    _showLegacy = value;
-    notifyListeners();
   }
 
   Future<void> addRecord(Disturbance record) async {

@@ -13,12 +13,10 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:narcis_nadzorniki/data/legacy_records.dart';
 import 'package:narcis_nadzorniki/data/local_store.dart';
 import 'package:narcis_nadzorniki/data/remote_api.dart';
 import 'package:narcis_nadzorniki/data/walks_local_store.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
-import 'package:narcis_nadzorniki/models/legacy_disturbance.dart';
 import 'package:narcis_nadzorniki/models/walk.dart';
 import 'package:narcis_nadzorniki/services/auth_service.dart';
 import 'package:narcis_nadzorniki/state/app_state.dart';
@@ -74,11 +72,6 @@ class _FakeAuth extends AuthService {
       const StoredSession(email: 'warden@gov.si', token: 'tok');
 }
 
-class _FakeLegacy extends LegacyRecordsLoader {
-  @override
-  Future<List<LegacyDisturbance>> load() async => const [];
-}
-
 class _Connectivity implements Connectivity {
   _Connectivity(this.online);
   final bool online;
@@ -115,7 +108,6 @@ Future<AppState> _boot(_MemWalksStore walks, {bool online = false}) async {
     remoteApi: RemoteApi(client: client),
     connectivity: _Connectivity(online),
     authService: _FakeAuth(),
-    legacyLoader: _FakeLegacy(),
   );
   await state.init();
   await pumpEventQueue();

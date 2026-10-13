@@ -19,13 +19,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:narcis_nadzorniki/data/legacy_records.dart';
 import 'package:narcis_nadzorniki/data/local_store.dart';
 import 'package:narcis_nadzorniki/data/remote_api.dart';
 import 'package:narcis_nadzorniki/data/walks_local_store.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
 import 'package:narcis_nadzorniki/models/disturbance_photo.dart';
-import 'package:narcis_nadzorniki/models/legacy_disturbance.dart';
 import 'package:narcis_nadzorniki/models/walk.dart';
 import 'package:narcis_nadzorniki/services/auth_service.dart';
 import 'package:narcis_nadzorniki/widgets/record_actions_menu.dart';
@@ -103,11 +101,6 @@ class _FakeAuth extends AuthService {
   @override
   Future<StoredSession?> readStoredSession() async =>
       const StoredSession(email: 'warden@gov.si', token: 'tok');
-}
-
-class _FakeLegacy extends LegacyRecordsLoader {
-  @override
-  Future<List<LegacyDisturbance>> load() async => const [];
 }
 
 class _FakePhotos extends PhotoStorage {
@@ -191,7 +184,6 @@ class _Harness {
       remoteApi: RemoteApi(client: client),
       connectivity: _FakeConnectivity(online),
       authService: _FakeAuth(),
-      legacyLoader: _FakeLegacy(),
       photoStorage: photos,
     );
     await state.init();

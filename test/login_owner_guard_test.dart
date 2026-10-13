@@ -16,12 +16,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:narcis_nadzorniki/data/legacy_records.dart';
 import 'package:narcis_nadzorniki/data/local_store.dart';
 import 'package:narcis_nadzorniki/data/remote_api.dart';
 import 'package:narcis_nadzorniki/data/walks_local_store.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
-import 'package:narcis_nadzorniki/models/legacy_disturbance.dart';
 import 'package:narcis_nadzorniki/models/walk.dart';
 import 'package:narcis_nadzorniki/screens/login_screen.dart';
 import 'package:narcis_nadzorniki/services/auth_service.dart';
@@ -106,11 +104,6 @@ class _FakeAuth extends AuthService {
   Future<void> clearCache() async => stored = null;
 }
 
-class _FakeLegacy extends LegacyRecordsLoader {
-  @override
-  Future<List<LegacyDisturbance>> load() async => const [];
-}
-
 class _OnlineConnectivity implements Connectivity {
   @override
   Future<List<ConnectivityResult>> checkConnectivity() async =>
@@ -165,7 +158,6 @@ class _Harness {
       remoteApi: RemoteApi(client: client),
       connectivity: _OnlineConnectivity(),
       authService: auth,
-      legacyLoader: _FakeLegacy(),
       photoStorage: PhotoStorage(rootResolver: () => photoRoot),
     );
     await state.init();

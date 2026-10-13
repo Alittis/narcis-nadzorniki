@@ -148,7 +148,7 @@ Aplikacija je razvita za uporabnike, ki delajo na zavarovanih in drugih naravova
 
 • Obhodi z GPS sledjo. Snemanje neprekinjene poti obhoda v ozadju, tudi pri zaklenjenem zaslonu. Motnje, zabeležene med obhodom, se samodejno povežejo s sledjo, da je delo enostavno za pregled in arhiviranje.
 
-• Zemljevid s plastmi. Izberite med OpenStreetMap in satelitskim slojem (Esri). Prikažite svoje motnje, motnje sodelavcev iz iste organizacije, sledi obhodov in zgodovinske zapise (Notranjski regijski park, marec–avgust 2025).
+• Zemljevid s plastmi. Izberite med OpenStreetMap in satelitskim slojem (Esri). Prikažite svoje motnje, motnje sodelavcev iz iste organizacije in sledi obhodov.
 
 • Fotografije. Vgrajeni fotoaparat samodejno zmanjša velikost slike na ~200–500 KB pred prenosom — kakovost ostane primerna za dokazilo, prenos pa hiter tudi pri šibki povezavi.
 
@@ -198,7 +198,7 @@ The app is purpose-built for wardens working in protected and other nature-conse
 
 • GPS-tracked walk-arounds. Continuous background tracking of the patrol path, even with the screen off. Disturbances recorded during a walk are automatically linked to the GPS track for later review.
 
-• Map with togglable layers. Choose between OpenStreetMap and Esri satellite imagery. Show your own disturbances, your organisation's disturbances, walk-around tracks, and a bundled historical archive (Notranjska Regional Park, March–August 2025).
+• Map with togglable layers. Choose between OpenStreetMap and Esri satellite imagery. Show your own disturbances, your organisation's disturbances and walk-around tracks.
 
 • Photos. The built-in capture flow auto-shrinks images to ~200–500 KB before upload — quality remains adequate for evidence, while upload stays fast on weak connections.
 
@@ -672,8 +672,7 @@ obhodov in fotografij neposredno na terenu, s sinhronizacijo v sistem NarcIS.
 — Kaj prosimo, da preizkusite —
 
 • Prijavo (z omrežno povezavo).
-• Pregled zemljevida: motnje (vaše + sodelavcev), obhodi, zgodovinski
-  zapisi Notranjskega regijskega parka.
+• Pregled zemljevida: motnje (vaše + sodelavcev) in obhodi.
 • Zapis nove motnje (foto + tipi iz šifranta + opis).
 • Snemanje obhoda: zaženite, hodite eno-dve minuti, zaklenite zaslon,
   spet odklenite — preverite, da snemanje ni bilo prekinjeno (poglejte,
@@ -732,8 +731,8 @@ into the Slovenian NarcIS system.
 — What we'd like you to test —
 
 • Sign-in with network.
-• Map browsing: own disturbances, your organisation's disturbances,
-  walks, and bundled historical Notranjska records.
+• Map browsing: own disturbances, your organisation's disturbances
+  and walks.
 • Creating a disturbance (photo + types from the codebook + notes).
 • Walk-around recording: start, walk for 1–2 minutes, lock the screen,
   unlock — confirm the "Walk recording" notification is still visible

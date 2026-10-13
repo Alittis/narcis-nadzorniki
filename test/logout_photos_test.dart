@@ -12,11 +12,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:narcis_nadzorniki/data/legacy_records.dart';
 import 'package:narcis_nadzorniki/data/local_store.dart';
 import 'package:narcis_nadzorniki/data/walks_local_store.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
-import 'package:narcis_nadzorniki/models/legacy_disturbance.dart';
 import 'package:narcis_nadzorniki/models/walk.dart';
 import 'package:narcis_nadzorniki/services/auth_service.dart';
 import 'package:narcis_nadzorniki/services/photo_storage.dart';
@@ -49,11 +47,6 @@ class _MemCache implements AuthCacheStore {
   Future<void> write(String key, String value) async => values[key] = value;
   @override
   Future<void> delete(String key) async => values.remove(key);
-}
-
-class _FakeLegacy extends LegacyRecordsLoader {
-  @override
-  Future<List<LegacyDisturbance>> load() async => const [];
 }
 
 class _OfflineConnectivity implements Connectivity {
@@ -104,7 +97,6 @@ void main() {
         client: MockClient((_) async => http.Response('', 200)),
         cacheStore: _MemCache(),
       ),
-      legacyLoader: _FakeLegacy(),
       photoStorage: PhotoStorage(rootResolver: () => root),
     );
     await state.init();

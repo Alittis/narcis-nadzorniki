@@ -10,10 +10,8 @@ import 'package:narcis_nadzorniki/data/map_layers_store.dart';
 import 'package:narcis_nadzorniki/data/map_view_store.dart';
 import 'package:narcis_nadzorniki/data/obmocja_store.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
-import 'package:narcis_nadzorniki/models/legacy_disturbance.dart';
 import 'package:narcis_nadzorniki/screens/detail_screen.dart';
 import 'package:narcis_nadzorniki/screens/form_screen.dart';
-import 'package:narcis_nadzorniki/screens/legacy_detail_screen.dart';
 import 'package:narcis_nadzorniki/screens/place_search_screen.dart';
 import 'package:narcis_nadzorniki/screens/profile_screen.dart';
 import 'package:narcis_nadzorniki/screens/type_selection_screen.dart';
@@ -254,12 +252,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _mapController.move(position.location, zoom);
     unawaited(
       _mapViewStore.save(MapViewport(center: position.location, zoom: zoom)),
-    );
-  }
-
-  void _openLegacyDetail(LegacyDisturbance record) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => LegacyDetailScreen(record: record)),
     );
   }
 
@@ -529,7 +521,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 showObhodi: _showObhodi,
                 showParcele: _showParcele,
                 showObmocja: _activeZos.isNotEmpty,
-                showLegacy: state.showLegacy,
                 onAvatarTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const ProfileScreen()),
@@ -562,7 +553,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     }
                   }),
                 ),
-                onLegacyToggle: () => state.setShowLegacy(!state.showLegacy),
               ),
               if (_identifying)
                 Positioned(
@@ -708,21 +698,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<Marker> _buildMarkers(AppState state) {
     final markers = <Marker>[];
-    if (state.showLegacy) {
-      for (final record in state.legacyRecords) {
-        markers.add(
-          Marker(
-            point: LatLng(record.latitude, record.longitude),
-            width: kRecordMarkerTapDiameter,
-            height: kRecordMarkerTapDiameter,
-            child: GestureDetector(
-              onTap: () => _openLegacyDetail(record),
-              child: const LegacyRecordMarker(),
-            ),
-          ),
-        );
-      }
-    }
     if (_showMotnje) {
       // Sort by observedAt ascending so the youngest records end up last in
       // the list and render on top — flutter_map draws markers in list order.
@@ -777,7 +752,6 @@ class _TopChrome extends StatelessWidget {
     required this.showObhodi,
     required this.showParcele,
     required this.showObmocja,
-    required this.showLegacy,
     required this.onAvatarTap,
     required this.onSearchTap,
     required this.onSyncTap,
@@ -786,7 +760,6 @@ class _TopChrome extends StatelessWidget {
     required this.onObhodiToggle,
     required this.onParceleToggle,
     required this.onObmocjaToggle,
-    required this.onLegacyToggle,
   });
 
   final AppState state;
@@ -795,7 +768,6 @@ class _TopChrome extends StatelessWidget {
   final bool showObhodi;
   final bool showParcele;
   final bool showObmocja;
-  final bool showLegacy;
   final VoidCallback onAvatarTap;
   final VoidCallback onSearchTap;
   final VoidCallback? onSyncTap;
@@ -804,7 +776,6 @@ class _TopChrome extends StatelessWidget {
   final VoidCallback onObhodiToggle;
   final VoidCallback onParceleToggle;
   final VoidCallback onObmocjaToggle;
-  final VoidCallback onLegacyToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -880,10 +851,6 @@ class _TopChrome extends StatelessWidget {
                     enabled: true,
                     onTap: onParceleToggle,
                   ),
-                  // "Zgodovina" chip removed 2026-05-22 — legacy overlay
-                  // data is now in TB_MOTNJE (commit 1430a5a). Full removal
-                  // of the layer (AppState field, loader, detail screen,
-                  // showLegacy/onLegacyToggle params) is a follow-up.
                 ],
               ),
             ),
