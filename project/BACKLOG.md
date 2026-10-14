@@ -789,7 +789,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   which was corrected in the same pass: it had the merged-manifest path as `android/app/build/…`.
 
 ### TB-28 · Login says "wrong credentials" when the real problem is a missing TERENSKA-BELEZNICA authorization
-`✨ Enhancement` · `P1` · `Doing` (half 1 shipped in v1.13.0+23, released 2026-10-14 (owner); **half 2 built in [TB-46](#tb-46--move-the-app-to-the-postgres-backend-on-the-vps-phone-side-of-narcis-vibed-nv-259) 2026-10-13** — the server's `reason` picks the hint; ships with the cutover) · Maintainer-initiated · Updated: 2026-10-14
+`✨ Enhancement` · `P1` · `Doing` (half 1 shipped in v1.13.0+23, released 2026-10-14 (owner); **half 2 built in [TB-46](#tb-46--move-the-app-to-the-postgres-backend-on-the-vps-phone-side-of-narcis-vibed-nv-259) 2026-10-13, into v1.14.0+24 2026-10-14** — the server's `reason` picks the hint; ships with the cutover) · Maintainer-initiated · Updated: 2026-10-14
 
 - **Problem:** Registration in NarcIS is **not enough** to use Terenska beležnica. The account
   must additionally hold the `TERENSKA-BELEZNICA` function authorization, granted by an
@@ -1648,7 +1648,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** **v1.11.0+21**, archived `~/Releases/terenska-beleznica-1.11.0+21.aab` (signed with the upload key); **rolled out on the Play Closed testing track 2026-10-12** and checked on the A56 by the owner.
 
 ### TB-46 · Move the app to the Postgres backend on the VPS (phone side of narcis-vibed NV-259)
-`🔧 Chore` · `P1` · `Doing` (built 2026-10-13, P4 gate met and owner-accepted on an emulator; ships with the cutover) · Reporter: Alexis (owner direction, 2026-10-12) · Updated: 2026-10-13
+`🔧 Chore` · `P1` · `Doing` (built 2026-10-13, P4 gate met and owner-accepted on an emulator; **built into v1.14.0+24 2026-10-14**, pending upload with managed publishing on, held until the T0 cutover) · Reporter: Alexis (owner direction, 2026-10-12) · Updated: 2026-10-14
 - **Decision (owner, 2026-10-12):** the field notebook's data leaves Oracle/ORDS for Postgres on the
   VPS **before** the server-side wishlist items (TB-36, 38, 39, 42, 43), so each is built once, on the
   new backend. The move is a **pure copy** — no new fields — and the map-layer swap is separate (TB-47).
@@ -1728,7 +1728,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   - **Found:** TB-55 (a record on a discarded walk can never be sent).
 - **Before the release:** bump pubspec **and `kAppBuild`** — **to `1.14.0+24` / `24`**: the `1.13.0+23` AAB (2026-10-13 10:33) predates this item (narcis-vibed NV-259, 2026-10-14); `+23` was released 2026-10-14 (owner), so `+24` may now be uploaded. Build per `flutter-release`; submit with managed publishing on,
   held until T0 (plan §11). Leave narcis-vibed's `BELEZNICA_APP_MIN_BUILD` unset at T0.
-- **Shipped:** —
+- **Shipped:** — built into **v1.14.0+24** (2026-10-14, archived `~/Releases/terenska-beleznica-1.14.0+24.aab`, signed with the upload key; release notes PLAY_CLOSED_TEST §3.3); **not yet uploaded**. Upload with **managed publishing on**; publish only at T0 step 9 (narcis-vibed OPERATIONS §21.9). Flips to `Done` when the release is live after T0.
 
 ### TB-47 · Read the Območja layers from the VPS instead of the NarcIS GeoServer
 `✨ Enhancement` · `P2` · `Blocked` (on TB-46 / NV-259 cutover; spike first) · Reporter: Alexis (owner direction, 2026-10-12) · Updated: 2026-10-12

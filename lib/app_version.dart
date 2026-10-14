@@ -6,4 +6,4 @@
 /// Dart cannot read the build number without a plugin, so it is written here.
 /// Bump it with pubspec.yaml: `test/app_version_test.dart` fails while they
 /// differ.
-const int kAppBuild = 23;
+const int kAppBuild = 24;
