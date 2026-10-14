@@ -711,7 +711,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   signed with the upload key); committed `d5ff149`. Rolled out on the Play Closed testing track 2026-06-24 (confirmed installing + working).
 
 ### TB-23 · Remove the vestigial `showLegacy` legacy-overlay layer (dead code)
-`🔧 Chore` · `P3` · `Doing` (built into v1.13.0+23 2026-10-13; pending upload + rollout) · Reporter: Claude (found during TB-6, 2026-06-24) · Updated: 2026-10-13
+`🔧 Chore` · `P3` · `Done` (shipped v1.13.0+23; released on the Play Closed testing track 2026-10-14 (owner)) · Reporter: Claude (found during TB-6, 2026-06-24) · Updated: 2026-10-14
 - **Problem:** The bundled-legacy overlay is **dead code**. The "Zgodovina" chip was removed 2026-05-22
   (commit `1430a5a`) when its 703 records were migrated into `TB_MOTNJE`, and the comment in
   [`home_screen.dart`](../lib/screens/home_screen.dart) flagged full removal as a follow-up. `showLegacy`
@@ -759,7 +759,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
     live; `a4295de` on the branch), with §2.8–§2.10 renumbered down by one.
   - **The Play Console listing still advertises the bundled archive.** `PLAY_CLOSED_TEST.md`'s listing
     copy is corrected; pasting it into the Play Console is the owner's step.
-- **Shipped:** — built into **v1.13.0+23** (2026-10-13, archived `~/Releases/terenska-beleznica-1.13.0+23.aab`, signed with the upload key); **not yet uploaded**. Flips to `Done` when the rollout is confirmed.
+- **Shipped:** — built into **v1.13.0+23** (2026-10-13, archived `~/Releases/terenska-beleznica-1.13.0+23.aab`, signed with the upload key); ~~**not yet uploaded**~~ **uploaded to closed testing 2026-10-13; released on the Play Closed testing track 2026-10-14 (owner)**.
 
 ### TB-24 · Pre-upload AAB check misses the signer certificate
 `🔧 Chore` · `P2` · `Done` · Updated: 2026-08-06
@@ -789,7 +789,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   which was corrected in the same pass: it had the merged-manifest path as `android/app/build/…`.
 
 ### TB-28 · Login says "wrong credentials" when the real problem is a missing TERENSKA-BELEZNICA authorization
-`✨ Enhancement` · `P1` · `Doing` (half 1 built into v1.13.0+23 2026-10-13, pending upload + rollout; **half 2 built in [TB-46](#tb-46--move-the-app-to-the-postgres-backend-on-the-vps-phone-side-of-narcis-vibed-nv-259) 2026-10-13** — the server's `reason` picks the hint; ships with the cutover) · Maintainer-initiated · Updated: 2026-10-13
+`✨ Enhancement` · `P1` · `Doing` (half 1 shipped in v1.13.0+23, released 2026-10-14 (owner); **half 2 built in [TB-46](#tb-46--move-the-app-to-the-postgres-backend-on-the-vps-phone-side-of-narcis-vibed-nv-259) 2026-10-13** — the server's `reason` picks the hint; ships with the cutover) · Maintainer-initiated · Updated: 2026-10-14
 
 - **Problem:** Registration in NarcIS is **not enough** to use Terenska beležnica. The account
   must additionally hold the `TERENSKA-BELEZNICA` function authorization, granted by an
@@ -875,7 +875,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   - **Checked by removal:** without `rejectedByServer: true` on the 401 path, the auth test fails; with
     the hint keyed on any failure, the offline test fails; with the hint never set, the 401 test fails.
     Full suite 199/199; `flutter analyze` at the documented 10 info lints.
-- **Shipped:** — built into **v1.13.0+23** (2026-10-13, archived `~/Releases/terenska-beleznica-1.13.0+23.aab`, signed with the upload key); **not yet uploaded**. Flips to `Done` when the rollout is confirmed.
+- **Shipped:** — built into **v1.13.0+23** (2026-10-13, archived `~/Releases/terenska-beleznica-1.13.0+23.aab`, signed with the upload key); ~~**not yet uploaded**~~ **half 1 uploaded 2026-10-13, released on the Play Closed testing track 2026-10-14 (owner)**. Flips to `Done` when TB-46 (half 2) is released.
 
 ### TB-29 · Retire age colouring end to end — the walk map, and the Starost filter with it
 `🔧 Chore` · `P2` · `Done` (shipped v1.7.0+16; rolled out on the Play Closed testing track 2026-08-31) · Reporter: maintainer (on the v1.6.0+15 rollout) · Updated: 2026-08-31
@@ -1726,7 +1726,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
     drained; first pull under a new generation evicted 0 of 1,373; after a restore, the own lost record came back with a
     byte-identical photo and a colleague's was evicted; 426 → the update screen. **Owner-accepted 2026-10-13.**
   - **Found:** TB-55 (a record on a discarded walk can never be sent).
-- **Before the release:** bump pubspec **and `kAppBuild`**; build per `flutter-release`; submit with managed publishing on,
+- **Before the release:** bump pubspec **and `kAppBuild`** — **to `1.14.0+24` / `24`**: the `1.13.0+23` AAB (2026-10-13 10:33) predates this item (narcis-vibed NV-259, 2026-10-14); `+23` was released 2026-10-14 (owner), so `+24` may now be uploaded. Build per `flutter-release`; submit with managed publishing on,
   held until T0 (plan §11). Leave narcis-vibed's `BELEZNICA_APP_MIN_BUILD` unset at T0.
 - **Shipped:** —
 
@@ -1891,7 +1891,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** **v1.12.0+22**, archived `~/Releases/terenska-beleznica-1.12.0+22.aab` (signed with the upload key); **rolled out on the Play Closed testing track**, confirmed by the owner 2026-10-13.
 
 ### TB-51 · A photo whose stripped copy could not be saved would upload with its EXIF
-`🐞 Bug` · `P3` · `Doing` (built into v1.13.0+23 2026-10-13; pending upload + rollout) · Reporter: Claude (TB-50 follow-up, 2026-10-13) · Updated: 2026-10-13
+`🐞 Bug` · `P3` · `Done` (shipped v1.13.0+23; released on the Play Closed testing track 2026-10-14 (owner)) · Reporter: Claude (TB-50 follow-up, 2026-10-13) · Updated: 2026-10-14
 - **Problem:** TB-50 strips a photo in `PhotoStorage.savePicked`. Its only caller,
   `AppState._materializePhotos`, catches any error from it and keeps the photo as the form built it:
   `localPath` on `image_picker`'s temp file, `pendingUpload: true` (`form_screen.dart` `initState` and
@@ -1932,10 +1932,10 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   - **Checked by removal:** without the strip in `_drainPendingPhotos` the test fails at the `samsung`
     check (*Expected: false, Actual: <true>*).
   - Full suite 200/200. `flutter analyze` is at the documented 10 info lints.
-- **Shipped:** — built into **v1.13.0+23** (2026-10-13, archived `~/Releases/terenska-beleznica-1.13.0+23.aab`, signed with the upload key); **not yet uploaded**. Flips to `Done` when the rollout is confirmed.
+- **Shipped:** — built into **v1.13.0+23** (2026-10-13, archived `~/Releases/terenska-beleznica-1.13.0+23.aab`, signed with the upload key); ~~**not yet uploaded**~~ **uploaded to closed testing 2026-10-13; released on the Play Closed testing track 2026-10-14 (owner)**.
 
 ### TB-52 · A photo left on image_picker's cache file can vanish before it uploads
-`🐞 Bug` · `P3` · `Doing` (built into v1.13.0+23 2026-10-13; pending upload + rollout) · Reporter: Claude (found during TB-51, 2026-10-13) · Updated: 2026-10-13
+`🐞 Bug` · `P3` · `Done` (shipped v1.13.0+23; released on the Play Closed testing track 2026-10-14 (owner)) · Reporter: Claude (found during TB-51, 2026-10-13) · Updated: 2026-10-14
 - **Problem:** when `PhotoStorage.savePicked` fails (TB-51), `_materializePhotos` keeps the photo on
   `image_picker`'s output file. `image_picker_android` 0.8.13+13 writes that file to the app's cache
   directory (`ImageResizer` → `context.getCacheDir()`). Android may delete cache files when it needs
@@ -2001,10 +2001,10 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   - **Not run by any test:** the `HomeScreen` listener that opens the dialog. No test pumps
     `HomeScreen` (map, location and tile plugins), so that wiring was checked by reading only.
   - Full suite 204/204. `flutter analyze` is at the documented 10 info lints.
-- **Shipped:** — built into **v1.13.0+23** (2026-10-13, archived `~/Releases/terenska-beleznica-1.13.0+23.aab`, signed with the upload key); **not yet uploaded**. Flips to `Done` when the rollout is confirmed.
+- **Shipped:** — built into **v1.13.0+23** (2026-10-13, archived `~/Releases/terenska-beleznica-1.13.0+23.aab`, signed with the upload key); ~~**not yet uploaded**~~ **uploaded to closed testing 2026-10-13; released on the Play Closed testing track 2026-10-14 (owner)**.
 
 ### TB-53 · A photo whose upload fails is dropped from its record by the next pull
-`🐞 Bug` · `P2` · `Doing` (built into v1.13.0+23 2026-10-13; pending upload + rollout) · Reporter: Claude (found while recording the TB-52 decision, 2026-10-13) · Updated: 2026-10-13
+`🐞 Bug` · `P2` · `Done` (shipped v1.13.0+23; released on the Play Closed testing track 2026-10-14 (owner)) · Reporter: Claude (found while recording the TB-52 decision, 2026-10-13) · Updated: 2026-10-14
 - **Problem:** for a record both sides know, `_mergeRemoteIntoLocal` takes the server's fields and calls
   `_mergePhotos(local, remote)`. That returns the **server's** photo list and only copies cached
   `localPath`s across. A local photo the server does not have yet (`pendingUpload: true`) is not in that
@@ -2043,7 +2043,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
     (*Expected: not null, Actual: <null>*).
 - **Not recovered:** photos already lost this way stay lost. Their record no longer points at them,
   though the file may still be on the phone until the record is deleted or the user logs out (TB-49).
-- **Shipped:** — built into **v1.13.0+23** (2026-10-13, archived `~/Releases/terenska-beleznica-1.13.0+23.aab`, signed with the upload key); **not yet uploaded**. Flips to `Done` when the rollout is confirmed.
+- **Shipped:** — built into **v1.13.0+23** (2026-10-13, archived `~/Releases/terenska-beleznica-1.13.0+23.aab`, signed with the upload key); ~~**not yet uploaded**~~ **uploaded to closed testing 2026-10-13; released on the Play Closed testing track 2026-10-14 (owner)**.
 
 ### TB-54 · Photos are ~650–850 KB, not ~200–500 KB — should they be smaller?
 `❓ Needs discussion` · `P3` · `Blocked` · Reporter: Claude (from the NV-259 P0 probe, 2026-10-13) · Updated: 2026-10-13
