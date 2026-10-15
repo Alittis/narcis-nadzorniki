@@ -657,6 +657,7 @@ For **every** entry below: collection is **required for app functionality** (or 
 | **Location** | Approximate location | Yes | No | Optional | App functionality (low-accuracy disturbance entries marked "Približna") |
 | **Location** | Precise location | Yes | No | Required for the feature | App functionality (precise disturbance pins; live track points during a walk) |
 | **Photos and videos** | Photos | Yes | No | Optional | App functionality (evidence photos attached to disturbance records) |
+| **App activity** | Other user-generated content | Yes | No | Optional | App functionality (the record's description, the walk's name and notes — every one marked *neobvezno*). **Added 2026-10-15** (owner; NV-259 B5), in Play review |
 | **App info and performance** | Crash logs | No | — | — | (No Crashlytics / Sentry / Firebase wired in) |
 | **App info and performance** | Diagnostics | No | — | — | (No analytics SDK; only local debug-prints during development) |
 | **Device or other IDs** | Device or other IDs | No | — | — | (No advertising-ID, no install-ID, no GAID; only Android Keystore-backed secure storage) |
@@ -673,7 +674,7 @@ For **every** entry below: collection is **required for app functionality** (or 
 >
 > **Since v1.12.0+22 (rolled out, confirmed 2026-10-13), TB-50 strips it.** Every new photo loses its Exif, XMP, IPTC and comment segments before it is stored and uploaded; only the Orientation tag stays. Photos saved by earlier versions may still carry EXIF, on the server too. The declared categories need no change: **Precise location** and **Photos** stay declared for the records themselves. Policy §1 and §2.3 say so since 2026-10-13.
 >
-> **Re-check at the NV-259 cutover (TB-46):** *"encrypted in transit"* then means HTTPS to `narcis.alittis.com` (and from there to `narcis.gov.si`), not only to `narcis.gov.si`. Alittis and Hostinger hold the data **on ARSO's behalf**, which Play counts as a service provider, not as sharing, so *Shared? No* stands. Also consider, at that review, whether the free-text description and walk notes belong under **App activity → Other user-generated content**, which this form has never declared.
+> **Re-check at the NV-259 cutover (TB-46):** *"encrypted in transit"* then means HTTPS to `narcis.alittis.com` (and from there to `narcis.gov.si`), not only to `narcis.gov.si`. Alittis and Hostinger hold the data **on ARSO's behalf**, which Play counts as a service provider, not as sharing, so *Shared? No* stands. Also consider, at that review, whether the free-text description and walk notes belong under **App activity → Other user-generated content**, which this form has never declared. **Done 2026-10-15 (owner):** the other answers stand, and *Other user-generated content* is declared (the row above). The form is under Play Console → the app → Policy and programs → App content → **Actioned** tab → Data safety → **Manage**.
 
 #### Children's data
 
