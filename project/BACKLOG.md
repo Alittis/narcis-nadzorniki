@@ -1648,7 +1648,12 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** **v1.11.0+21**, archived `~/Releases/terenska-beleznica-1.11.0+21.aab` (signed with the upload key); **rolled out on the Play Closed testing track 2026-10-12** and checked on the A56 by the owner.
 
 ### TB-46 · Move the app to the Postgres backend on the VPS (phone side of narcis-vibed NV-259)
-`🔧 Chore` · `P1` · `Doing` (built 2026-10-13, P4 gate met and owner-accepted on an emulator; **built into v1.14.0+24 2026-10-14**, pending upload with managed publishing on, held until the T0 cutover) · Reporter: Alexis (owner direction, 2026-10-12) · Updated: 2026-10-14
+`🔧 Chore` · `P1` · `Done` (**released 2026-10-15 08:44 local: `1.14.0 (24)` live on the closed track**, at the narcis-vibed NV-259 T0 cutover; ~~`Doing` (built 2026-10-13, P4 gate met and owner-accepted on an emulator; built into v1.14.0+24 2026-10-14, pending upload with managed publishing on, held until the T0 cutover)~~) · Reporter: Alexis (owner direction, 2026-10-12) · Updated: 2026-10-15
+- **2026-10-15 — T0 done; the build is live.** narcis-vibed served the field-app API from Postgres from 06:10:41 UTC
+  (`BELEZNICA_SOURCE=postgres`; Oracle `TB_*` frozen, assert 52/52, owner-accepted on production), and the owner pressed
+  *Publish changes* in Play: `24 (1.14.0)` *Available to selected testers*, released 08:44. `BELEZNICA_APP_MIN_BUILD` is
+  still unset (owner's call, narcis-vibed OPERATIONS §21.9 A3). The first updated phone (T0.10) is being watched from the
+  server; details in narcis-vibed BACKLOG NV-259, 2026-10-15.
 - **Decision (owner, 2026-10-12):** the field notebook's data leaves Oracle/ORDS for Postgres on the
   VPS **before** the server-side wishlist items (TB-36, 38, 39, 42, 43), so each is built once, on the
   new backend. The move is a **pure copy** — no new fields — and the map-layer swap is separate (TB-47).
