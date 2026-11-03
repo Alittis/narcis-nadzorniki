@@ -2110,7 +2110,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Discussion:** open.
 
 ### TB-56 · The `tools/ords` test scripts put the login credentials and the bearer token in curl's argv
-`🐞 Bug` · `P3` · `Doing` · Reporter: Claude (VPS-71 follow-up, 2026-11-03) · Updated: 2026-11-03
+`🐞 Bug` · `P3` · `Done` · Reporter: Claude (VPS-71 follow-up, 2026-11-03) · Updated: 2026-11-03
 - **Problem:** `tools/ords/test_auth_login.sh`, `test_disturbances.sh`, `test_walks.sh` and `verify_tb26.sh`
   passed `-H "X-Narcis-Auth: Basic <base64 of e-mail:password>"` to curl. `test_auth_login.sh` also passed
   `-H "X-Narcis-Auth: Bearer $TOKEN"`. A command line is readable by every user on the host (VPS-71 in
@@ -2124,6 +2124,8 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
     deliberate wrong-credential probes, 3 bearer calls, and the no-header probes.
   - Both versions exited the same way (1, 7, 5 and 2), on the content checks the mock does not satisfy.
   - No new curl argv held a credential, the token, `Bearer` or `Basic `. HEAD put a secret in 28 lines.
+- **Shipped 2026-11-03:** `3e3b509`, pushed. Mac-only scripts, so nothing to deploy. They have not run against the
+  real ORDS, which is down (VPS-56).
 - **Discussion:** none.
 
 ---
