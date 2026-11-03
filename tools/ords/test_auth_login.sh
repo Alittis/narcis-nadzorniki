@@ -44,21 +44,19 @@ probe() {
   local email="${1:-}"; [ "$#" -ge 1 ] && shift || true
   local password="${1:-}"; [ "$#" -ge 1 ] && shift || true
 
-  local hdr_args=()
+  local creds_b64=""
   if [ -n "$email" ] || [ -n "$password" ]; then
-    local creds_b64
     creds_b64=$(printf '%s:%s' "$email" "$password" | base64 | tr -d '\n')
-    hdr_args=(-H "X-Narcis-Auth: Basic $creds_b64")
   fi
 
   local tmp_body tmp_meta
   tmp_body=$(mktemp); tmp_meta=$(mktemp)
-  # NOTE: ${hdr_args[@]+"${hdr_args[@]}"} expands to nothing when the array
-  # is empty, which is required under `set -u` on macOS bash 3.2. Plain
-  # "${hdr_args[@]}" would raise an unbound-variable error.
-  curl -sS -o "$tmp_body" \
+  # The header reaches curl as a config line on stdin (-K -), never as an -H argument in argv,
+  # which every user on the host can read (TB-56). No credentials: an empty config, no header.
+  { [ -z "$creds_b64" ] || printf 'header = "X-Narcis-Auth: Basic %s"\n' "$creds_b64"; } \
+    | curl -sS -o "$tmp_body" \
     -w 'status=%{http_code}\ncontent_type=%{content_type}\n' \
-    ${hdr_args[@]+"${hdr_args[@]}"} "$URL" > "$tmp_meta" 2>&1
+    -K - "$URL" > "$tmp_meta" 2>&1
 
   local status content_type body authenticated message
   status=$(sed -n 's/^status=//p' "$tmp_meta")
@@ -137,7 +135,9 @@ if [ -n "${APP_AUTH_EMAIL:-}" ] && [ -n "${APP_AUTH_PASSWORD:-}" ]; then
   CRUD_URL="${APP_DISTURBANCES_URL:-https://narcis.gov.si/ords/narcis/disturbances/}"
 
   tok_creds_b64=$(printf '%s:%s' "$APP_AUTH_EMAIL" "$APP_AUTH_PASSWORD" | base64 | tr -d '\n')
-  login_body=$(curl -sS -H "X-Narcis-Auth: Basic $tok_creds_b64" "$URL")
+  # the credentials and the token reach curl on stdin, never in argv (TB-56)
+  login_body=$(printf 'header = "X-Narcis-Auth: Basic %s"\n' "$tok_creds_b64" | curl -sS -K - "$URL")
+  auth() { printf 'header = "X-Narcis-Auth: Bearer %s"\n' "$TOKEN"; }
   TOKEN=$(printf '%s' "$login_body" | python3 -c 'import json,sys
 try:
     print(json.load(sys.stdin).get("token") or "")
@@ -150,12 +150,12 @@ except Exception:
   else
     printf '  minted token  : %s… (%s chars)\n' "${TOKEN:0:8}" "${#TOKEN}"
 
-    st_use=$(curl -sS -o /dev/null -w '%{http_code}' \
-      -H "X-Narcis-Auth: Bearer $TOKEN" "$CRUD_URL")
+    st_use=$(auth | curl -sS -o /dev/null -w '%{http_code}' \
+      -K - "$CRUD_URL")
     printf '  Bearer GET %s : %s (expected 200)\n' "$CRUD_URL" "$st_use"
     if [ "$st_use" = "200" ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); fi
 
-    revoked=$(curl -sS -X POST -H "X-Narcis-Auth: Bearer $TOKEN" "$LOGOUT_URL" \
+    revoked=$(auth | curl -sS -X POST -K - "$LOGOUT_URL" \
       | python3 -c 'import json,sys
 try:
     print(json.load(sys.stdin).get("revoked"))
@@ -164,8 +164,8 @@ except Exception:
     printf '  POST logout   : revoked=%s (expected True)\n' "$revoked"
     if [ "$revoked" = "True" ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); fi
 
-    st_rev=$(curl -sS -o /dev/null -w '%{http_code}' \
-      -H "X-Narcis-Auth: Bearer $TOKEN" "$CRUD_URL")
+    st_rev=$(auth | curl -sS -o /dev/null -w '%{http_code}' \
+      -K - "$CRUD_URL")
     printf '  Bearer GET (revoked token) : %s (expected 401)\n' "$st_rev"
     if [ "$st_rev" = "401" ]; then PASS=$((PASS+1)); else FAIL=$((FAIL+1)); fi
   fi

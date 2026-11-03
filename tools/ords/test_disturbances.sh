@@ -54,10 +54,9 @@ probe() {
   local password="${1:-}"; [ "$#" -ge 1 ] && shift || true
 
   local hdr_args=()
+  local creds_b64=""
   if [ -n "$email" ] || [ -n "$password" ]; then
-    local creds_b64
     creds_b64=$(printf '%s:%s' "$email" "$password" | base64 | tr -d '\n')
-    hdr_args=(-H "X-Narcis-Auth: Basic $creds_b64")
   fi
   if [ -n "$body" ]; then
     hdr_args+=(-H "Content-Type: application/json")
@@ -65,8 +64,11 @@ probe() {
 
   local tmp_body tmp_meta
   tmp_body=$(mktemp); tmp_meta=$(mktemp)
-  curl -sS -X "$method" -o "$tmp_body" \
-    -w 'status=%{http_code}\n' \
+  # The credentials reach curl as a config line on stdin (-K -), never as an -H argument in argv,
+  # which every user on the host can read (TB-56). No credentials: an empty config, no header.
+  { [ -z "$creds_b64" ] || printf 'header = "X-Narcis-Auth: Basic %s"\n' "$creds_b64"; } \
+    | curl -sS -X "$method" -o "$tmp_body" \
+    -w 'status=%{http_code}\n' -K - \
     ${hdr_args[@]+"${hdr_args[@]}"} \
     ${body:+--data "$body"} \
     "${BASE}${suffix}" > "$tmp_meta" 2>&1
@@ -138,12 +140,13 @@ EOF
   printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\rIDATx\x9cc\xfa\xff\xff?\x03\x00\x05\xfe\x02\xfe\xa7V\xc4\xc7\x00\x00\x00\x00IEND\xaeB`\x82' > "$PHOTO_FILE"
 
   CREDS_B64=$(printf '%s:%s' "$APP_AUTH_EMAIL" "$APP_AUTH_PASSWORD" | base64 | tr -d '\n')
+  basic() { printf 'header = "X-Narcis-Auth: Basic %s"\n' "$CREDS_B64"; }   # on curl's stdin, never argv (TB-56)
   PHOTO_PATH="${TEST_ID}/photos/${PHOTO_ID}"
 
   printf '\n--- POST photo (201 created) ---\n  POST %s%s\n' "$BASE" "$PHOTO_PATH"
-  P_STATUS=$(curl -sS -o /dev/null -w '%{http_code}' \
+  P_STATUS=$(basic | curl -sS -o /dev/null -w '%{http_code}' \
     -X POST "${BASE}${PHOTO_PATH}" \
-    -H "X-Narcis-Auth: Basic $CREDS_B64" \
+    -K - \
     -H "Content-Type: image/png" \
     --data-binary @"$PHOTO_FILE")
   if [ "$P_STATUS" = '201' ]; then
@@ -155,9 +158,9 @@ EOF
   fi
 
   printf '\n--- POST photo duplicate (200 exists) ---\n  POST %s%s\n' "$BASE" "$PHOTO_PATH"
-  P_STATUS=$(curl -sS -o /dev/null -w '%{http_code}' \
+  P_STATUS=$(basic | curl -sS -o /dev/null -w '%{http_code}' \
     -X POST "${BASE}${PHOTO_PATH}" \
-    -H "X-Narcis-Auth: Basic $CREDS_B64" \
+    -K - \
     -H "Content-Type: image/png" \
     --data-binary @"$PHOTO_FILE")
   if [ "$P_STATUS" = '200' ]; then
@@ -170,9 +173,9 @@ EOF
 
   GET_OUT=$(mktemp)
   printf '\n--- GET photo (200 + image MIME) ---\n  GET %s%s\n' "$BASE" "$PHOTO_PATH"
-  P_STATUS=$(curl -sS -o "$GET_OUT" -w '%{http_code}|%{content_type}' \
+  P_STATUS=$(basic | curl -sS -o "$GET_OUT" -w '%{http_code}|%{content_type}' \
     -X GET "${BASE}${PHOTO_PATH}" \
-    -H "X-Narcis-Auth: Basic $CREDS_B64")
+    -K -)
   P_CODE=${P_STATUS%%|*}
   P_TYPE=${P_STATUS##*|}
   P_SIZE=$(wc -c < "$GET_OUT" | tr -d ' ')

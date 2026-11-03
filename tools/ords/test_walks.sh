@@ -51,10 +51,9 @@ probe() {
   local password="${1:-}"; [ "$#" -ge 1 ] && shift || true
 
   local hdr_args=()
+  local creds_b64=""
   if [ -n "$email" ] || [ -n "$password" ]; then
-    local creds_b64
     creds_b64=$(printf '%s:%s' "$email" "$password" | base64 | tr -d '\n')
-    hdr_args=(-H "X-Narcis-Auth: Basic $creds_b64")
   fi
   if [ -n "$body" ]; then
     hdr_args+=(-H "Content-Type: application/json")
@@ -62,8 +61,11 @@ probe() {
 
   local tmp_body tmp_meta
   tmp_body=$(mktemp); tmp_meta=$(mktemp)
-  curl -sS -X "$method" -o "$tmp_body" \
-    -w 'status=%{http_code}\n' \
+  # The credentials reach curl as a config line on stdin (-K -), never as an -H argument in argv,
+  # which every user on the host can read (TB-56). No credentials: an empty config, no header.
+  { [ -z "$creds_b64" ] || printf 'header = "X-Narcis-Auth: Basic %s"\n' "$creds_b64"; } \
+    | curl -sS -X "$method" -o "$tmp_body" \
+    -w 'status=%{http_code}\n' -K - \
     ${hdr_args[@]+"${hdr_args[@]}"} \
     ${body:+--data "$body"} \
     "${BASE}${suffix}" > "$tmp_meta" 2>&1

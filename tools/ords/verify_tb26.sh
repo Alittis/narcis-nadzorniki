@@ -58,7 +58,9 @@ trap 'rm -f "$BODY"' EXIT
 
 printf '\nGET %s\n\n' "$BASE"
 CREDS_KEEP="$CREDS_B64"
-CODE=$(curl -s -o "$BODY" -w '%{http_code}' -H "X-Narcis-Auth: Basic $CREDS_B64" "$BASE")
+# The credentials reach curl as a config line on stdin (-K -), never as an -H argument in argv,
+# which every user on the host can read (TB-56).
+CODE=$(printf 'header = "X-Narcis-Auth: Basic %s"\n' "$CREDS_B64" | curl -s -o "$BODY" -w '%{http_code}' -K - "$BASE")
 unset PASSWORD CREDS_B64
 
 if [ "$CODE" != "200" ]; then
@@ -148,7 +150,7 @@ printf '\n  ---- timezone proof (TB-14 method, walks endpoint) ----\n'
 WBODY=$(mktemp)
 trap 'rm -f "$BODY" "$WBODY"' EXIT
 WALKS_URL="${BASE%disturbances/}walks/"
-WCODE=$(curl -s -o "$WBODY" -w '%{http_code}' -H "X-Narcis-Auth: Basic $CREDS_KEEP" "$WALKS_URL")
+WCODE=$(printf 'header = "X-Narcis-Auth: Basic %s"\n' "$CREDS_KEEP" | curl -s -o "$WBODY" -w '%{http_code}' -K - "$WALKS_URL")
 unset CREDS_KEEP
 
 if [ "$WCODE" != "200" ]; then

@@ -2109,6 +2109,23 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   records), or ask whether to keep them. Test with the booted-`AppState` harness; verify by removal.
 - **Discussion:** open.
 
+### TB-56 · The `tools/ords` test scripts put the login credentials and the bearer token in curl's argv
+`🐞 Bug` · `P3` · `Doing` · Reporter: Claude (VPS-71 follow-up, 2026-11-03) · Updated: 2026-11-03
+- **Problem:** `tools/ords/test_auth_login.sh`, `test_disturbances.sh`, `test_walks.sh` and `verify_tb26.sh`
+  passed `-H "X-Narcis-Auth: Basic <base64 of e-mail:password>"` to curl. `test_auth_login.sh` also passed
+  `-H "X-Narcis-Auth: Bearer $TOKEN"`. A command line is readable by every user on the host (VPS-71 in
+  `~/Developer/VPS`). The scripts run on the Mac only, from `APP_AUTH_EMAIL` and `APP_AUTH_PASSWORD` or a hidden
+  prompt.
+- **Done 2026-11-03:** every header reaches curl as a config line on stdin (`printf 'header = "…"' | curl -K -`).
+  With no credentials, the config is empty and no header is sent, as before. Request bodies still come from
+  `--data` or a file, so nothing else wants curl's stdin.
+- **Tested 2026-11-03** against a mock ORDS, HEAD against the new code, under macOS bash 3.2:
+  - Both versions sent the same 41 requests with the same outcomes: 25 with accepted Basic credentials, the 4
+    deliberate wrong-credential probes, 3 bearer calls, and the no-header probes.
+  - Both versions exited the same way (1, 7, 5 and 2), on the content checks the mock does not satisfy.
+  - No new curl argv held a credential, the token, `Bearer` or `Basic `. HEAD put a secret in 28 lines.
+- **Discussion:** none.
+
 ---
 
 ## Done
