@@ -1935,7 +1935,27 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   - Go/no-go.
   - Which library line: beta `vector_map_tiles` 9.x + `flutter_map` 8 (measured here) or stable
     8.0.0 + `flutter_map` 7 (untested).
-- **Next — narcis-vibed:** an NV item for the style and sprite routes above (not filed yet).
+- **narcis-vibed: NV-546 — live on `narcis.alittis.com` 2026-11-04** (`3e9538e` at 15:29 UTC, version
+  fix `dab16a8` at 16:00 UTC). Probed from the Mac 2026-11-04: both tones 200 with a strong ETag, 19
+  layers each, sprite JSON and PNG 200, a bad tone 400.
+  - `GET /api/layers/zos-style?tone=light|dark` (default light, anything else 400): 19 layers, source
+    `zos` = `pmtiles://<origin>/api/layers/zos-tiles`, `sprite` = `<origin>/api/layers/zos-sprite/sprite`.
+    `metadata["narcis:legend"]` rows carry `key` = `_cls`, `null` for single-class epo/nvj.
+  - `GET /api/layers/zos-sprite/sprite@2x.json|png`: 162×32 sheet at pixelRatio 2, drawn server-side
+    by `@napi-rs/canvas` from the same code the web map draws with.
+  - `metadata.version`: the first 12 hex digits of a sha256 over the style (without URLs and version),
+    the sprite and the tileset's **content** hash (`dab16a8`). It was the ETag at first, but the nightly
+    republish (pipeline step 15) renames a byte-identical file into place, which would have changed the
+    version, and so dropped the phone's tile cache, every night. Now it changes exactly when the file's
+    bytes change. Live 2026-11-04: light `106b1f98a980`, dark `64de1082b87f`.
+  - **For the TB-47 build:** an archive held open across a publish that does change the bytes still
+    reads the new file at old offsets until the phone sees the new version. So re-check the style (a
+    304 when unchanged) on app resume and whenever tile decoding fails.
+  - Both public, strong ETag, `max-age=0`, 304 on If-None-Match.
+  - Drift guard: `web/scripts/verify-zos-style-phone.ts` (one `PHONE` table read from
+    `vector_tile_renderer` 6.1.0). It also allows `icon-allow-overlap` / `icon-ignore-placement`, at
+    `true` only (the renderer ignores both and draws every icon). Re-run from this session 2026-11-04:
+    22 passed, 0 failed.
 - **Absorbs TB-37** (natural monuments): the web's ZO *Vrsta* facet (NV-84) already separates them, so
   if this lands within weeks, TB-37 should not be built on GeoServer first.
 - **Stays external either way:** GURS parcels (WMS), the OSM and Esri basemaps.
