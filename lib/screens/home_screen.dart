@@ -9,6 +9,7 @@ import 'package:narcis_nadzorniki/data/disturbance_filter.dart';
 import 'package:narcis_nadzorniki/data/map_layers_store.dart';
 import 'package:narcis_nadzorniki/data/map_view_store.dart';
 import 'package:narcis_nadzorniki/data/obmocja_store.dart';
+import 'package:narcis_nadzorniki/data/zos_style_store.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
 import 'package:narcis_nadzorniki/screens/detail_screen.dart';
 import 'package:narcis_nadzorniki/screens/form_screen.dart';
@@ -24,6 +25,7 @@ import 'package:narcis_nadzorniki/widgets/lost_photos_dialog.dart';
 import 'package:narcis_nadzorniki/widgets/motnje_filter_sheet.dart';
 import 'package:narcis_nadzorniki/widgets/obmocja_picker.dart';
 import 'package:narcis_nadzorniki/widgets/obmocje_sheet.dart';
+import 'package:narcis_nadzorniki/widgets/zos_layer.dart';
 import 'package:provider/provider.dart';
 
 enum AppMode { motnje, obhodi, mode3, mode4 }
@@ -80,7 +82,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   static const _sloveniaCenter = LatLng(46.15, 14.99);
   static const _sloveniaZoom = 8.0;
 
@@ -90,6 +92,8 @@ class _HomeScreenState extends State<HomeScreen> {
   final _mapViewStore = MapViewStore();
   final _mapLayersStore = MapLayersStore();
   final _obmocjaStore = ObmocjaStore();
+  // The Območja overlay: the VPS tileset in the web's style (TB-47).
+  final _zos = ZosOverlay();
   LatLng _center = _sloveniaCenter;
   double _initialZoom = _sloveniaZoom;
   bool _viewLoaded = false;
@@ -113,7 +117,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _showParcele = MapLayers.defaults.showParcele;
   // Active "Območja s statusom" sublayers; Natura 2000 on by default.
   final Set<ZosKind> _activeZos = {...MapLayers.defaults.zos};
-  // True while a tap's GetFeatureInfo identify is in flight.
+  // True while a tap's identify is in flight.
   bool _identifying = false;
   // Last Območja identify tap; drives the buffer circle on the map.
   LatLng? _obmocjaTapPoint;
@@ -127,6 +131,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _zos.addListener(_onZosChanged);
     _bootstrapView();
     _restoreLayers();
     // TB-52: a photo dropped during a sync is announced once, over whatever
@@ -149,16 +155,36 @@ class _HomeScreenState extends State<HomeScreen> {
   /// TB-40: the layer setup the user left the map with.
   Future<void> _restoreLayers() async {
     final saved = await _mapLayersStore.load();
-    if (saved == null || !mounted) return;
-    setState(() {
-      _basemapMode = saved.basemap;
-      _showMotnje = saved.showMotnje;
-      _showObhodi = saved.showObhodi;
-      _showParcele = saved.showParcele;
-      _activeZos
-        ..clear()
-        ..addAll(saved.zos);
-    });
+    if (!mounted) return;
+    if (saved != null) {
+      setState(() {
+        _basemapMode = saved.basemap;
+        _showMotnje = saved.showMotnje;
+        _showObhodi = saved.showObhodi;
+        _showParcele = saved.showParcele;
+        _activeZos
+          ..clear()
+          ..addAll(saved.zos);
+      });
+    }
+    _syncZosTone();
+  }
+
+  /// The Območja style follows the basemap: light over OSM, dark over the
+  /// satellite imagery (TB-47, as the web does).
+  void _syncZosTone() {
+    _zos.useTone(
+        _basemapMode == BasemapMode.satellite ? ZosTone.dark : ZosTone.light);
+  }
+
+  void _onZosChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // A publish on the VPS while the app was away shows up as a new version.
+    if (state == AppLifecycleState.resumed) _zos.recheck();
   }
 
   /// Applies a layer change and remembers it (TB-40).
@@ -175,6 +201,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _zos
+      ..removeListener(_onZosChanged)
+      ..dispose();
     _appState.removeListener(_tellLostPhotos);
     _positionSub?.cancel();
     super.dispose();
@@ -508,15 +538,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       if (_activeZos.isNotEmpty) _identifyObmocja(point);
                     },
                     onPositionChanged: (position, _) {
-                      if (position.center != null) {
-                        _center = position.center!;
-                      }
+                      _center = position.center;
                     },
                   ),
                   children: [
                     ...basemapTileLayers(_basemapMode),
                     if (_showParcele) ...parceleOverlayTileLayers(),
-                    if (_activeZos.isNotEmpty) ...obmocjaWmsLayers(_activeZos),
+                    ?_zos.layer(_activeZos),
                     if (_activeZos.isNotEmpty && _obmocjaTapPoint != null)
                       obmocjaBufferCircleLayer(
                         _obmocjaTapPoint!,
@@ -546,7 +574,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
                 onSearchTap: _openSearch,
                 onSyncTap: state.isSyncing ? null : state.syncAll,
-                onBasemapChanged: (m) => _setLayers(() => _basemapMode = m),
+                onBasemapChanged: (m) {
+                  _setLayers(() => _basemapMode = m);
+                  _syncZosTone();
+                },
                 onMotnjeTap: () => showMotnjeFilterSheet(
                   context,
                   showMotnje: _showMotnje,
@@ -694,9 +725,10 @@ class _HomeScreenState extends State<HomeScreen> {
     return out;
   }
 
-  /// Tap-to-identify: GetFeatureInfo for the Natura 2000 areas under the tapped
-  /// point. Opens the list/detail sheet when one or more areas are hit; a tap
-  /// on no area does nothing. A small indicator marks the in-flight query.
+  /// Tap-to-identify: the protected areas under the tapped point, read from
+  /// the tileset itself (TB-47). Opens the list/detail sheet when one or more
+  /// areas are hit; a tap on no area does nothing. A small indicator marks the
+  /// in-flight query.
   Future<void> _identifyObmocja(LatLng point) async {
     if (_identifying) return;
     setState(() {
@@ -704,7 +736,12 @@ class _HomeScreenState extends State<HomeScreen> {
       _obmocjaTapPoint = point;
     });
     try {
-      final features = await _obmocjaStore.identify(point, _activeZos);
+      final features = await _obmocjaStore.identify(
+        point,
+        _activeZos,
+        readTile: _zos.readTile,
+        legend: _zos.bundle?.legend ?? const {},
+      );
       if (!mounted) return;
       if (features.isNotEmpty) showObmocjaSheet(context, features);
     } on ObmocjaException {

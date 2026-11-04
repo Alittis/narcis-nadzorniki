@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:narcis_nadzorniki/data/obmocja_store.dart';
 
 enum BasemapMode { osm, satellite }
 
@@ -61,37 +60,8 @@ List<Widget> parceleOverlayTileLayers() {
   ];
 }
 
-// NarcIS production GeoServer (public WMS). The "Območja s statusom" layers
-// live in the SI.NARCIS workspace, rendered with GeoServer's own published
-// styles (STYLES empty). Tiles load per-viewport — instant first paint, and it
-// scales to any sublayer because the server rasterises. Layer names + ordering
-// are in obmocja_store.dart (zosWmsLayers / zosOrder).
-const String _narcisOwsBase = 'https://narcis.gov.si/ows/ows?';
-
-/// Protected-area ("Območja s statusom") overlay as server-styled WMS tiles for
-/// the [active] sublayers, stacked into one request (polygons under points,
-/// flagship layers under the rest). Tap-to-identify is handled separately via
-/// GeoServer GetFeatureInfo (see `ObmocjaStore.identify`).
-List<Widget> obmocjaWmsLayers(Set<ZosKind> active) {
-  final names = <String>[];
-  for (final k in zosOrder) {
-    if (active.contains(k)) names.addAll(zosWmsLayers[k]!);
-  }
-  if (names.isEmpty) return const [];
-  return [
-    TileLayer(
-      wmsOptions: WMSTileLayerOptions(
-        baseUrl: _narcisOwsBase,
-        layers: names,
-        format: 'image/png',
-        transparent: true,
-        version: '1.3.0',
-      ),
-      maxZoom: 19,
-      userAgentPackageName: _userAgent,
-    ),
-  ];
-}
+// The "Območja s statusom" overlay is the VPS tileset drawn on the device
+// (TB-47): see `ZosOverlay` in zos_layer.dart.
 
 List<Widget> basemapTileLayers(BasemapMode mode) {
   switch (mode) {
@@ -142,7 +112,7 @@ CircleLayer userAccuracyCircleLayer(LatLng point, double accuracyMeters) {
 }
 
 /// Same halo style, drawn at the last Območja tap to show the identify search
-/// radius (the GetFeatureInfo buffer). Radius from `ObmocjaStore.bufferRadiusMeters`.
+/// radius for points. Radius from `ObmocjaStore.bufferRadiusMeters`.
 CircleLayer obmocjaBufferCircleLayer(LatLng point, double radiusMeters) {
   return CircleLayer(circles: [_haloCircle(point, radiusMeters)]);
 }

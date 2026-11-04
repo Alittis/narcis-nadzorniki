@@ -328,3 +328,24 @@ python3 tools/icon/build_login_bg.py
 ```
 
 The login screen's `Image.asset` falls back to a solid `#2E7D32` panel via `errorBuilder` if the file is missing, so the app still launches on a fresh clone before the asset is added — useful for CI / fresh-machine bootstrap, not as a long-term default.
+
+## 13. Območja Layer (TB-47 — built 2026-11-04, not yet released)
+From the next release the Območja overlay comes from narcis-vibed on the VPS, not the NarcIS GeoServer (ARCHITECTURE §10.2). The Play build 1.14.0+24 still reads GeoServer.
+
+- **Logs:** `[zos] <tone> style <version> on` when a style takes effect; `[zos] style check failed: …` when the VPS cannot be reached (the device's last copy stays on); `[zos] renderer: …` when the phone's renderer skipped part of the style.
+  ```bash
+  ~/Library/Android/sdk/platform-tools/adb logcat -v time '*:S' flutter:I | grep '\[zos\]'
+  ```
+- **The layer stays blank:** the first start needs the network (no style on the device yet). After that the device's copy is used offline, but only tiles already in the cache draw, and identify needs the network.
+- **A web style or tileset change** reaches the phone as a new `metadata.version`: on the next start, basemap switch, app resume or failed tile read. The phone then reopens the archive and starts a fresh tile cache folder.
+- **Drift guard, phone half.** It checks that the served style still goes through the phone's renderer whole:
+  ```bash
+  ZOS_LIVE=1 flutter test test/zos_render_style_test.dart
+  ```
+  Without `ZOS_LIVE=1` it checks the fixtures in `test/fixtures/zos/` (the live style of 2026-11-04). A failure means the web style uses something `vector_tile_renderer` 6.1.0 skips. Fix it in narcis-vibed (its `verify-zos-style-phone.ts` should have failed too) or teach `zosRenderStyle` the new form.
+- **Changing the phone's conversion or dot drawing** (`lib/data/zos_render_style.dart`, `zosSpriteStyle`): bump `kZosRendererRevision`. Otherwise phones keep showing raster tiles cached under the old revision.
+- **Probe the VPS side:**
+  ```bash
+  curl -sS -D - -o /dev/null "https://narcis.alittis.com/api/layers/zos-style?tone=light" | grep -iE "^HTTP|^etag"
+  curl -sS "https://narcis.alittis.com/api/layers/detail/401" | head -c 200
+  ```

@@ -4,14 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:narcis_nadzorniki/data/obmocja_store.dart';
 
 // ── Sublayer presentation ───────────────────────────────────────────────────
-// The map tiles are server-rendered by the NarcIS GeoServer; these swatches
-// mirror that SLD so the identify list shows the SAME colour + shape the user
-// sees on the map. Colours/rules captured from GetLegendGraphic (FORMAT=
-// application/json) on the SI.NARCIS ZOS_* layers, 2026-06-15 — if ARSO restyles
-// a layer, re-pull and update here. Shape is the feature's real geometry: areas
-// (polygons) vs the per-layer point marks (circle / triangle / cave).
+// The map draws the web map's own style, served by the VPS (TB-47). A swatch
+// takes the feature's colour from that style's legend (`ObmocjeFeature.color`)
+// and its shape from how the style draws the feature: areas filled — Natura
+// 2000 POV as an outline, because the phone has no hatch — and points as their
+// layer's mark (dot, triangle or cave).
 
-/// The on-map mark for one identified feature: its SLD shape + fill colour.
+/// The on-map mark for one identified feature: its shape + colour.
 enum ZosShape { polygon, polygonOutline, circle, triangle, cave }
 
 class ZosSymbol {
@@ -20,60 +19,29 @@ class ZosSymbol {
   final ZosShape shape;
 }
 
-/// N2k splits POV (SPA, red outline) from POO (SAC, orange fill) on its `tip`.
-bool _n2kIsPov(ObmocjeFeature f) => f.tip.toUpperCase().startsWith('POV');
+/// Grey when the legend had no colour for the feature.
+const Color _noLegendColor = Color(0xFF8E8E93);
 
-/// ZO is coloured per `ZO_VRSTA` (7 categories), same colour for its polygon
-/// and point renderings. Unknown vrsta falls back to the park green.
-Color _zoVrstaColor(String vrsta) {
-  switch (vrsta.toLowerCase().trim()) {
-    case 'narodni park':
-      return const Color(0xFF6CC092);
-    case 'regijski park':
-      return const Color(0xFF80B537);
-    case 'krajinski park':
-      return const Color(0xFF8D8634);
-    case 'naravni spomenik':
-      return const Color(0xFFCD4E1B);
-    case 'naravni rezervat':
-      return const Color(0xFFD01C8B);
-    case 'strogi naravni rezervat':
-      return const Color(0xFFE683C0);
-    case 'spomenik oblikovane narave':
-      return const Color(0xFFAB61E4);
-    default:
-      return const Color(0xFF6CC092);
-  }
-}
-
-/// The real GeoServer symbol for [f] — colour + shape — matched by the same
-/// attribute its SLD rule keys on (tip / ZO_VRSTA / NV_POMEN / NV_STATUS) and
-/// by geometry (polygon vs point, via [ObmocjeFeature.isPoint]).
+/// The map's mark for [f]: the legend colour of its class, in the shape the
+/// served style draws it with.
 ZosSymbol zosSymbol(ObmocjeFeature f) {
+  final argb = f.color;
+  final color = argb == null ? _noLegendColor : Color(argb);
+  if (!f.isPoint) {
+    final outline = f.kind == ZosKind.n2k && f.cls == 'POV';
+    return ZosSymbol(
+        color, outline ? ZosShape.polygonOutline : ZosShape.polygon);
+  }
   switch (f.kind) {
-    case ZosKind.n2k:
-      return _n2kIsPov(f)
-          ? const ZosSymbol(Color(0xFFE30000), ZosShape.polygonOutline)
-          : const ZosSymbol(Color(0xFFD98210), ZosShape.polygon);
-    case ZosKind.zo:
-      return ZosSymbol(_zoVrstaColor(f.vrsta),
-          f.isPoint ? ZosShape.circle : ZosShape.polygon);
-    case ZosKind.epo:
-      return f.isPoint
-          ? const ZosSymbol(Color(0xFF0C000B), ZosShape.circle)
-          : const ZosSymbol(Color(0xFFFBFB7F), ZosShape.polygon);
     case ZosKind.nv:
-      if (f.isPoint) {
-        final lokalni = f.pomen.toLowerCase().startsWith('lokal');
-        return ZosSymbol(
-            lokalni ? const Color(0xFF178D89) : const Color(0xFFD6161F),
-            ZosShape.triangle);
-      }
-      return f.status.toUpperCase() == 'OP'
-          ? const ZosSymbol(Color(0xFFD6161F), ZosShape.polygonOutline)
-          : const ZosSymbol(Color(0xFFD6161F), ZosShape.polygon);
+      return ZosSymbol(color, ZosShape.triangle);
     case ZosKind.nvj:
-      return const ZosSymbol(Color(0xFFD6161F), ZosShape.cave);
+    case ZosKind.epo:
+      return ZosSymbol(color, ZosShape.cave);
+    case ZosKind.n2k:
+    case ZosKind.zo:
+    case ZosKind.mvo:
+      return ZosSymbol(color, ZosShape.circle);
   }
 }
 
@@ -90,6 +58,8 @@ String zosTitle(ZosKind k) {
       return 'Naravne vrednote';
     case ZosKind.nvj:
       return 'Naravne vrednote – jame';
+    case ZosKind.mvo:
+      return 'Mednarodno varovana območja';
   }
 }
 
@@ -106,24 +76,24 @@ String zosShort(ZosKind k) {
       return 'Naravna vrednota';
     case ZosKind.nvj:
       return 'Naravna vrednota – jama';
+    case ZosKind.mvo:
+      return 'Mednarodno varovano območje';
   }
 }
 
 /// Text label for one identified feature. N2k keeps the POV/POO distinction;
 /// other kinds use their sublayer's short label. (Colour + shape: [zosSymbol].)
 String _badgeLabel(ObmocjeFeature f) {
-  if (f.kind == ZosKind.n2k && f.tip.isNotEmpty) {
-    return _n2kIsPov(f) ? 'Natura 2000 · POV' : 'Natura 2000 · POO';
-  }
+  if (f.kind == ZosKind.n2k && f.cls.isNotEmpty) return 'Natura 2000 · ${f.cls}';
   return zosShort(f.kind);
 }
 
 // ── Identify result sheet ───────────────────────────────────────────────────
 
-/// Bottom sheet for the protected areas under a map tap, from one WMS
-/// GetFeatureInfo across the active sublayers. Several hits (overlap is the
-/// norm) open as a list; a row-tap drills into that area's detail; a single hit
-/// opens detail directly. All attributes are already in [features].
+/// Bottom sheet for the protected areas under a map tap (`ObmocjaStore.identify`
+/// across the active sublayers). Several hits (overlap is the norm) open as a
+/// list; a row-tap drills into that area's detail; a single hit opens detail
+/// directly. All attributes are already in [features].
 Future<void> showObmocjaSheet(
   BuildContext context,
   List<ObmocjeFeature> features,
@@ -352,8 +322,8 @@ class _DetailRow extends StatelessWidget {
   }
 }
 
-/// Small swatch drawing a feature's real GeoServer mark — colour + shape from
-/// [zosSymbol]: a translucent area for polygons, an outline for POV/OP areas,
+/// Small swatch drawing a feature's map mark — colour + shape from
+/// [zosSymbol]: a translucent area for polygons, an outline for POV areas,
 /// and the per-layer point marks (circle / triangle / cave glyph).
 class _ZosSwatch extends StatelessWidget {
   const _ZosSwatch(this.symbol, {this.size = 16});
@@ -409,8 +379,8 @@ class _ZosSwatchPainter extends CustomPainter {
         canvas.drawPath(p, Paint()..color = c);
         canvas.drawPath(p, edge);
       case ZosShape.cave:
-        // Cave entrance: a red arch/dome rising from a flat base line, with the
-        // dark entrance dot resting on that base — the GeoServer jame mark.
+        // Cave entrance: an arch/dome rising from a flat base line, with the
+        // dark entrance dot resting on that base — the web's cave mark.
         // NB: addArc sweeps clockwise from +x, so (math.pi, math.pi) is the TOP
         // half (arch); (0, math.pi) would be the bottom half (an upside-down bowl).
         final r = size.width / 2 - 1.5;

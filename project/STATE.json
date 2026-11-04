@@ -232,6 +232,7 @@
     },
     {
       "name": "NarcIS GeoServer (production WMS) — Območja overlay",
+      "status": "used by the builds up to 1.14.0+24 (the Play build); replaced by TB-47 (the next entry) from the next release. Down since ~2026-10-29 17:27 UTC (refuses connections), so on those builds Območja draws nothing and identify shows the network-error snackbar.",
       "base_url": "https://narcis.gov.si/ows/ows",
       "purpose": "'Območja s statusom' map overlay (all five sublayers): server-rendered WMS tiles + tap-to-identify (GetFeatureInfo). The production GeoServer the APEX NarcIS app uses. Public (no auth) for these layers.",
       "service": "OGC WMS 1.3.0",
@@ -253,6 +254,23 @@
       "replaces": "the prior ORDS vib/zos + vib/zos-detail GeoJSON+proj4dart approach (removed 2026-06-15): that endpoint serialises live via SDO_UTIL.TO_GEOJSON (~14-16s time-to-first-byte per cold request, measured) and whole-layer vector download did not scale to NV (5.3k) / NVJ (14.7k). proj4dart dependency removed.",
       "auth": "none (public) for SI.NARCIS:ZOS_* layers; some other GeoServer layers are HTTP-Basic gated (SPLETNI_GIS) — not used here",
       "verified": "2026-06-15 — GetCapabilities 200 (~0.8s, 85 layers); GetMap 200 image/png for all five sublayers (ZOS_N2K/ZO/EPO/NV_PLG + ZOS_NV_PNT_JAME); GetFeatureInfo over Cerknica returned overlapping areas across N2k/ZO/EPO/NV with per-kind attributes. On-device tile render + tap on the A56 verified for N2k; ZO/EPO/NV/jame on-device UNVERIFIED as of this edit."
+    },
+    {
+      "name": "narcis-vibed ZOS layers (VPS) — Območja overlay (TB-47)",
+      "status": "built 2026-11-04, NOT RELEASED: in the code from the next release on; the Play build 1.14.0+24 still reads the GeoServer entry above",
+      "base_url": "https://narcis.alittis.com (kZosOrigin in lib/data/zos_style_store.dart; every build, whatever BELEZNICA_API points at)",
+      "purpose": "'Območja s statusom' overlay, all six sublayers (n2k zo epo nv nvj mvo), drawn on the device from the web map's tileset in the web map's own style; tap-to-identify from the tile data plus the VPS register's detail",
+      "requests": [
+        {"request": "GET /api/layers/zos-tiles", "use": "PMTiles v3 archive (MVT, z5-15, ~32.5 MB), HTTP byte ranges, strong ETag (narcis-vibed NV-400); opened by pmtiles 1.3.0, drawn by vector_map_tiles 9.0.0-beta.9 in raster mode; z16-18 built on the device from z15 (zosOverzoomTile)"},
+        {"request": "GET /api/layers/zos-style?tone=light|dark", "use": "MapLibre style v8 of the web map (narcis-vibed NV-546); metadata.version = hash over style, sprite and tileset content; metadata[\"narcis:legend\"] = class rows; revalidated by ETag on start, tone change, resume and after a failed tile read"},
+        {"request": "GET /api/layers/zos-sprite/sprite@2x.json|png", "use": "the web map's icons (triangles, caves, POV hatch), fetched when the style changes"},
+        {"request": "GET /api/layers/detail/<id>", "use": "one call per identified area (id = NARCIS_ZOS.ID = the MVT feature id), in parallel; a failure leaves that area's rows to the tile fields"}
+      ],
+      "client_conversion": "zosRenderStyle (lib/data/zos_render_style.dart): circle -> symbol with dot sprites; the N2k POV fill-pattern hatch dropped (outline kept); a paint block added to icon-only symbol layers. kZosRendererRevision = 2 (bump when the conversion or the sprite drawing changes)",
+      "device_storage": "documents/zos_style/ (last style + sprite per tone); <temp>/zos_tiles/<style version>/ (vector_map_tiles raster + tile-byte cache, 30-day TTL, 50 MB cap; per version because the library keys tile bytes by z/x/y only; older versions deleted on a version change)",
+      "drift_guard": "narcis-vibed web/scripts/verify-zos-style-phone.ts + test/zos_render_style_test.dart (fixtures; ZOS_LIVE=1 checks the live style)",
+      "auth": "none (public)",
+      "verified": "2026-11-04 — suite 256 passed + 1 network test skipped (passes with ZOS_LIVE=1); on the A56 (SM-A566B) through a login-free harness of the same code (the real login needs ORDS, down): all six layers draw in both tones, identify at Cerknica 9 areas in 677 ms cold with details, z16+ drawn without tile seams. The home screen's own wiring (tone sync, resume re-check, remembered layers) NOT exercised on a device."
     }
   ],
   "bundled_assets": [
@@ -414,7 +432,7 @@
     "from": "Oracle/ORDS on narcis.gov.si (app-auth/, disturbances/, walks/; TB_* tables; TB_AUTH_TOKENS)",
     "to": "Postgres schema beleznica in narcis_spike on the narcis-vibed VPS, served by Next.js at https://narcis.alittis.com/api/beleznica/app/v1/ (proposed path), vibed token auth",
     "plan": "narcis-vibed project/NV-259-BELEZNICA-PLAN.md",
-    "items": ["narcis-vibed NV-259", "TB-45 (logout guard, ships first)", "TB-46 (phone side)", "TB-47 (GeoServer -> VPS layer swap, separate later release)"],
+    "items": ["narcis-vibed NV-259", "TB-45 (logout guard, ships first)", "TB-46 (phone side)", "TB-47 (GeoServer -> VPS layer swap, separate later release; built 2026-11-04, unreleased)"],
     "identity_unchanged": "users, orgs and function grants stay in NarcIS Oracle; login and per-request verify still go through ORDS vibed-auth"
   }
 }

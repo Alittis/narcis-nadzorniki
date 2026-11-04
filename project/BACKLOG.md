@@ -1736,7 +1736,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** — built into **v1.14.0+24** (2026-10-14, archived `~/Releases/terenska-beleznica-1.14.0+24.aab`, signed with the upload key; release notes PLAY_CLOSED_TEST §3.3); ~~**not yet uploaded**~~ **uploaded 2026-10-14, managed publishing on; review passed the same day** (owner) — held under *Changes ready to publish*. Publish only at T0 step 9 (narcis-vibed OPERATIONS §21.9). **Upgrade path proven 2026-10-14** (narcis-vibed B14): a queue made in 1.10.1 and in 1.13.0 survives the in-place update and drains after the forced re-login; walks not covered. Flips to `Done` when the release is live after T0.
 
 ### TB-47 · Read the Območja layers from the VPS instead of the NarcIS GeoServer
-`✨ Enhancement` · `P2` · `Doing` (spike complete 2026-11-04; go/no-go is the owner's; ~~`Blocked` on TB-46 / NV-259 cutover~~ — TB-46 live 2026-10-15) · Reporter: Alexis (owner direction, 2026-10-12) · Updated: 2026-11-04
+`✨ Enhancement` · `P2` · `Doing` (built 2026-11-04, not released; owner: go, beta 9.x line; ~~`Blocked` on TB-46 / NV-259 cutover~~ — TB-46 live 2026-10-15) · Reporter: Alexis (owner direction, 2026-10-12) · Updated: 2026-11-04
 - **Want:** drop the dependence on `narcis.gov.si/ows` (ARCHITECTURE §10.2) and draw the protected-area
   layers from the data narcis-vibed already holds in Postgres. The web serves them as a static vector
   tileset (`zos.pmtiles` via `/api/layers/zos-tiles`, NV-400) with legends and facets. Once TB-46 puts
@@ -1931,10 +1931,8 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
       `fill-pattern` as named exceptions. Added to the narcis-vibed session's scope.
     - **Phone (TB-47 build):** a test that loads the live style into `vector_tile_renderer` and fails
       on any warning. This also catches the narcis-vibed subset going stale after a renderer upgrade.
-- **Next — owner's call:**
-  - Go/no-go.
-  - Which library line: beta `vector_map_tiles` 9.x + `flutter_map` 8 (measured here) or stable
-    8.0.0 + `flutter_map` 7 (untested).
+- **Owner's calls (2026-11-04):** go with the swap; the beta `vector_map_tiles` 9.x + `flutter_map` 8
+  line (the one measured here).
 - **narcis-vibed: NV-546 — live on `narcis.alittis.com` 2026-11-04** (`3e9538e` at 15:29 UTC, version
   fix `dab16a8` at 16:00 UTC). Probed from the Mac 2026-11-04: both tones 200 with a strong ETag, 19
   layers each, sprite JSON and PNG 200, a bad tone 400.
@@ -1959,6 +1957,46 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Absorbs TB-37** (natural monuments): the web's ZO *Vrsta* facet (NV-84) already separates them, so
   if this lands within weeks, TB-37 should not be built on GeoServer first.
 - **Stays external either way:** GURS parcels (WMS), the OSM and Esri basemaps.
+- **Build (2026-11-04) — in the code, not released.** ARCHITECTURE §10.2, OPERATIONS §13, STATE.json
+  `external_services`.
+  - **Libraries:** `flutter_map` 6.2.1 → 8.3.2 (one fix: `position.center` is non-null now), plus
+    `vector_map_tiles` 9.0.0-beta.9 (exact pin), `vector_map_tiles_pmtiles` 1.5.2, `pmtiles` 1.3.0,
+    `vector_tile_renderer` 6.1.0, `vector_tile` 2.0.1. The suite passed unchanged under `flutter_map` 8
+    (228/228) before any layer work.
+  - **What changed:**
+    - `obmocjaWmsLayers` and GetFeatureInfo are gone.
+    - `ZosOverlay` (`lib/widgets/zos_layer.dart`) draws the six layers from the served style:
+      `ZosStyleStore` loads it, `zosRenderStyle` converts it, `zosSpriteStyle` builds the atlas.
+    - `ObmocjaStore.identify` reads the z15 tiles and the VPS detail.
+    - The sheet's swatches come from the served legend.
+    - `ZosKind.mvo` is new, so it has a picker row and a remembered choice.
+  - **Found on the A56: a grid of lines at z16+.**
+    - Cause: `vector_map_tiles`' raster-mode over-zoom clips the z15 tile exactly at each deeper
+      tile's edge, with no buffer (`vector_tile_loading_cache.dart` `_createTile`). The outline layers
+      then draw that cut, a 3 px line along every tile edge. Unchanged in beta.13 (source read).
+    - Fix: the provider serves z16–18 itself. `zosOverzoomTile` scales the z15 ancestor without
+      cutting anything, and the canvas trims it. A pixel profile at z18 shows the seams gone.
+  - **Dropped with GeoServer:**
+    - The ZO *Predpis* row (`CITAT` is not in the VPS detail).
+    - NV *OP* outline-only areas (the web style draws NV areas alike).
+  - **Verified 2026-11-04:**
+    - Tests: suite 256 passed + 1 skipped (the live-style guard; it passes with `ZOS_LIVE=1`).
+      `flutter analyze` is at the 10 info lints that were there before.
+    - On the A56, a profile build of a login-free harness running the same code. The real login
+      needs ORDS, which is down.
+      - All six layers draw in both tones, with no renderer warning.
+      - The picker shows six rows.
+      - Identify at Cerknica: 9 areas in 677 ms cold, swatches from the legend, and the POV detail
+        from the register.
+      - z18 draws without seams.
+      - The harness was uninstalled afterwards.
+  - **Not verified:**
+    - The home screen's own wiring on a device: tone sync on a basemap switch, the re-check on
+      resume, and remembered layers with `mvo`. Needs a login, so ORDS back up.
+    - The location picker and walk-detail maps under `flutter_map` 8. They compile, and the tests
+      pass.
+    - The release size. Profile APKs varied 82–105 MB between builds; the release step compares
+      the per-ABI download against 1.14.0.
 - **Shipped:** —
 
 ### TB-48 · After a rejected session, a different user can send the previous user's queued records as their own
