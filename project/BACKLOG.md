@@ -1807,17 +1807,40 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
       (`caches_tile_provider.dart:63`). That is log noise, not a crash.
     - **Network** (pure Dart on the Mac): archive open 191 ms; tile fetch p50 38 ms, p90 110 ms;
       z5 tile decode 75–117 ms.
-  - **Performance — not answered.** The emulator fell back to software GL (host memory pressure).
-    Frame times there mean nothing: the basemap alone managed ~10 frames in 15 s. It needs a profile
-    build of the harness on the A56; none was attached.
-    - The risk to measure is the low-zoom tiles carrying the whole dataset.
-    - If the A56 struggles, there are two options: a minimum zoom for the overlay, or a lighter phone
-      tileset built by narcis-vibed (cross-repo; no NV item yet).
-  - **Option noted, not tried:** download the 32.5 MB archive once and read it with
-    `PmTilesArchive.fromFile`, so the layer works offline in the field. WMS never could; it needs an
-    ETag-based refresh.
-  - **Next:** (1) the A56 profile run; (2) point rendering; (3) then the go/no-go and which library
-    line to take.
+  - **Performance on the emulator — not answered.** It fell back to software GL (host memory
+    pressure), so its frame times mean nothing: the basemap alone managed ~10 frames in 15 s.
+- **Spike, part 2 (2026-11-04): A56 run — areas answered.** Galaxy A56 (SM-A566B, Android 16, ~120 Hz).
+  Profile build of the harness as a separate app (`si.terenska.beleznica.spike`), uninstalled
+  afterwards. The phone's Play app and its old `Beležnica dev` (1.4.0-dev, 74 records + 22 walks, all
+  synced) were not touched. Raw lines are local-only in `misc/tb47-spike/a56-results.txt`.
+  - **Scripted camera tour,** 17.5 s per phase from the z6.5 overview through Kras, Cerknica,
+    Ljubljana and TNP. At ~120 Hz the frame budget is 8.3 ms.
+    | phase | frames | p90 frame | over 16.7 ms | worst |
+    |---|---|---|---|---|
+    | OSM only | 2088 | 6.5 ms | 0.0 % | 15 ms |
+    | overlay, raster mode, cold (301 tiles, 7.9 MB) | 1918 | 8.8 ms | 2.6 % | 89 ms |
+    | overlay, raster mode, warm | 2005 | 6.8 ms | 1.0 % | 29 ms |
+    | overlay, vector mode, warm | 1069 | 52.1 ms | 63 % | 136 ms |
+    - **Raster mode** (the library default) is smooth; **vector mode is not usable.**
+  - **Time to overlay, cold** (app data cleared): switching the overlay on at the z7 overview fetches
+    2 tiles (1.5 MB, 328 ms average). The whole of Slovenia is drawn by the first screenshot after
+    the switch, at +1.6 s.
+  - **Identify on the A56:** 106 ms per tap (z15 tile fetch, decode and hit test), versus a WMS
+    GetFeatureInfo round trip today.
+  - **Not covered:** points, because icons still do not draw (above), so the 14.7k NVJ points' cost is
+    not in these numbers.
+  - **File cache:** with `fileCacheTtl: Duration.zero`, a relaunch still drew the z7 tiles without
+    calling the provider, from the disk cache of the previous run. Stale tiles after a web *Objavi*
+    can therefore outlive the archive reopen too; needs an explicit cache key or clear.
+  - **Low-zoom density is a readability issue, not a speed one** (for areas; points unmeasured): at
+    z7, all layers on, Slovenia is a solid blanket of NV outlines. A per-layer `minzoom` in the phone
+    theme could fix that without a lighter tileset.
+- **Option noted, not tried:** download the 32.5 MB archive once and read it with
+  `PmTilesArchive.fromFile`, so the layer works offline in the field. WMS never could; it needs an
+  ETag-based refresh.
+- **Next:** (1) point rendering: fix the icon path, or draw points with `flutter_map`'s own layers
+  from decoded tile data, then re-measure on the A56 with NVJ on; (2) then the go/no-go and which
+  library line to take (beta 9.x + `flutter_map` 8, or stable 8.0.0 + `flutter_map` 7).
 - **Absorbs TB-37** (natural monuments): the web's ZO *Vrsta* facet (NV-84) already separates them, so
   if this lands within weeks, TB-37 should not be built on GeoServer first.
 - **Stays external either way:** GURS parcels (WMS), the OSM and Esri basemaps.
