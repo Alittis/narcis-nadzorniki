@@ -1736,7 +1736,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** — built into **v1.14.0+24** (2026-10-14, archived `~/Releases/terenska-beleznica-1.14.0+24.aab`, signed with the upload key; release notes PLAY_CLOSED_TEST §3.3); ~~**not yet uploaded**~~ **uploaded 2026-10-14, managed publishing on; review passed the same day** (owner) — held under *Changes ready to publish*. Publish only at T0 step 9 (narcis-vibed OPERATIONS §21.9). **Upgrade path proven 2026-10-14** (narcis-vibed B14): a queue made in 1.10.1 and in 1.13.0 survives the in-place update and drains after the forced re-login; walks not covered. Flips to `Done` when the release is live after T0.
 
 ### TB-47 · Read the Območja layers from the VPS instead of the NarcIS GeoServer
-`✨ Enhancement` · `P2` · `Doing` (spike; ~~`Blocked` on TB-46 / NV-259 cutover~~ — TB-46 live 2026-10-15) · Reporter: Alexis (owner direction, 2026-10-12) · Updated: 2026-11-04
+`✨ Enhancement` · `P2` · `Doing` (spike complete 2026-11-04; go/no-go is the owner's; ~~`Blocked` on TB-46 / NV-259 cutover~~ — TB-46 live 2026-10-15) · Reporter: Alexis (owner direction, 2026-10-12) · Updated: 2026-11-04
 - **Want:** drop the dependence on `narcis.gov.si/ows` (ARCHITECTURE §10.2) and draw the protected-area
   layers from the data narcis-vibed already holds in Postgres. The web serves them as a static vector
   tileset (`zos.pmtiles` via `/api/layers/zos-tiles`, NV-400) with legends and facets. Once TB-46 puts
@@ -1790,11 +1790,8 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   - **Prototype on the emulator.**
     - **Polygons:** fills and outlines of all six layers draw over OSM, in both raster and vector
       layer modes.
-    - **Points — open.** Sprite icons did not draw. An icon-only `symbol` layer without a `paint` block
-      is dropped by the theme reader ("layer has no paint"). With one it parses but still draws
-      nothing. Text labels on the same points do draw, and `vector_tile_renderer` has no `circle`
-      layer type. Next: fix or work around the icon path, or draw the points with `flutter_map`'s own
-      layers from decoded tile data.
+    - **Points:** sprite icons did not draw here. Solved in part 3 below; the "still draws nothing"
+      was stale cached tiles.
     - **Identify from the tile data works.** Decode the z15 tile under the tap, then point-in-polygon
       for areas and 50 m for points. At Cerknica that gave 9 hits across all six layers, with names
       and classes.
@@ -1827,20 +1824,118 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
     the switch, at +1.6 s.
   - **Identify on the A56:** 106 ms per tap (z15 tile fetch, decode and hit test), versus a WMS
     GetFeatureInfo round trip today.
-  - **Not covered:** points, because icons still do not draw (above), so the 14.7k NVJ points' cost is
-    not in these numbers.
+  - **Not covered here:** points (no icons in this run); measured in part 3.
   - **File cache:** with `fileCacheTtl: Duration.zero`, a relaunch still drew the z7 tiles without
-    calling the provider, from the disk cache of the previous run. Stale tiles after a web *Objavi*
-    can therefore outlive the archive reopen too; needs an explicit cache key or clear.
-  - **Low-zoom density is a readability issue, not a speed one** (for areas; points unmeasured): at
-    z7, all layers on, Slovenia is a solid blanket of NV outlines. A per-layer `minzoom` in the phone
-    theme could fix that without a lighter tileset.
+    calling the provider, from the disk cache of the previous run. Cause and fix: part 3.
+  - **Low-zoom density is a readability issue, not a speed one:** at z7, all layers on, Slovenia is a
+    solid blanket of NV outlines, and with points on (part 3) the caves turn it white. A per-layer
+    `minzoom` and smaller icons in the phone theme can fix that without a lighter tileset.
+- **Spike, part 3 (2026-11-04): points — solved and measured.**
+  - **Two library quirks hid the icons.** A Mac-side `flutter test` (local-only:
+    `misc/tb47-spike/tb47_icons_test.dart`) rendered a real Kras z12 tile through `vector_tile_renderer`
+    directly. The icons drew there, with and without a `geometry-type == Point` filter:
+    1. **An icon-only `symbol` layer needs a `paint` block** (e.g. `{"text-color": "#000000"}`).
+       Without one the theme reader drops the layer ("layer has no paint").
+    2. **vector_map_tiles caches rendered raster tiles on disk, keyed by theme `id` + `metadata.version`**
+       (`StorageImageCache`), not by the style's content. Defaults are `default` / `none`, so every
+       style change kept serving old images. The emulator's second try showed the first try's
+       icon-less tiles.
+       - TTL is enforced only by a periodic `applyConstraints()` sweep, never on read. That is why
+         `fileCacheTtl: Duration.zero` did not stop the reuse.
+       - **For the app:** set the theme `id` and bump `metadata.version` with every style change, and
+         clear the cache when the tileset changes (web *Objavi*, see the ETag note in part 1).
+    - No `circle` layer is needed: one dot sprite per layer colour, drawn by a runtime atlas, works.
+  - **A56 with all points on** (14.7k caves plus ZO/EPO/NV points; raw lines local-only in
+    `misc/tb47-spike/a56-results-points.txt`):
+    | phase | p90 frame | over 16.7 ms | worst |
+    |---|---|---|---|
+    | overlay + points, raster mode, cold (302 tiles, 7.9 MB) | 8.9 ms | 2.9 % | 104 ms |
+    | overlay + points, raster mode, warm | 6.8 ms | 0.6 % | 30 ms |
+    | overlay + points, vector mode, warm | 52.3 ms | 65 % | 179 ms |
+    - Points cost almost nothing in raster mode: cold p90 8.9 ms vs 8.8 ms without points.
+    - **Time to overlay, cold, with points:** the whole z7 overview is drawn by +1.6 s, as without
+      points.
+    - Identify: 84–137 ms per tap.
+- **Spike conclusion.** Every spike question has an answer, and nothing found blocks the swap.
+  - **Library:** the swap forces a `flutter_map` major. 8.x compiles clean against the app.
+  - **Performance:** areas plus every point draw smoothly on the A56 in raster mode.
+  - **Identify:** works from the tile data, with details from the VPS register.
+  - **Work the build carries:**
+    - The point/class styling from the web's legend, with a `minzoom` for the caves.
+    - The theme cache key.
+    - An archive and cache refresh on ETag change.
+    - Neighbouring tiles for identify near a tile edge.
+    - The `mvo` layer is new to the app.
 - **Option noted, not tried:** download the 32.5 MB archive once and read it with
   `PmTilesArchive.fromFile`, so the layer works offline in the field. WMS never could; it needs an
   ETag-based refresh.
-- **Next:** (1) point rendering: fix the icon path, or draw points with `flutter_map`'s own layers
-  from decoded tile data, then re-measure on the A56 with NVJ on; (2) then the go/no-go and which
-  library line to take (beta 9.x + `flutter_map` 8, or stable 8.0.0 + `flutter_map` 7).
+- **The web's styles on the phone (2026-11-04, owner question) — yes, proven on the Mac.**
+  - **Where they live:** the web has no style file. `zosLayerSpecs()` in narcis-vibed
+    `web/src/components/MapLibreMap.tsx` builds the MapLibre layers in code from the `lib/map/zos.ts`
+    tables (`ZOS_LAYERS`, `ZO_CLASSES`, `MVO_CLASSES`, `NV_POLY`, `EPO_POLY`, `N2K_STYLE`), keyed on
+    the `_cls` the tiles already carry. Its icons (`tri-drzavni`, `tri-lokalni`, `cave-red`,
+    `cave-yellow`, `pov-hatch-*`) are drawn on a canvas at runtime (`IMAGE_MAKERS`).
+  - **What carries over to `vector_tile_renderer` 6.1.0 unchanged:** `fill`, `line`, `symbol`, `match`
+    on `_cls`, `geometry-type`, `rgba()` colours, the layer order, the icon names.
+  - **What does not:**
+    - `circle` layers (N2k, ZO and MVO points) — there is no circle type. They become `symbol`
+      layers with one circle sprite per class colour, drawn to the same radius, colour and stroke.
+    - The N2k POV `fill-pattern` hatch (NV-438) — there is no pattern support; POV draws as its
+      outline only.
+    - The light/dark `tone` variants map onto the phone's OSM/Esri basemaps.
+  - **Proof:** a line-by-line port of `zosLayerSpecs` (light tone) rendered over 3×3 blocks of real
+    tiles (Cerknica z12, Kras z13, TNP z11). Every layer parsed; the web's class colours, triangles and
+    cave domes all draw. Local-only: `misc/tb47-spike/tb47_webstyle_test.dart`,
+    `webstyle-*.png`.
+  - **Two ways to get them onto the phone:**
+    - **(a) Port in the app:** Dart constants mirroring `zos.ts`. No cross-repo work, but it drifts as
+      soon as the web changes a class or colour, exactly like today's `zosSymbol` SLD mirror.
+    - **(b) Served from the VPS:** narcis-vibed emits its style as JSON (the `zosLayerSpecs` output
+      plus the class labels for the legend) and its icons as a sprite sheet, next to `zos.pmtiles`.
+      The phone loads both, turns `circle` into sprite symbols and drops the hatch at load time. Its
+      `metadata.version` doubles as the theme cache key (contract below).
+  - **Decision (owner, 2026-11-04): (b), served from the VPS.**
+- **Style contract for (b): what the phone needs from narcis-vibed.** Checked against narcis-vibed
+  `12473a11`. The NV item, route names and implementation are narcis-vibed's call.
+  - **Style:** `GET /api/layers/zos-style?tone=light|dark`, a MapLibre style v8 JSON. Public, strong
+    ETag, `cache-control: public, max-age=0`, as `/api/layers/zos-tiles`.
+    - `layers`: `zosLayerSpecs(def, tone)` for the six `ZOS_LAYERS`, in that order, from the same
+      function the web map uses. It sits in the client component `MapLibreMap.tsx` today, so it has to
+      move to a shared module.
+    - One vector source `zos` (the PMTiles URL), each layer's `source-layer` = its slug, as the web's
+      tiles mode does.
+    - Layers visible: the web specs start `visibility: none`, and `vector_tile_renderer` drops those.
+    - The fill/line geometry filters baked in: the web adds `POLY_FILTER` / `NON_PT_FILTER` later
+      (`syncFilters`), not in the specs.
+    - Without the NV-op, highlight and legend-filter layers.
+    - `id` = `zos-<tone>`; `metadata.version` changes whenever the style, the sprite or the tileset
+      changes (e.g. a hash of the three). It is the phone's raster-cache key (part 3) and its signal
+      to reopen the archive (part 1).
+    - `metadata["narcis:legend"]`: per slug, the class rows `{key, label, color}` from `zos.ts`, for
+      the swatches in the phone's Območje sheet.
+  - **Sprite:** MapLibre sprite JSON + PNG at pixelRatio 2: `tri-drzavni`, `tri-lokalni`, `cave-red`,
+    `cave-yellow`, `pov-hatch-light|dark`, from the same drawing code as `IMAGE_MAKERS`. Those draw
+    with `document.createElement("canvas")` (browser-only), so the route needs a server-side raster.
+  - **Tones:** the phone's OSM basemap takes `light`, its Esri satellite `dark` (the web's Satelit is
+    dark-toned too).
+  - **The phone's load step (TB-47 build):** `circle` → `symbol` with generated circle sprites; drops
+    the `fill-pattern` layer (POV keeps its outline); adds a `paint` block to the icon-only symbols
+    (re-checked 2026-11-04: an icon layer without one draws 0 px); keeps the last style and sprite on
+    disk, so the layer still draws offline from cached tiles; swatches from the legend block, replacing
+    `zosSymbol`'s SLD mirror.
+  - **Drift guard (owner, 2026-11-04).** The renderer skips what it cannot draw without an error (an
+    unknown layer type only logs a warning, off by default, and the layer is dropped:
+    `theme_reader.dart:66`), so a later web style change could vanish on the phone unnoticed.
+    - **narcis-vibed:** a verify check that fails when the served style goes beyond a declared phone
+      subset (layer types, paint/layout keys, expression operators), with `circle` and the POV
+      `fill-pattern` as named exceptions. Added to the narcis-vibed session's scope.
+    - **Phone (TB-47 build):** a test that loads the live style into `vector_tile_renderer` and fails
+      on any warning. This also catches the narcis-vibed subset going stale after a renderer upgrade.
+- **Next — owner's call:**
+  - Go/no-go.
+  - Which library line: beta `vector_map_tiles` 9.x + `flutter_map` 8 (measured here) or stable
+    8.0.0 + `flutter_map` 7 (untested).
+- **Next — narcis-vibed:** an NV item for the style and sprite routes above (not filed yet).
 - **Absorbs TB-37** (natural monuments): the web's ZO *Vrsta* facet (NV-84) already separates them, so
   if this lands within weeks, TB-37 should not be built on GeoServer first.
 - **Stays external either way:** GURS parcels (WMS), the OSM and Esri basemaps.
