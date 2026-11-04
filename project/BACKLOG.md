@@ -1736,7 +1736,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** — built into **v1.14.0+24** (2026-10-14, archived `~/Releases/terenska-beleznica-1.14.0+24.aab`, signed with the upload key; release notes PLAY_CLOSED_TEST §3.3); ~~**not yet uploaded**~~ **uploaded 2026-10-14, managed publishing on; review passed the same day** (owner) — held under *Changes ready to publish*. Publish only at T0 step 9 (narcis-vibed OPERATIONS §21.9). **Upgrade path proven 2026-10-14** (narcis-vibed B14): a queue made in 1.10.1 and in 1.13.0 survives the in-place update and drains after the forced re-login; walks not covered. Flips to `Done` when the release is live after T0.
 
 ### TB-47 · Read the Območja layers from the VPS instead of the NarcIS GeoServer
-`✨ Enhancement` · `P2` · `Blocked` (on TB-46 / NV-259 cutover; spike first) · Reporter: Alexis (owner direction, 2026-10-12) · Updated: 2026-10-12
+`✨ Enhancement` · `P2` · `Doing` (spike; ~~`Blocked` on TB-46 / NV-259 cutover~~ — TB-46 live 2026-10-15) · Reporter: Alexis (owner direction, 2026-10-12) · Updated: 2026-11-04
 - **Want:** drop the dependence on `narcis.gov.si/ows` (ARCHITECTURE §10.2) and draw the protected-area
   layers from the data narcis-vibed already holds in Postgres. The web serves them as a static vector
   tileset (`zos.pmtiles` via `/api/layers/zos-tiles`, NV-400) with legends and facets. Once TB-46 puts
@@ -1744,6 +1744,11 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Deliberately separate from the data cutover.** A failed data move can lose records; a failed layer
   swap can only make the map look wrong. In one release, a problem is harder to pin down and roll back,
   and GeoServer is not causing trouble today.
+  - **2026-11-04: it is now.** `narcis.gov.si` has refused connections since ≈17:27 UTC 2026-10-29
+    (VPS-56; refused on 80 and 443 from the Mac again 2026-11-04). The app still reads all five
+    sublayers from `narcis.gov.si/ows/ows` (`basemap.dart` `_narcisOwsBase`, `obmocja_store.dart`
+    `_owsBase`), so Območja draws nothing (no tile error handling) and a tap shows the network-error
+    snackbar. Operator expects NarcIS back early on 2026-11-06.
 - **What has to change on the phone:**
   - **Rendering:** WMS raster tiles become vector tiles drawn on the device.
   - **Styling:** replace `zosSymbol`'s SLD mirror with the web's legend.
@@ -1754,6 +1759,65 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
     exists for it, and whether the swap forces an upgrade to a current major (breaking changes across
     every map screen).
   - **Performance.** Does an A56 draw the dense layers smoothly? NVJ has ~14.7k points.
+- **Spike, part 1 (2026-11-04).** Throwaway worktree, nothing committed; the harness and screenshots are
+  local-only in `misc/tb47-spike/`.
+  - **Library — answered.** No vector-tile plugin supports `flutter_map` 6; the swap forces a major.
+    - What resolves today: `flutter_map` **8.3.2** + `vector_map_tiles` **9.0.0-beta.9** +
+      `vector_map_tiles_pmtiles` **1.5.2** (`pmtiles` 1.3.0, `vector_tile_renderer` 6.1.0). The 9.x line
+      is still beta (latest beta.13). It is held at beta.9 because `pmtiles` 1.3.0 pins `latlong2`
+      ^0.9 and beta.10+ need ^0.10.1. Lock side effects: `archive` 4.0.9→3.6.1 and `image`
+      4.8.0→4.3.0 (downgrades), plus new `sembast`, `idb_shim` and others.
+    - Stable alternative, **untested**: `vector_map_tiles_pmtiles` 1.5.0 → `vector_map_tiles` ^8.0.0
+      (stable, 2 years old) → `flutter_map` ^7.0.2.
+    - Upgrade cost 6.2.1 → 8.3.2: `flutter analyze` 10 → 12 issues, no errors. The 2 new ones are
+      `position.center` now non-null (`home_screen.dart` `onPositionChanged`). Unit tests were not run
+      under 8, and the four map screens (home, location picker, walk detail, basemap) were not exercised.
+  - **Tileset (VPS).** `/api/layers/zos-tiles` is public: 32.5 MB PMTiles v3, gzip MVT, z5–15, tippecanoe
+    2.53.0.
+    - Six source-layers `n2k zo epo nv nvj mvo` (`mvo` is not in the app today). Points and polygons
+      share a layer (no `_PLG`/`_PNT` split).
+    - Tile fields are only `IME_OBM`, `KODA_OBM`, `TIP_ZOS` and the class fields (`_cls`,
+      `N2K_*`, `NV_*`, `ZO_*`).
+    - Built with `--drop-rate=1 --no-feature-limit --no-tile-size-limit`, so **every feature is in every
+      zoom**: z5/z6 tiles are ~1.3 MB with ~20k features (all 14,695 NVJ points), z7 up to 1.1 MB/16k,
+      z8 up to 700 kB/10k.
+    - Low zooms also hold axis-aligned square polygons (NV: 554 at z5, 76 at z7, 16 at z8), which draw as
+      squares on the phone. Probably tippecanoe's tiny-polygon reduction; whether the web shows them:
+      `STATUS: UNKNOWN – REQUIRES CONFIRMATION`.
+    - The route sends a strong ETag, but Dart `pmtiles` 1.3.0 checks neither ETag nor Content-Range
+      (`HttpAt`). An archive held open across a web *Objavi* would read the new file at the old offsets
+      until reopened.
+  - **Prototype on the emulator.**
+    - **Polygons:** fills and outlines of all six layers draw over OSM, in both raster and vector
+      layer modes.
+    - **Points — open.** Sprite icons did not draw. An icon-only `symbol` layer without a `paint` block
+      is dropped by the theme reader ("layer has no paint"). With one it parses but still draws
+      nothing. Text labels on the same points do draw, and `vector_tile_renderer` has no `circle`
+      layer type. Next: fix or work around the icon path, or draw the points with `flutter_map`'s own
+      layers from decoded tile data.
+    - **Identify from the tile data works.** Decode the z15 tile under the tap, then point-in-polygon
+      for areas and 50 m for points. At Cerknica that gave 9 hits across all six layers, with names
+      and classes.
+    - The MVT feature id is `NARCIS_ZOS.ID`: `/api/layers/detail/401` returned 200 with
+      `x-zos-vir: register` (Postgres; it answers while NarcIS is down).
+    - Two identify costs vs GetFeatureInfo: the z15 tile buffer is narrower than 50 m, so taps near a
+      tile edge must also read the neighbouring tiles; and the detail attributes (`OPIS`, `POV_HA`, …)
+      need one detail call per area.
+    - `vector_map_tiles` logs unhandled `Cancelled` exceptions when panning cancels tile jobs
+      (`caches_tile_provider.dart:63`). That is log noise, not a crash.
+    - **Network** (pure Dart on the Mac): archive open 191 ms; tile fetch p50 38 ms, p90 110 ms;
+      z5 tile decode 75–117 ms.
+  - **Performance — not answered.** The emulator fell back to software GL (host memory pressure).
+    Frame times there mean nothing: the basemap alone managed ~10 frames in 15 s. It needs a profile
+    build of the harness on the A56; none was attached.
+    - The risk to measure is the low-zoom tiles carrying the whole dataset.
+    - If the A56 struggles, there are two options: a minimum zoom for the overlay, or a lighter phone
+      tileset built by narcis-vibed (cross-repo; no NV item yet).
+  - **Option noted, not tried:** download the 32.5 MB archive once and read it with
+    `PmTilesArchive.fromFile`, so the layer works offline in the field. WMS never could; it needs an
+    ETag-based refresh.
+  - **Next:** (1) the A56 profile run; (2) point rendering; (3) then the go/no-go and which library
+    line to take.
 - **Absorbs TB-37** (natural monuments): the web's ZO *Vrsta* facet (NV-84) already separates them, so
   if this lands within weeks, TB-37 should not be built on GeoServer first.
 - **Stays external either way:** GURS parcels (WMS), the OSM and Esri basemaps.
