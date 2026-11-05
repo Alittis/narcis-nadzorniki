@@ -109,6 +109,7 @@ flutter build appbundle --release
 | Upload keystore (`.jks`) | `~/keystores/narcis_nadzorniki_upload.jks` | NEVER commit; back up offline |
 | `key.properties` | `android/key.properties` (gitignored, `0600`) | Plain-text passwords by Gradle's design |
 | Play Console account | `admin@alittis.com` (Alittis) | 2FA strongly recommended |
+| Play trader status (EEA/UK) | Play Console, account-wide | **Non-trader**, declared 2026-11-05 under Google's EEA/UK marketplace rules (in force 2027-03-01). Basis: the apps on this account are unpaid, have no price, ads or in-app purchases, and are not part of the owner's s.p.; "Alittis" is a personal nickname, not a trade name. EEA/UK listings show only email + country, plus a consumer-law notice. |
 
 ## 5. Deployment Risks
 - **Lost upload keystore** → cannot publish updates. Mitigation: keep an encrypted offline backup of `narcis_nadzorniki_upload.jks` plus the passwords (separate location). Recovery via Play Console support is possible but slow.
@@ -118,3 +119,7 @@ flutter build appbundle --release
   and a blocking update screen. Raised before the new build is downloadable in Play (review ~1–20 h), it locks testers out
   with nothing to update to. **Raise it only after Play Console shows the build live;** their queue survives either way.
 - **Privacy policy URL drift** → if the policy URL ever 404s, Play can suspend the listing. Edits to the policy must keep the URL stable.
+- **Trader status drift** → the non-trader declaration (§4) covers every app on the account. Publishing a paid, ad-supported or
+  in-app-purchase app, or paid client work, under it without switching to trader can get apps removed worldwide (EU UCPD /
+  UK DMCCA). Update the declaration in Play Console first; as a trader, the listing then shows name, address and phone,
+  and every app needs a Terms of Service link.
