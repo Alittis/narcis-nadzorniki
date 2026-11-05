@@ -1,4 +1,9 @@
 --------------------------------------------------------------------------------
+-- ⚠️ RETIRED 2026-11-05 (narcis-vibed NV-548, its ords/nv548_tb_umik.sql; TB-57): every handler of
+-- this module answers 410 on production. DO NOT RE-RUN THIS FILE: it would bring back a module that
+-- takes NarcIS passwords with no server key and no counting of failures. Deleting the module, with
+-- TB_* and PKG_TB_AUTH, waits for D8 (narcis-vibed project/NV-259-BELEZNICA-PLAN.md).
+--------------------------------------------------------------------------------
 -- ORDS module: narcis_walks
 --   GET    /ords/narcis/walks/                - list (caller's org)
 --   POST   /ords/narcis/walks/                - create (with inline points)

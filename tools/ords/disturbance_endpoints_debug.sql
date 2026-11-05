@@ -1,4 +1,9 @@
 --------------------------------------------------------------------------------
+-- ⚠️ RETIRED 2026-11-05 (narcis-vibed NV-548, its ords/nv548_tb_umik.sql; TB-57): every handler of
+-- this module answers 410 on production. DO NOT RE-RUN THIS FILE: it would bring back a module that
+-- takes NarcIS passwords with no server key and no counting of failures. Deleting the module, with
+-- TB_* and PKG_TB_AUTH, waits for D8 (narcis-vibed project/NV-259-BELEZNICA-PLAN.md).
+--------------------------------------------------------------------------------
 -- TEMPORARY: redeploys the narcis_disturbances ORDS module with the POST
 -- handler instrumented to log every request to tb_motnje_debug via an
 -- autonomous transaction. PUT and DELETE are unchanged.

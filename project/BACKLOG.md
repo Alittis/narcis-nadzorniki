@@ -2479,3 +2479,13 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   back-office act, that may be worth removing — a one-line change in `remote_api.dart` plus the dropdown,
   on this app's own release cycle.
 
+### TB-57 · The old ORDS modules `app-auth`, `disturbances`, `walks` retired with 410 (narcis-vibed NV-548) — Done 2026-11-05
+- **Why.** The APEX team (2026-11-05): our ORDS logins never count a wrong password. `app-auth/login` (PKG_TB_AUTH) took
+  passwords with no counting, and `disturbances/` and `walks/` accepted Basic on every handler. Since 1.14.0 the app signs
+  in through narcis.alittis.com (`/api/beleznica/app/v1/prijava`) and never calls these modules (grep of `lib/`,
+  2026-11-05); only older builds did, with their writes frozen since T0.
+- **Done.** The owner ran narcis-vibed `ords/nv548_tb_umik.sql` in APEX SQL Workshop (~21.35 UTC); from the VPS every
+  handler answers 410 *"… is retired (NV-548). Install Terenska beleznica 1.14.0 or later."* (narcis-vibed DEPLOYMENT
+  §3.6zzzc). Ahead of D8, by the owner's decision; D8 still deletes the modules, `TB_*`, `TB_AUTH_TOKENS` and `PKG_TB_AUTH`.
+- **Guard.** `tools/ords/auth_login.sql`, `disturbance_endpoints.sql`, `disturbance_endpoints_debug.sql` and
+  `walks_endpoints.sql` now open with a do-not-re-run banner: each one recreates its module.
