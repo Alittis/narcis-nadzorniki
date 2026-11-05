@@ -1990,11 +1990,19 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
         from the register.
       - z18 draws without seams.
       - The harness was uninstalled afterwards.
+  - **Verified on the real app, 2026-11-05** (NarcIS back; profile build of `d082939` on the A56,
+    logged in by the owner, `Beležnica dev`; no record created, *Za pošiljanje* stayed 0):
+    - Home map at Cerknica: Natura 2000 by default, then all six layers through the picker (six
+      rows); identify listed 7 areas with legend swatches.
+    - Satellite switch → `[zos] dark style 64de1082b87f on`. After a force-stop and restart: the
+      satellite basemap, the dark style and all six layers, `mvo` included, came back.
+    - `flutter_map` 8 on the other screens: the location picker (*Karta* in the form) draws and pans;
+      the walk-detail map (Kolpa) fits the track with its records over OSM.
+    - The style versions were unchanged after the night's republish (light `106b1f98a980`, dark
+      `64de1082b87f`), so NV-546's content-hash version holds and phones keep their tile cache.
   - **Not verified:**
-    - The home screen's own wiring on a device: tone sync on a basemap switch, the re-check on
-      resume, and remembered layers with `mvo`. Needs a login, so ORDS back up.
-    - The location picker and walk-detail maps under `flutter_map` 8. They compile, and the tests
-      pass.
+    - The re-check on resume. It is wired in `didChangeAppLifecycleState`, but an unchanged style is
+      a silent 304, so the device run cannot show it.
     - The release size. Profile APKs varied 82–105 MB between builds; the release step compares
       the per-ABI download against 1.14.0.
 - **Shipped:** —

@@ -270,7 +270,7 @@
       "device_storage": "documents/zos_style/ (last style + sprite per tone); <temp>/zos_tiles/<style version>/ (vector_map_tiles raster + tile-byte cache, 30-day TTL, 50 MB cap; per version because the library keys tile bytes by z/x/y only; older versions deleted on a version change)",
       "drift_guard": "narcis-vibed web/scripts/verify-zos-style-phone.ts + test/zos_render_style_test.dart (fixtures; ZOS_LIVE=1 checks the live style)",
       "auth": "none (public)",
-      "verified": "2026-11-04 — suite 256 passed + 1 network test skipped (passes with ZOS_LIVE=1); on the A56 (SM-A566B) through a login-free harness of the same code (the real login needs ORDS, down): all six layers draw in both tones, identify at Cerknica 9 areas in 677 ms cold with details, z16+ drawn without tile seams. The home screen's own wiring (tone sync, resume re-check, remembered layers) NOT exercised on a device."
+      "verified": "2026-11-04 — suite 256 passed + 1 network test skipped (passes with ZOS_LIVE=1); on the A56 (SM-A566B) through a login-free harness of the same code (the real login needs ORDS, down): all six layers draw in both tones, identify at Cerknica 9 areas in 677 ms cold with details, z16+ drawn without tile seams. 2026-11-05 on the real app (logged in, NarcIS back): six layers, identify, the dark tone on the satellite switch, all six layers and the basemap remembered across a restart; the location picker and walk-detail maps work under flutter_map 8. The re-check on resume is not observable on the device (an unchanged style is a silent 304)."
     }
   ],
   "bundled_assets": [
