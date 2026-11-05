@@ -1736,7 +1736,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** — built into **v1.14.0+24** (2026-10-14, archived `~/Releases/terenska-beleznica-1.14.0+24.aab`, signed with the upload key; release notes PLAY_CLOSED_TEST §3.3); ~~**not yet uploaded**~~ **uploaded 2026-10-14, managed publishing on; review passed the same day** (owner) — held under *Changes ready to publish*. Publish only at T0 step 9 (narcis-vibed OPERATIONS §21.9). **Upgrade path proven 2026-10-14** (narcis-vibed B14): a queue made in 1.10.1 and in 1.13.0 survives the in-place update and drains after the forced re-login; walks not covered. Flips to `Done` when the release is live after T0.
 
 ### TB-47 · Read the Območja layers from the VPS instead of the NarcIS GeoServer
-`✨ Enhancement` · `P2` · `Doing` (built into v1.15.0+25 2026-11-05, pending upload + rollout; owner: go, beta 9.x line; ~~`Blocked` on TB-46 / NV-259 cutover~~ — TB-46 live 2026-10-15) · Reporter: Alexis (owner direction, 2026-10-12) · Updated: 2026-11-04
+`✨ Enhancement` · `P2` · `Done` (shipped v1.15.0+25; rolled out on the Play Closed testing track, confirmed by the owner 2026-11-05) · Reporter: Alexis (owner direction, 2026-10-12) · Updated: 2026-11-05
 - **Want:** drop the dependence on `narcis.gov.si/ows` (ARCHITECTURE §10.2) and draw the protected-area
   layers from the data narcis-vibed already holds in Postgres. The web serves them as a static vector
   tileset (`zos.pmtiles` via `/api/layers/zos-tiles`, NV-400) with legends and facets. Once TB-46 puts
@@ -2018,9 +2018,13 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   - Bump the policy's last-change date, and `privacy_policy_last_change` in STATE.json.
   - Play Data safety: no change. No new data type is collected, and the only new host is the app's
     own server.
-- **Shipped:** — built into **v1.15.0+25** (2026-11-05, archived
-  `~/Releases/terenska-beleznica-1.15.0+25.aab`, signed with the upload key); **pending upload +
-  rollout**. Release notes in PLAY_CLOSED_TEST §3.3.
+  - **Done 2026-11-05 (alittis.github.io GHP-5).** The paragraph after the bullet now lists *oznake
+    prepoznanih območij* where it said *tapnjeno točko*: the detail request names the area by its
+    id, so the server learns which area was tapped, though not the point.
+- **Shipped:** — **v1.15.0+25** (2026-11-05, archived `~/Releases/terenska-beleznica-1.15.0+25.aab`,
+  signed with the upload key). Uploaded, reviewed and released on the Play Closed testing track
+  2026-11-05; the owner confirmed it is offered as an update on phones. Release notes in
+  PLAY_CLOSED_TEST §3.3.
 
 ### TB-48 · After a rejected session, a different user can send the previous user's queued records as their own
 `🐞 Bug` · `P2` · `Done` (shipped v1.12.0+22; rolled out on the Play Closed testing track, confirmed 2026-10-13) · Reporter: Claude (split from TB-45, 2026-10-12) · Updated: 2026-10-13
