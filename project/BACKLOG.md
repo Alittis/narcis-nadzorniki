@@ -789,7 +789,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   which was corrected in the same pass: it had the merged-manifest path as `android/app/build/…`.
 
 ### TB-28 · Login says "wrong credentials" when the real problem is a missing TERENSKA-BELEZNICA authorization
-`✨ Enhancement` · `P1` · `Doing` (half 1 shipped in v1.13.0+23, released 2026-10-14 (owner); **half 2 built in [TB-46](#tb-46--move-the-app-to-the-postgres-backend-on-the-vps-phone-side-of-narcis-vibed-nv-259) 2026-10-13, into v1.14.0+24 2026-10-14** — the server's `reason` picks the hint; ships with the cutover) · Maintainer-initiated · Updated: 2026-10-14
+`✨ Enhancement` · `P1` · `Done` (half 2 released with TB-46 in v1.14.0+24, live 2026-10-15 at the NV-259 cutover; flipped 2026-11-05) · ~~`Doing` (half 1 shipped in v1.13.0+23, released 2026-10-14 (owner); **half 2 built in [TB-46](#tb-46--move-the-app-to-the-postgres-backend-on-the-vps-phone-side-of-narcis-vibed-nv-259) 2026-10-13, into v1.14.0+24 2026-10-14** — the server's `reason` picks the hint; ships with the cutover)~~ · Maintainer-initiated · Updated: 2026-11-05
 
 - **Problem:** Registration in NarcIS is **not enough** to use Terenska beležnica. The account
   must additionally hold the `TERENSKA-BELEZNICA` function authorization, granted by an
@@ -875,7 +875,8 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   - **Checked by removal:** without `rejectedByServer: true` on the 401 path, the auth test fails; with
     the hint keyed on any failure, the offline test fails; with the hint never set, the 401 test fails.
     Full suite 199/199; `flutter analyze` at the documented 10 info lints.
-- **Shipped:** — built into **v1.13.0+23** (2026-10-13, archived `~/Releases/terenska-beleznica-1.13.0+23.aab`, signed with the upload key); ~~**not yet uploaded**~~ **half 1 uploaded 2026-10-13, released on the Play Closed testing track 2026-10-14 (owner)**. Flips to `Done` when TB-46 (half 2) is released.
+- **Shipped:** — built into **v1.13.0+23** (2026-10-13, archived `~/Releases/terenska-beleznica-1.13.0+23.aab`, signed with the upload key); ~~**not yet uploaded**~~ **half 1 uploaded 2026-10-13, released on the Play Closed testing track 2026-10-14 (owner)**. Half 2 shipped with TB-46 in
+  **v1.14.0+24**, released 2026-10-15 at the NV-259 cutover, so the item is `Done`.
 
 ### TB-29 · Retire age colouring end to end — the walk map, and the Starost filter with it
 `🔧 Chore` · `P2` · `Done` (shipped v1.7.0+16; rolled out on the Play Closed testing track 2026-08-31) · Reporter: maintainer (on the v1.6.0+15 rollout) · Updated: 2026-08-31
