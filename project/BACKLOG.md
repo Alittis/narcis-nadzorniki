@@ -23,7 +23,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 ## Open
 
 ### TB-58 · Sign in through Račun NarcIS in the browser (NV-554 P3) — admins with two-step can use the phone again
-`✨ Enhancement` · `P1` · `Doing` (built into **v1.16.0+26** 2026-11-07, pending upload + rollout) · Reporter: owner (NV-554) · Updated: 2026-11-07
+`✨ Enhancement` · `P1` · `Done` (**v1.16.0+26 ROLLED OUT LIVE on the Play Closed testing track 2026-11-07**; the owner signed in on a real phone through the browser 19:39 UTC) · Reporter: owner (NV-554) · Updated: 2026-11-07
 - **Problem:** since narcis-vibed's switch to Račun NarcIS (2026-11-07 16:48 UTC, its NV-554 P2) the installed builds
   sign in through an interim password route that refuses any account owing a second factor with 426 (D-P2-2): the 4
   admins who use the phone cannot.
@@ -40,6 +40,10 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   signed in, an offline record syncs later; a lock cuts within 60 s; an admin enrols two-step and syncs; 1.15 → 1.16.0
   upgrade keeps the session and the queue; 1.15 with a two-step account still gets 426. Screenshots in narcis-vibed
   `misc/nv554-p3/`.
+- **Rolled out 2026-11-07** (the owner: *"1 & 2 went well"* — uploaded, released, and signed in on the phone).
+  Production trace: Račun NarcIS `soglasje` for `terenska-beleznica` and a browser-kind `telefon` session in
+  narcis-vibed's `prijava.seja`, both 19:39 UTC. The interim password route for builds ≤ 1.15 retires 30 days later,
+  **2026-12-07** (narcis-vibed NV-554).
 - **Not done:** iOS (the app has never been configured for iOS: bundle id, signing, App Store record — its own task).
 - **Open — task hijacking on Android 7–10 (a side review, 2026-11-07):** removing `taskAffinity=""` drops the template's
   partial guard against task hijacking (StrandHogg) on Android 7–10; Android 11+ is patched in the OS, and Android's own
