@@ -247,8 +247,11 @@ password and offline-cache steps below, which stay as the record of builds ≤ 1
   (API 30) and newer are patched in the OS; on Android 7–10 (minSdk is 24) the empty affinity only partly covered the
   first variant, and Android's own mitigation is `minSdkVersion 30`. Keeping the empty affinity would need AppAuth's
   redirect handling forked: its `AuthorizationManagementActivity` is started for a result inside the app's task, and
-  the redirect arrives from Chrome in a new task that can find it only by affinity. **Open (TB-58):** the owner reads
-  Play Console's Android-version statistics; with no testers on Android 7–10, the next build raises minSdk to 30.
+  the redirect arrives from Chrome in a new task that can find it only by affinity. **Decided (owner, 2026-11-07):
+  minSdk 30** (`android/app/build.gradle.kts`) from the build after 1.16.0+26 (1.16.0 itself ships with minSdk 24).
+  Play's statistics showed 33 of 34 installs on Android 11+; the 34th could not be identified. A tester on Android ≤ 10,
+  if any, can still install 1.16.0 (browser sign-in, so unaffected when the interim password route retires) but gets
+  no later update.
 
 **TB-46 (built 2026-10-13, ships with the cutover):** the steps below hold with `POST prijava` and `Authorization` in place of
 `GET app-auth/login` and `X-Narcis-Auth` (§9.0). Three additions:

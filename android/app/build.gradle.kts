@@ -30,7 +30,10 @@ android {
 
     defaultConfig {
         applicationId = "si.terenska.beleznica"
-        minSdk = flutter.minSdkVersion
+        // TB-58 (owner, 2026-11-07): Android 11+ only. The browser sign-in needs MainActivity without the empty
+        // taskAffinity that partly guarded Android 7–10 against task hijacking (StrandHogg); Android 11 (API 30) is
+        // patched in the OS, which is Android's own mitigation. First shipped in the build after 1.16.0+26.
+        minSdk = 30
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
