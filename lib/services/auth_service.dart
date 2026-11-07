@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
-import 'dart:typed_data';
 
-import 'package:crypto/crypto.dart';
+import 'package:flutter/services.dart' show PlatformException;
+import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:narcis_nadzorniki/app_version.dart';
@@ -15,7 +15,6 @@ class AuthResult {
     required this.success,
     this.user,
     this.message,
-    this.wasOffline = false,
     this.rejectedByServer = false,
     this.token,
     this.reason,
@@ -26,27 +25,21 @@ class AuthResult {
   final String? user;
   final String? message;
 
-  /// True when a successful login was served from the local PBKDF2 cache
-  /// (i.e. no network round-trip succeeded).
-  final bool wasOffline;
-
   /// True when the server answered 401.
   final bool rejectedByServer;
 
-  /// Why the server refused a login whose password was right (TB-28 half 2):
+  /// Why the server refused a sign-in that succeeded at Račun NarcIS (TB-28 half 2):
   /// `not_authorized` (no TERENSKA-BELEZNICA) or `no_org` (no organisation, so
   /// nothing captured could be stored). Null for a wrong password, which keeps
   /// the one generic message.
   final String? reason;
 
-  /// The server answered 426: this build is below its minimum (TB-46). The
-  /// offline cache and any stored session are left as they are.
+  /// The server answered 426: this build is below its minimum (TB-46). Any
+  /// stored session is left as it is.
   final bool updateRequired;
 
-  /// Bearer session token minted by the server on a successful ONLINE login.
-  /// Null when the login was served offline, or when the backend didn't mint
-  /// one (older ORDS deploy → the caller falls back to an in-memory Basic
-  /// session). Persisted by [AuthService] so the session survives app restart.
+  /// Bearer session token minted by the server on a successful sign-in.
+  /// Persisted by [AuthService] so the session survives app restart.
   final String? token;
 }
 
@@ -69,7 +62,7 @@ abstract class AuthCacheStore {
 
 class _SecureStorageAdapter implements AuthCacheStore {
   _SecureStorageAdapter([FlutterSecureStorage? storage])
-      : _storage = storage ?? const FlutterSecureStorage();
+    : _storage = storage ?? const FlutterSecureStorage();
 
   final FlutterSecureStorage _storage;
 
@@ -84,95 +77,187 @@ class _SecureStorageAdapter implements AuthCacheStore {
   Future<void> delete(String key) => _storage.delete(key: key);
 }
 
-/// Login service. Talks to the field-app API's `prijava` / `odjava`
-/// ([kBeleznicaApi], ARCHITECTURE.md §9.1) with the standard `Authorization`
-/// header (TB-46: ORDS swallowed it, which is why the old login used a custom
-/// `X-Narcis-Auth`; the narcis-vibed host does not). Caches a PBKDF2 hash of
-/// the credentials in flutter_secure_storage so subsequent logins can succeed
-/// while offline, up to [maxOfflineWindow] since the last successful online
-/// login.
+/// Račun NarcIS, where the app signs in (NV-554 P3). A debug build points it at
+/// a local provider: `--dart-define=RACUN_ISSUER=http://127.0.0.1:3811` with
+/// `adb reverse tcp:3811 tcp:3811`.
+const String kRacunIssuer = String.fromEnvironment(
+  'RACUN_ISSUER',
+  defaultValue: 'https://prijava.alittis.com',
+);
+
+/// The app's client at Račun NarcIS and its redirect (narcis-racun RN-18): a
+/// private-use scheme, claimed on Android through `appAuthRedirectScheme`
+/// (android/app/build.gradle.kts) and on iOS through `CFBundleURLTypes`.
+const String kRacunClient = 'terenska-beleznica';
+const String kRacunRedirect = 'si.terenska.beleznica:/prijava';
+
+/// What the browser step hands back: the code, and what binds it to this
+/// request (the PKCE verifier and the nonce the app sent).
+class BrowserCode {
+  const BrowserCode({
+    required this.code,
+    required this.codeVerifier,
+    required this.nonce,
+  });
+
+  final String code;
+  final String codeVerifier;
+  final String nonce;
+}
+
+/// The person closed the browser, or tapped back, before signing in.
+class BrowserSignInCancelled implements Exception {
+  const BrowserSignInCancelled();
+}
+
+/// The browser step ended without a code. [error] is the OAuth error when the
+/// provider sent one (`access_denied` after *Zavrni*).
+class BrowserSignInFailed implements Exception {
+  const BrowserSignInFailed(this.error);
+
+  final String? error;
+}
+
+/// The browser step, behind an interface so tests can stand in for it.
+abstract class BrowserSignIn {
+  /// Opens Račun NarcIS; returns the code, or throws [BrowserSignInCancelled]
+  /// or [BrowserSignInFailed].
+  Future<BrowserCode> authorize();
+}
+
+/// The browser step through flutter_appauth (AppAuth: Custom Tabs on Android,
+/// ASWebAuthenticationSession on iOS). Only `authorize` — the code exchange is
+/// narcis-vibed's (`prijava/koda`), which holds the client's secret, so the
+/// provider's tokens never reach the phone.
+class AppAuthBrowserSignIn implements BrowserSignIn {
+  AppAuthBrowserSignIn([FlutterAppAuth? appAuth, Random? random])
+    : _appAuth = appAuth ?? const FlutterAppAuth(),
+      _random = random ?? Random.secure();
+
+  final FlutterAppAuth _appAuth;
+  final Random _random;
+
+  @override
+  Future<BrowserCode> authorize() async {
+    final nonce = base64UrlEncode(
+      List<int>.generate(24, (_) => _random.nextInt(256)),
+    ).replaceAll('=', '');
+    try {
+      final r = await _appAuth.authorize(
+        AuthorizationRequest(
+          kRacunClient,
+          kRacunRedirect,
+          serviceConfiguration: const AuthorizationServiceConfiguration(
+            authorizationEndpoint: '$kRacunIssuer/oidc/auth',
+            tokenEndpoint: '$kRacunIssuer/oidc/token',
+          ),
+          scopes: const ['openid', 'email', 'profile', 'narcis'],
+          nonce: nonce,
+          allowInsecureConnections: kRacunIssuer.startsWith('http://'),
+        ),
+      );
+      final code = r.authorizationCode;
+      final verifier = r.codeVerifier;
+      if (code == null || verifier == null) {
+        throw const BrowserSignInFailed(null);
+      }
+      return BrowserCode(
+        code: code,
+        codeVerifier: verifier,
+        nonce: r.nonce ?? nonce,
+      );
+    } on FlutterAppAuthUserCancelledException {
+      throw const BrowserSignInCancelled();
+    } on FlutterAppAuthPlatformException catch (e) {
+      throw BrowserSignInFailed(e.platformErrorDetails.error);
+    } on PlatformException catch (e) {
+      throw BrowserSignInFailed(e.code);
+    }
+  }
+}
+
+/// Sign-in service (NV-554 P3). The person signs in at Račun NarcIS in the
+/// phone's browser — a fresh password every time, the second factor where the
+/// account needs one, and the consent screen — and the app hands the code to
+/// the field-app API's `prijava/koda` ([kBeleznicaApi]), which redeems it and
+/// answers with this app's Bearer, as `prijava` did. The app never sees the
+/// password, so there is no offline password check any more: a signed-in
+/// phone stays signed in across restarts without signal (the stored Bearer),
+/// and only a new sign-in needs signal.
 class AuthService {
   AuthService({
     http.Client? client,
     Uri? endpoint,
     AuthCacheStore? cacheStore,
-    DateTime Function()? clock,
-    Duration maxOfflineWindow = const Duration(days: 14),
-    Random? random,
-  })  : _client = client ?? http.Client(),
-        _endpoint = endpoint ?? Uri.parse('$kBeleznicaApi/prijava'),
-        _cache = cacheStore ?? _SecureStorageAdapter(),
-        _clock = clock ?? DateTime.now,
-        _maxOfflineWindow = maxOfflineWindow,
-        _random = random ?? Random.secure();
+    BrowserSignIn? browser,
+  }) : _client = client ?? http.Client(),
+       _endpoint = endpoint ?? Uri.parse('$kBeleznicaApi/prijava'),
+       _cache = cacheStore ?? _SecureStorageAdapter(),
+       _browser = browser ?? AppAuthBrowserSignIn();
 
   final http.Client _client;
   final Uri _endpoint;
   final AuthCacheStore _cache;
-  final DateTime Function() _clock;
-  final Duration _maxOfflineWindow;
-  final Random _random;
+  final BrowserSignIn _browser;
 
-  // ---- Cache schema ----
-  // See ARCHITECTURE.md §8 cleanup checklist; the `algo` tag lets us migrate
-  // PBKDF2 parameters by recognizing old caches and forcing online relogin.
+  // ---- Stored keys ----
+  // The signed-in address and this app's Bearer (a narcis-vibed phone session,
+  // TB-46 / NV-554 P3: revocable, expiring, never a password). The address is
+  // written LAST, so a crash mid-write leaves no session.
   static const _kEmail = 'narcis_auth_email';
-  static const _kSalt = 'narcis_auth_salt_b64';
-  static const _kHash = 'narcis_auth_hash_b64';
-  static const _kLastOnline = 'narcis_auth_last_online_at';
-  static const _kAlgo = 'narcis_auth_algo';
-  // Bearer session token (plaintext) — a vibed token minted by `prijava`
-  // (TB-46). Lives in the same secure storage as the PBKDF2 cache; it is a
-  // revocable, expiring token, never the password.
   static const _kToken = 'narcis_vibed_token';
   // The ORDS-era TB token (`TB_AUTH_TOKENS`), which the new API cannot verify.
   // Found on the first start after the update: removed, and the user sent to
   // the login screen with the queue untouched (TB-46).
   static const _kLegacyToken = 'narcis_auth_token';
-  static const _algoCurrent = 'pbkdf2_sha256_100k_v1';
-  static const _pbkdf2Iters = 100000;
-  static const _pbkdf2KeyBytes = 32;
-  static const _saltBytes = 32;
+  // Builds up to 1.15 kept a PBKDF2 hash of the password for an offline
+  // check. Nothing reads it since P3: it is deleted on start and at sign-in.
+  static const _kOldOffline = [
+    'narcis_auth_salt_b64',
+    'narcis_auth_hash_b64',
+    'narcis_auth_last_online_at',
+    'narcis_auth_algo',
+  ];
 
-  /// Attempts an online login first (if [online] is true), falling back to
-  /// the offline cache only when the online attempt fails with a network
-  /// error. A successful 200 refreshes the cache; a 401 wipes it (server
-  /// revocation propagates to the device). If [online] is false, goes
-  /// straight to the cache.
-  Future<AuthResult> login(
-    String email,
-    String password, {
-    required bool online,
-  }) async {
-    final normalizedEmail = email.trim().toLowerCase();
-    if (normalizedEmail.isEmpty || password.isEmpty) {
+  static const _unreachable =
+      'Strežnik za prijavo trenutno ni dosegljiv. Poskusite znova pozneje.';
+
+  /// Signs in through the browser. Needs signal ([online]); a definite refusal
+  /// by the server (401) clears anything stored, as before.
+  Future<AuthResult> login({required bool online}) async {
+    if (!online) {
       return const AuthResult(
         success: false,
-        message: 'Vnesite e-pošto in geslo.',
+        message: 'Za prijavo potrebujete internetno povezavo.',
       );
     }
-
-    if (online) {
-      final onlineResult = await _tryOnline(normalizedEmail, password);
-      // Network errors (null) drop through to the offline path.
-      // Definite 200/401 results are returned directly.
-      if (onlineResult != null) return onlineResult;
+    final BrowserCode code;
+    try {
+      code = await _browser.authorize();
+    } on BrowserSignInCancelled {
+      return const AuthResult(
+        success: false,
+        message: 'Prijava je bila preklicana.',
+      );
+    } on BrowserSignInFailed catch (e) {
+      return AuthResult(
+        success: false,
+        message: e.error == 'access_denied'
+            ? 'Dostopa niste dovolili, zato prijava ni uspela.'
+            : 'Prijava v brskalniku ni uspela. Poskusite znova.',
+      );
     }
-
-    return _tryOffline(normalizedEmail, password);
+    return _redeem(code);
   }
 
-  /// Wipes the offline credential cache AND the bearer token. Called on
+  /// Wipes the stored session (and any leftover from older builds). Called on
   /// explicit logout and on any definite 401 (server revocation).
   Future<void> clearCache() async {
     await Future.wait([
       _cache.delete(_kEmail),
-      _cache.delete(_kSalt),
-      _cache.delete(_kHash),
-      _cache.delete(_kLastOnline),
-      _cache.delete(_kAlgo),
       _cache.delete(_kToken),
       _cache.delete(_kLegacyToken),
+      for (final k in _kOldOffline) _cache.delete(k),
     ]);
   }
 
@@ -183,10 +268,15 @@ class AuthService {
   Future<StoredSession?> readStoredSession() async {
     // TB-46: a token from the ORDS backend opens nothing on the new one, and
     // sending it would be answered 401. Forget it; this call then finds no
-    // session, so the app opens on the login screen. The offline credential
-    // cache stays, and the stores are not touched, so the queue survives.
+    // session, so the app opens on the login screen. The stores are not
+    // touched, so the queue survives.
     if (await _cache.read(_kLegacyToken) != null) {
       await _cache.delete(_kLegacyToken);
+    }
+    // P3: the old offline password hash goes; a session stored beside it (a
+    // Bearer from the password sign-in) stays and keeps working.
+    for (final k in _kOldOffline) {
+      if (await _cache.read(k) != null) await _cache.delete(k);
     }
     final email = await _cache.read(_kEmail);
     final token = await _cache.read(_kToken);
@@ -199,10 +289,15 @@ class AuthService {
   /// caller clears the local session regardless.
   Future<void> revokeToken(String token) async {
     try {
-      await _client.post(
-        _endpoint.resolve('odjava'),
-        headers: {'Authorization': 'Bearer $token', 'X-App-Build': '$kAppBuild'},
-      ).timeout(const Duration(seconds: 10));
+      await _client
+          .post(
+            _endpoint.resolve('odjava'),
+            headers: {
+              'Authorization': 'Bearer $token',
+              'X-App-Build': '$kAppBuild',
+            },
+          )
+          .timeout(const Duration(seconds: 10));
     } catch (_) {
       // Intentionally ignored.
     }
@@ -210,52 +305,55 @@ class AuthService {
 
   // ---- internals ----
 
-  /// Returns a definite [AuthResult] when the server replied (200 or 401),
-  /// or `null` when the request couldn't complete (timeout, DNS, connection).
-  /// A null return tells the caller to fall through to the offline cache.
-  Future<AuthResult?> _tryOnline(String email, String password) async {
-    final credsB64 = base64Encode(utf8.encode('$email:$password'));
+  Future<AuthResult> _redeem(BrowserCode code) async {
     try {
-      final response = await _client.post(
-        _endpoint,
-        headers: {'Authorization': 'Basic $credsB64', 'X-App-Build': '$kAppBuild'},
-      ).timeout(const Duration(seconds: 15));
+      final response = await _client
+          .post(
+            _endpoint.replace(path: '${_endpoint.path}/koda'),
+            headers: {
+              'Content-Type': 'application/json',
+              'X-App-Build': '$kAppBuild',
+            },
+            body: jsonEncode({
+              'code': code.code,
+              'code_verifier': code.codeVerifier,
+              'nonce': code.nonce,
+            }),
+          )
+          .timeout(const Duration(seconds: 20));
 
-      // Body parsing is lenient (ORDS once answered JSON as text/html): parse
-      // by content, not by header.
+      // Body parsing is lenient: parse by content, not by header.
       Map<String, dynamic> body = const <String, dynamic>{};
       if (response.body.isNotEmpty) {
         try {
           final decoded = jsonDecode(response.body);
           if (decoded is Map<String, dynamic>) body = decoded;
         } catch (_) {
-          // Non-JSON body is treated as an empty map — status code drives
-          // success/failure below.
+          // Non-JSON body: the status decides below.
         }
       }
-
-      if (response.statusCode == 200 && body['authenticated'] == true) {
-        final user = (body['user'] as String?) ?? email;
-        final token = body['token'] as String?;
-        await _writeCache(email: user, password: password);
-        await _writeToken(token);
+      final user = body['user'];
+      final token = body['token'];
+      if (response.statusCode == 200 &&
+          body['authenticated'] == true &&
+          user is String &&
+          token is String &&
+          token.isNotEmpty) {
+        await _writeSession(email: user, token: token);
         return AuthResult(success: true, user: user, token: token);
       }
-
       if (response.statusCode == 426) {
-        // Below the server's minimum build (TB-46): neither a rejection nor a
-        // network error. Nothing is wiped; the app asks for the update.
+        // Below the server's minimum build (TB-46): nothing is wiped; the app
+        // asks for the update.
         return const AuthResult(
           success: false,
           message: 'Ta različica aplikacije ni več podprta.',
           updateRequired: true,
         );
       }
-
       if (response.statusCode == 401) {
-        // Definite server rejection. Nuke any cached creds so a previously
-        // authorized user who has since had TERENSKA-BELEZNICA revoked can no
-        // longer log in offline.
+        // A definite refusal: a code the server would not redeem, or a sign-in
+        // without TERENSKA-BELEZNICA or an organisation (with a reason).
         await clearCache();
         return AuthResult(
           success: false,
@@ -264,189 +362,29 @@ class AuthService {
           reason: body['reason'] as String?,
         );
       }
-
-      // 5xx or other unexpected status (503: NarcIS could not be asked): treat
-      // as a network error and let the offline path try.
-      return null;
+      if (response.statusCode == 400) {
+        return const AuthResult(
+          success: false,
+          message: 'Prijava ni uspela. Poskusite znova.',
+        );
+      }
+      return const AuthResult(success: false, message: _unreachable);
     } on TimeoutException {
-      return null;
+      return const AuthResult(success: false, message: _unreachable);
     } catch (_) {
-      // Socket / DNS / TLS: also a network error.
-      return null;
+      // Socket / DNS / TLS.
+      return const AuthResult(success: false, message: _unreachable);
     }
   }
 
-  Future<AuthResult> _tryOffline(String email, String password) async {
-    final cached = await _readCache();
-    if (cached == null || cached.email != email) {
-      return const AuthResult(
-        success: false,
-        message: 'Brez povezave: nimamo shranjenih podatkov za ta račun.',
-      );
-    }
-
-    if (cached.algo != _algoCurrent) {
-      // Stored cache uses a hash scheme we no longer accept. Force online.
-      return const AuthResult(
-        success: false,
-        message: 'Brez povezave: shranjeni podatki so zastareli, '
-            'prijavite se z internetno povezavo.',
-      );
-    }
-
-    final age = _clock().difference(cached.lastOnlineAt);
-    if (age.isNegative || age > _maxOfflineWindow) {
-      return AuthResult(
-        success: false,
-        message: 'Brez povezave: dovoljeno obdobje '
-            '(${_maxOfflineWindow.inDays} dni) je poteklo. '
-            'Prijavite se z internetno povezavo.',
-      );
-    }
-
-    final candidate = _pbkdf2Sha256(
-      password: utf8.encode(password),
-      salt: cached.salt,
-      iterations: _pbkdf2Iters,
-      keyBytes: _pbkdf2KeyBytes,
-    );
-
-    if (!_constantTimeEquals(candidate, cached.hash)) {
-      return const AuthResult(
-        success: false,
-        message: 'Brez povezave: napačno geslo.',
-      );
-    }
-
-    return AuthResult(success: true, user: email, wasOffline: true);
-  }
-
-  Future<void> _writeCache({
+  Future<void> _writeSession({
     required String email,
-    required String password,
+    required String token,
   }) async {
-    final salt = _randomBytes(_saltBytes);
-    final hash = _pbkdf2Sha256(
-      password: utf8.encode(password),
-      salt: salt,
-      iterations: _pbkdf2Iters,
-      keyBytes: _pbkdf2KeyBytes,
-    );
-    final now = _clock().toUtc().toIso8601String();
-
-    // Order matters: write the email LAST. _readCache treats "no email" as
-    // "no cache", so a partial-write that crashes mid-way leaves the cache
-    // effectively empty rather than half-populated.
-    await _cache.write(_kAlgo, _algoCurrent);
-    await _cache.write(_kSalt, base64Encode(salt));
-    await _cache.write(_kHash, base64Encode(hash));
-    await _cache.write(_kLastOnline, now);
+    for (final k in _kOldOffline) {
+      await _cache.delete(k);
+    }
+    await _cache.write(_kToken, token);
     await _cache.write(_kEmail, email.toLowerCase());
   }
-
-  /// Persists (or clears) the bearer token. A null/empty token deletes any
-  /// stale value — e.g. re-logging in against a backend that no longer mints.
-  Future<void> _writeToken(String? token) async {
-    if (token == null || token.isEmpty) {
-      await _cache.delete(_kToken);
-    } else {
-      await _cache.write(_kToken, token);
-    }
-  }
-
-  Future<_CachedAuth?> _readCache() async {
-    final email = await _cache.read(_kEmail);
-    if (email == null) return null;
-
-    final saltB64 = await _cache.read(_kSalt);
-    final hashB64 = await _cache.read(_kHash);
-    final lastOnline = await _cache.read(_kLastOnline);
-    final algo = await _cache.read(_kAlgo);
-    if (saltB64 == null ||
-        hashB64 == null ||
-        lastOnline == null ||
-        algo == null) {
-      return null;
-    }
-
-    final ts = DateTime.tryParse(lastOnline);
-    if (ts == null) return null;
-
-    return _CachedAuth(
-      email: email,
-      salt: base64Decode(saltB64),
-      hash: base64Decode(hashB64),
-      lastOnlineAt: ts,
-      algo: algo,
-    );
-  }
-
-  Uint8List _randomBytes(int n) {
-    final out = Uint8List(n);
-    for (var i = 0; i < n; i++) {
-      out[i] = _random.nextInt(256);
-    }
-    return out;
-  }
-
-  /// PBKDF2-HMAC-SHA256. Implemented inline to avoid pulling in a heavier
-  /// crypto dep just for this. RFC 8018 §5.2.
-  static Uint8List _pbkdf2Sha256({
-    required List<int> password,
-    required List<int> salt,
-    required int iterations,
-    required int keyBytes,
-  }) {
-    final hmac = Hmac(sha256, password);
-    const hLen = 32; // SHA-256 output length in bytes
-    final blocks = (keyBytes + hLen - 1) ~/ hLen;
-    final out = BytesBuilder();
-
-    for (var i = 1; i <= blocks; i++) {
-      // U_1 = PRF(P, S || INT(i))
-      final block = Uint8List.fromList([
-        ...salt,
-        (i >> 24) & 0xff,
-        (i >> 16) & 0xff,
-        (i >> 8) & 0xff,
-        i & 0xff,
-      ]);
-      var u = Uint8List.fromList(hmac.convert(block).bytes);
-      final t = Uint8List.fromList(u);
-      // T_i = U_1 XOR U_2 XOR ... XOR U_c
-      for (var j = 1; j < iterations; j++) {
-        u = Uint8List.fromList(hmac.convert(u).bytes);
-        for (var k = 0; k < hLen; k++) {
-          t[k] ^= u[k];
-        }
-      }
-      out.add(t);
-    }
-    return Uint8List.fromList(out.toBytes().sublist(0, keyBytes));
-  }
-
-  static bool _constantTimeEquals(List<int> a, List<int> b) {
-    if (a.length != b.length) return false;
-    var diff = 0;
-    for (var i = 0; i < a.length; i++) {
-      diff |= a[i] ^ b[i];
-    }
-    return diff == 0;
-  }
-}
-
-class _CachedAuth {
-  _CachedAuth({
-    required this.email,
-    required this.salt,
-    required this.hash,
-    required this.lastOnlineAt,
-    required this.algo,
-  });
-
-  final String email;
-  final Uint8List salt;
-  final Uint8List hash;
-  final DateTime lastOnlineAt;
-  final String algo;
 }

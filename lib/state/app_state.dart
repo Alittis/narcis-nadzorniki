@@ -58,18 +58,12 @@ class AppState extends ChangeNotifier {
   StreamSubscription<dynamic>? _connectivitySub;
   List<String> _lastObservers = [];
   String? _currentUser;
-  // Bearer session token: the primary sync credential. Minted by the server on
-  // a successful ONLINE login (see AuthService), persisted in secure storage,
-  // and restored on app start for a sticky session across cold starts. Sent as
-  // Authorization: Bearer <token> on every CRUD call - the password is never
-  // stored or re-sent. Cleared on logout and on a sync 401 (revoked/expired).
+  // Bearer session token: the sync credential. Minted by the server on a
+  // successful sign-in (see AuthService; since NV-554 P3 through the browser),
+  // persisted in secure storage, and restored on app start for a sticky session
+  // across cold starts. Sent as Authorization: Bearer <token> on every CRUD
+  // call. Cleared on logout and on a sync 401 (revoked/expired).
   String? _sessionToken;
-  // Fallback credential: the plaintext password, held in memory ONLY for the
-  // current session and ONLY when the server didn't mint a token (older ORDS
-  // deploy). Never written to disk. If neither a token nor this is present
-  // (e.g. an offline manual login) queued records don't sync until the next
-  // online login.
-  String? _sessionPassword;
   // True until init() has restored any persisted session and decided whether to
   // show Home or Login - lets main.dart show a splash instead of flashing the
   // login screen on every cold start (incl. OS-killed background resumes).
@@ -121,9 +115,7 @@ class AppState extends ChangeNotifier {
   String? get currentUser => _currentUser;
   bool get isAuthenticated => _currentUser != null;
   bool get canSync =>
-      _currentUser != null &&
-      (_sessionToken != null || _sessionPassword != null) &&
-      !_updateRequired;
+      _currentUser != null && _sessionToken != null && !_updateRequired;
   bool get updateRequired => _updateRequired;
   bool get isBootstrapping => _bootstrapping;
 
@@ -133,33 +125,33 @@ class AppState extends ChangeNotifier {
   bool get hasActiveWalk => _activeWalk != null;
   bool get isWalkPaused => _activeWalk?.pausedAt != null;
 
+  /// Signs in through Račun NarcIS in the browser (NV-554 P3).
+  ///
   /// [confirmDiscard] is asked when the device holds unsent work captured by
-  /// a different account (TB-48). Only that account can send it: the server
-  /// files a POST under whoever's token carries it, so syncing it now would
-  /// file someone else's records as this user's. True discards the work and
-  /// logs in; false, or no callback, refuses the login and leaves it all.
-  Future<AuthResult> login(
-    String email,
-    String password, {
-    Future<bool> Function(String owner, UnsentWork unsent)? confirmDiscard,
+  /// a different account (TB-48) — `user` is the account that just signed in.
+  /// Only the owner can send that work: the server files a POST under whoever's
+  /// token carries it, so syncing it now would file someone else's records as
+  /// this user's. True discards the work and logs in; false, or no callback,
+  /// refuses the login and leaves it all.
+  Future<AuthResult> login({
+    Future<bool> Function(String owner, String user, UnsentWork unsent)?
+        confirmDiscard,
   }) async {
-    final result = await _authService.login(
-      email,
-      password,
-      online: isOnline,
-    );
+    final result = await _authService.login(online: isOnline);
     if (result.updateRequired) {
       _updateRequired = true;
       notifyListeners();
     }
     if (result.success) {
-      final owner = _unsentOwnerOtherThan(result.user ?? email);
+      final user = result.user ?? '';
+      final owner = _unsentOwnerOtherThan(user);
       if (owner != null) {
-        final discard = await confirmDiscard?.call(owner, unsentWork) ?? false;
+        final discard =
+            await confirmDiscard?.call(owner, user, unsentWork) ?? false;
         if (!discard) {
-          // Undo the login. AuthService has already stored this user's token
-          // and offline credentials; left there, the next cold start would
-          // restore this user over the old queue.
+          // Undo the login. AuthService has already stored this user's
+          // session; left there, the next cold start would restore this user
+          // over the old queue.
           final token = result.token;
           if (token != null) unawaited(_authService.revokeToken(token));
           await _authService.clearCache();
@@ -172,17 +164,7 @@ class AppState extends ChangeNotifier {
         await _discardLocalData();
       }
       _currentUser = result.user;
-      if (result.token != null) {
-        // Online login minted a token: persistent, password not retained.
-        _sessionToken = result.token;
-        _sessionPassword = null;
-      } else {
-        // No token: either an offline login (can't sync) or an older backend
-        // that doesn't mint - keep the password in memory for this session
-        // only so sync still works via the Basic fallback.
-        _sessionToken = null;
-        _sessionPassword = result.wasOffline ? null : password;
-      }
+      _sessionToken = result.token;
       notifyListeners();
       if (canSync) {
         unawaited(syncAll());
@@ -205,7 +187,6 @@ class AppState extends ChangeNotifier {
 
     _currentUser = null;
     _sessionToken = null;
-    _sessionPassword = null;
     await _authService.clearCache();
     notifyListeners();
   }
@@ -266,15 +247,8 @@ class AppState extends ChangeNotifier {
   SyncCredentials? get _credentials {
     final email = _currentUser;
     if (email == null) return null;
-    // Prefer the bearer token; fall back to the in-memory password (older
-    // backend that didn't mint a token).
     final token = _sessionToken;
-    if (token != null) return SyncCredentials.token(token);
-    final password = _sessionPassword;
-    if (password != null) {
-      return SyncCredentials.basic(email: email, password: password);
-    }
-    return null;
+    return token == null ? null : SyncCredentials.token(token);
   }
 
   bool get isOnline => !_offlineOverride && _connectivityResult != ConnectivityResult.none;
@@ -1529,11 +1503,10 @@ class AppState extends ChangeNotifier {
       notifyListeners();
     }
     if (e.isUnauthorized) {
-      // Token (or password) no longer accepted: drop the sync credential and
-      // wipe the persisted token + offline cache so the next cold start lands
-      // on the login screen. Queued records stay until the next online login.
+      // Token no longer accepted: drop the sync credential and wipe the stored
+      // session so the next cold start lands on the login screen. Queued
+      // records stay until the next sign-in.
       _sessionToken = null;
-      _sessionPassword = null;
       unawaited(_authService.clearCache());
       notifyListeners();
     }

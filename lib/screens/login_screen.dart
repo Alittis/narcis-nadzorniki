@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:narcis_nadzorniki/state/app_state.dart';
 import 'package:provider/provider.dart';
 
-/// Shown under the server's message when it refused a right password for a
+/// Shown under the server's message when it refused a sign-in for a
 /// missing TERENSKA-BELEZNICA right (TB-28; reason `not_authorized` since
 /// TB-46). Names the publisher, who provisions closed-test accounts; at
 /// production scale the addressee becomes the organisation's administrator —
@@ -19,13 +18,13 @@ const noOrgHintText =
     'Račun mora biti v NarcIS povezan z organizacijo. Za ureditev pišite na '
     'admin@alittis.com.';
 
-/// The hint for a server refusal's [reason]; null for a wrong password, which
-/// the server now tells apart (TB-28 half 2).
+/// The hint for a server refusal's [reason]; null for any other refusal
+/// (TB-28 half 2).
 String? hintForReason(String? reason) => switch (reason) {
-      'not_authorized' => accessHintText,
-      'no_org' => noOrgHintText,
-      _ => null,
-    };
+  'not_authorized' => accessHintText,
+  'no_org' => noOrgHintText,
+  _ => null,
+};
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -35,45 +34,28 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
   bool _submitting = false;
   String? _error;
   String? _hint;
 
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
-
+  /// NV-554 P3: the sign-in happens at Račun NarcIS in the phone's browser.
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
     setState(() {
       _submitting = true;
       _error = null;
       _hint = null;
     });
     final result = await context.read<AppState>().login(
-      _emailController.text,
-      _passwordController.text,
-      confirmDiscard: (owner, unsent) async {
+      confirmDiscard: (owner, user, unsent) async {
         if (!mounted) return false;
         return showForeignUnsentDialog(
           context,
           owner: owner,
-          user: _emailController.text.trim(),
+          user: user,
           unsent: unsent,
         );
       },
     );
-    if (result.success) {
-      TextInput.finishAutofillContext();
-    }
     if (!mounted) return;
     setState(() {
       _submitting = false;
@@ -84,42 +66,11 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
-  InputDecoration _fieldDecoration({
-    required String hint,
-    required IconData icon,
-  }) {
-    return InputDecoration(
-      hintText: hint,
-      prefixIcon: Icon(icon),
-      filled: true,
-      fillColor: Colors.white.withValues(alpha: 0.78),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(
-          color: Theme.of(context).colorScheme.primary,
-          width: 2,
-        ),
-      ),
-      errorStyle: const TextStyle(
-        color: Colors.white,
-        fontWeight: FontWeight.w600,
-        shadows: [
-          Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1)),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    const shadow = [
+      Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 1)),
+    ];
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
@@ -149,125 +100,93 @@ class _LoginScreenState extends State<LoginScreen> {
                 padding: const EdgeInsets.all(24),
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 420),
-                  child: Form(
-                    key: _formKey,
-                    child: AutofillGroup(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text(
-                            'Terenska beležnica',
-                            style: Theme.of(context).textTheme.headlineSmall
-                                ?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                  shadows: const [
-                                    Shadow(
-                                      color: Colors.black54,
-                                      blurRadius: 6,
-                                      offset: Offset(0, 1),
-                                    ),
-                                  ],
-                                ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'Terenska beležnica',
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              shadows: shadow,
+                            ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 12,
+                          horizontal: 14,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.55),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'Prijavite se z Računom NarcIS. Odprl se bo '
+                          'brskalnik: vnesite e-naslov in geslo (skrbniki tudi '
+                          'kodo za prijavo v dveh korakih) in dovolite dostop '
+                          'aplikaciji. Za prijavo potrebujete internetno '
+                          'povezavo; prijavljeni ostanete tudi brez nje.',
+                          style: TextStyle(color: Colors.white, fontSize: 14),
+                        ),
+                      ),
+                      if (_error != null) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 10,
+                            horizontal: 14,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade900.withValues(alpha: 0.82),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            _error!,
+                            style: const TextStyle(color: Colors.white),
                             textAlign: TextAlign.center,
                           ),
-                          const SizedBox(height: 24),
-                          TextFormField(
-                            controller: _emailController,
-                            autofillHints: const [
-                              AutofillHints.username,
-                              AutofillHints.email,
-                            ],
-                            keyboardType: TextInputType.emailAddress,
-                            textInputAction: TextInputAction.next,
-                            decoration: _fieldDecoration(
-                              hint: 'E-pošta',
-                              icon: Icons.person_outline,
-                            ),
-                            validator: (value) {
-                              final v = value?.trim() ?? '';
-                              if (v.isEmpty) return 'Vnesite e-pošto.';
-                              if (!v.contains('@'))
-                                return 'Neveljaven e-poštni naslov.';
-                              return null;
-                            },
+                        ),
+                      ],
+                      // TB-28: whom to ask, when the server said why a
+                      // successful sign-in was refused.
+                      if (_hint != null) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 10,
+                            horizontal: 14,
                           ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: _passwordController,
-                            autofillHints: const [AutofillHints.password],
-                            obscureText: true,
-                            textInputAction: TextInputAction.done,
-                            onFieldSubmitted: (_) => _submit(),
-                            decoration: _fieldDecoration(
-                              hint: 'Geslo',
-                              icon: Icons.lock_outline,
-                            ),
-                            validator: (value) {
-                              if ((value ?? '').isEmpty)
-                                return 'Vnesite geslo.';
-                              return null;
-                            },
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.6),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          if (_error != null) ...[
-                            const SizedBox(height: 16),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 10,
-                                horizontal: 14,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.red.shade900.withValues(
-                                  alpha: 0.82,
+                          child: Text(
+                            _hint!,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 24),
+                      FilledButton(
+                        onPressed: _submitting ? null : _submit,
+                        child: _submitting
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
                                 ),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                _error!,
-                                style: const TextStyle(color: Colors.white),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ],
-                          // TB-28: whom to ask, when the server said why a
-                          // right password was refused.
-                          if (_hint != null) ...[
-                            const SizedBox(height: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 10,
-                                horizontal: 14,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.6),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                _hint!,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                          ],
-                          const SizedBox(height: 24),
-                          FilledButton(
-                            onPressed: _submitting ? null : _submit,
-                            child: _submitting
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Text('Prijava'),
-                          ),
-                        ],
+                              )
+                            : const Text('Prijava z Računom NarcIS'),
                       ),
-                    ),
+                    ],
                   ),
                 ),
               ),
@@ -298,16 +217,20 @@ Future<bool> showForeignUnsentDialog(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Na tej napravi so podatki uporabnika $owner, ki jih strežnik '
-              'še nima:'),
+          Text(
+            'Na tej napravi so podatki uporabnika $owner, ki jih strežnik '
+            'še nima:',
+          ),
           const SizedBox(height: 8),
           if (unsent.records > 0) Text('• zapisi: ${unsent.records}'),
           if (unsent.walks > 0) Text('• obhodi: ${unsent.walks}'),
           if (unsent.deletes > 0) Text('• izbrisi: ${unsent.deletes}'),
           if (unsent.activeWalk) const Text('• obhod, ki se še snema'),
           const SizedBox(height: 12),
-          Text('Pošlje jih lahko le ta uporabnik, ko se prijavi. Če nadaljujete '
-              'kot $user, bodo izgubljeni.'),
+          Text(
+            'Pošlje jih lahko le ta uporabnik, ko se prijavi. Če nadaljujete '
+            'kot $user, bodo izgubljeni.',
+          ),
         ],
       ),
       actions: [

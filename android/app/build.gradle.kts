@@ -37,6 +37,11 @@ android {
         // Default launcher label; release (Play) build keeps this. Non-release
         // builds override it below so the side-by-side dev app is identifiable.
         manifestPlaceholders["appLabel"] = "Terenska beležnica"
+        // NV-554 P3: flutter_appauth's redirect receiver claims this private-use
+        // scheme — the app's client at Račun NarcIS redirects to
+        // si.terenska.beleznica:/prijava (narcis-racun RN-18). Lowercase, as
+        // AppAuth requires. The dev build claims it too (one app per device).
+        manifestPlaceholders["appAuthRedirectScheme"] = "si.terenska.beleznica"
     }
 
     signingConfigs {

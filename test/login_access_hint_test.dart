@@ -1,7 +1,8 @@
-// TB-28: a login refused with the right password says why, and whom to ask.
-// Since TB-46 the server tells the cases apart — `reason` not_authorized (no
-// TERENSKA-BELEZNICA right) or no_org — so the hint follows the reason. A
-// wrong password (401, no reason) and the offline failures get no hint.
+// TB-28: a sign-in the server refuses after it succeeded at Račun NarcIS says
+// why, and whom to ask. Since TB-46 the server tells the cases apart —
+// `reason` not_authorized (no TERENSKA-BELEZNICA right) or no_org — so the hint
+// follows the reason. Any other refusal (401, no reason) and the failures
+// before the server (no signal, a cancelled browser) get no hint.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,10 +16,9 @@ class _FakeAppState extends AppState {
   final AuthResult result;
 
   @override
-  Future<AuthResult> login(
-    String email,
-    String password, {
-    Future<bool> Function(String owner, UnsentWork unsent)? confirmDiscard,
+  Future<AuthResult> login({
+    Future<bool> Function(String owner, String user, UnsentWork unsent)?
+        confirmDiscard,
   }) async =>
       result;
 }
@@ -30,9 +30,9 @@ Future<void> _submit(WidgetTester tester, AuthResult result) async {
       child: const MaterialApp(home: LoginScreen()),
     ),
   );
-  await tester.enterText(find.byType(TextFormField).at(0), 'ana@gov.si');
-  await tester.enterText(find.byType(TextFormField).at(1), 'geslo');
-  await tester.tap(find.text('Prijava'));
+  // NV-554 P3: no fields any more; the button opens the browser.
+  expect(find.byType(TextFormField), findsNothing);
+  await tester.tap(find.text('Prijava z Računom NarcIS'));
   await tester.pumpAndSettle();
 }
 
@@ -43,7 +43,7 @@ void main() {
       tester,
       const AuthResult(
         success: false,
-        message: 'Geslo je pravilno, vendar vaš račun nima pravice za '
+        message: 'Prijava je uspela, vendar vaš račun nima pravice za '
             'Terensko beležnico (TERENSKA-BELEZNICA).',
         rejectedByServer: true,
         reason: 'not_authorized',
@@ -61,7 +61,7 @@ void main() {
       tester,
       const AuthResult(
         success: false,
-        message: 'Geslo je pravilno, vendar vaš račun ni povezan z nobeno '
+        message: 'Prijava je uspela, vendar vaš račun ni povezan z nobeno '
             'organizacijo, zato zapisov ni mogoče shraniti.',
         rejectedByServer: true,
         reason: 'no_org',
@@ -73,29 +73,34 @@ void main() {
     expect(noOrgHintText, contains('admin@alittis.com'));
   });
 
-  testWidgets('a wrong password: the generic error, no hint', (tester) async {
+  testWidgets('a code the server refused: the generic error, no hint',
+      (tester) async {
     await _submit(
       tester,
       const AuthResult(
         success: false,
-        message: 'Neveljavni podatki za prijavo.',
+        message: 'Prijava ni uspela ali je potekla. Poskusite znova.',
         rejectedByServer: true,
       ),
     );
 
-    expect(find.text('Neveljavni podatki za prijavo.'), findsOneWidget);
+    expect(find.text('Prijava ni uspela ali je potekla. Poskusite znova.'),
+        findsOneWidget);
     expect(find.text(accessHintText), findsNothing);
     expect(find.text(noOrgHintText), findsNothing);
   });
 
-  testWidgets('an offline failure shows the error but no hint',
-      (tester) async {
+  testWidgets('no signal shows the error but no hint', (tester) async {
     await _submit(
       tester,
-      const AuthResult(success: false, message: 'Brez povezave: napačno geslo.'),
+      const AuthResult(
+        success: false,
+        message: 'Za prijavo potrebujete internetno povezavo.',
+      ),
     );
 
-    expect(find.text('Brez povezave: napačno geslo.'), findsOneWidget);
+    expect(find.text('Za prijavo potrebujete internetno povezavo.'),
+        findsOneWidget);
     expect(find.text(accessHintText), findsNothing);
   });
 }

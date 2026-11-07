@@ -76,20 +76,18 @@ class _FakeWalksStore extends WalksLocalStore {
   Future<void> clearActive() async {}
 }
 
-/// Stands in for the server and secure storage. An online login succeeds for
-/// anyone and, like the real one, stores the new session at once.
+/// Stands in for the browser, the server and secure storage. A sign-in
+/// succeeds as [next] (the account the person signs in with at Račun NarcIS)
+/// and, like the real one, stores the new session at once.
 class _FakeAuth extends AuthService {
   _FakeAuth([this.stored]);
   StoredSession? stored;
+  String next = '';
   final revoked = <String>[];
 
   @override
-  Future<AuthResult> login(
-    String email,
-    String password, {
-    required bool online,
-  }) async {
-    final user = email.trim().toLowerCase();
+  Future<AuthResult> login({required bool online}) async {
+    final user = next.trim().toLowerCase();
     stored = StoredSession(email: user, token: 'tok-$user');
     return AuthResult(success: true, user: user, token: 'tok-$user');
   }
@@ -201,10 +199,9 @@ void main() {
       expect(h.state.isAuthenticated, isFalse, reason: 'cold start after 401');
 
       var asked = false;
+      h.auth.next = ' Ana@gov.si ';
       final result = await h.state.login(
-        ' Ana@gov.si ',
-        'geslo',
-        confirmDiscard: (_, _) async => asked = true,
+        confirmDiscard: (_, _, _) async => asked = true,
       );
       await pumpEventQueue();
 
@@ -225,10 +222,9 @@ void main() {
 
       String? askedOwner;
       UnsentWork? askedUnsent;
+      h.auth.next = _bor;
       final result = await h.state.login(
-        _bor,
-        'geslo',
-        confirmDiscard: (owner, unsent) async {
+        confirmDiscard: (owner, _, unsent) async {
           askedOwner = owner;
           askedUnsent = unsent;
           return false;
@@ -262,7 +258,8 @@ void main() {
       );
       await h.boot();
 
-      final result = await h.state.login(_bor, 'geslo');
+      h.auth.next = _bor;
+      final result = await h.state.login();
       await pumpEventQueue();
 
       expect(result.success, isFalse);
@@ -284,10 +281,9 @@ void main() {
       );
       await h.boot();
 
+      h.auth.next = _bor;
       final result = await h.state.login(
-        _bor,
-        'geslo',
-        confirmDiscard: (_, _) async => true,
+        confirmDiscard: (_, _, _) async => true,
       );
       await pumpEventQueue();
 
@@ -308,10 +304,9 @@ void main() {
       await h.boot();
 
       var asked = false;
+      h.auth.next = _bor;
       final result = await h.state.login(
-        _bor,
-        'geslo',
-        confirmDiscard: (_, _) async => asked = true,
+        confirmDiscard: (_, _, _) async => asked = true,
       );
 
       expect(result.success, isTrue);
