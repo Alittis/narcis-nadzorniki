@@ -41,6 +41,10 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   upgrade keeps the session and the queue; 1.15 with a two-step account still gets 426. Screenshots in narcis-vibed
   `misc/nv554-p3/`.
 - **Not done:** iOS (the app has never been configured for iOS: bundle id, signing, App Store record — its own task).
+- **Open — task hijacking on Android 7–10 (a side review, 2026-11-07):** removing `taskAffinity=""` drops the template's
+  partial guard against task hijacking (StrandHogg) on Android 7–10; Android 11+ is patched in the OS, and Android's own
+  mitigation is `minSdkVersion 30` (ARCHITECTURE §9bis). Owner: *ship as built, check stats* — read Play Console →
+  Statistics → Android version; with no testers on 7–10, raise minSdk to 30 in the next build.
 
 ### TB-2 · Delete disturbance entries from the phone
 `🐞 Bug` · `P1` · `Done` (shipped v1.9.0+18, rolled out on the Play Closed testing track 2026-09-02; **the delete never reached the server on that build** — fixed in [TB-33](#tb-33--delete-never-reached-the-server--ords-400-on-every-bodyless-delete)) · Reporter: Matjaž · Updated: 2026-09-02

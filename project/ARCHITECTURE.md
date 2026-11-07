@@ -241,7 +241,14 @@ password and offline-cache steps below, which stay as the record of builds ≤ 1
   dosegljiv*. TB-48's foreign-queue question now names the account the server returned.
 - **`MainActivity` has no `android:taskAffinity=""`** (the Flutter template's default, removed in TB-58): with it AppAuth's
   redirect activities started in a task of their own and the sign-in never returned to the app (seen on the emulator;
-  flutter_appauth README, *Troubleshooting*).
+  flutter_appauth README, *Troubleshooting*). **This is a security trade-off, not only a fix** (raised by a side review,
+  decided by the owner 2026-11-07: *ship as built, check stats*): the empty affinity is the template's guard against
+  task hijacking (StrandHogg — a malicious app's screen slipped into this app's task, e.g. a fake login). Android 11
+  (API 30) and newer are patched in the OS; on Android 7–10 (minSdk is 24) the empty affinity only partly covered the
+  first variant, and Android's own mitigation is `minSdkVersion 30`. Keeping the empty affinity would need AppAuth's
+  redirect handling forked: its `AuthorizationManagementActivity` is started for a result inside the app's task, and
+  the redirect arrives from Chrome in a new task that can find it only by affinity. **Open (TB-58):** the owner reads
+  Play Console's Android-version statistics; with no testers on Android 7–10, the next build raises minSdk to 30.
 
 **TB-46 (built 2026-10-13, ships with the cutover):** the steps below hold with `POST prijava` and `Authorization` in place of
 `GET app-auth/login` and `X-Narcis-Auth` (§9.0). Three additions:

@@ -51,7 +51,9 @@
         <!-- NV-554 P3: no empty taskAffinity (the Flutter template's default). With it,
              AppAuth's redirect activities start in a task of their own and the browser
              sign-in never returns to the app: seen on the emulator 2026-11-07, and the
-             flutter_appauth README's own troubleshooting note. -->
+             flutter_appauth README's own troubleshooting note. A security trade-off: the
+             empty affinity guarded against task hijacking on Android 7 to 10 (Android 11+
+             is patched in the OS). ARCHITECTURE 9bis, TB-58: minSdk 30 is the planned fix. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
