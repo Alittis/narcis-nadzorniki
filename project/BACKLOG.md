@@ -45,6 +45,9 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   partial guard against task hijacking (StrandHogg) on Android 7–10; Android 11+ is patched in the OS, and Android's own
   mitigation is `minSdkVersion 30` (ARCHITECTURE §9bis). Owner: *ship as built, check stats* — read Play Console →
   Statistics → Android version; with no testers on 7–10, raise minSdk to 30 in the next build.
+  **Read 2026-11-07 (the owner's screenshot, Play installed audience, 2026-11-05):** 34 installs; the tooltip lists 33,
+  all on Android 11+ (16: 17, 13: 8, 17: 4, 11: 2, 12: 1, 15: 1); **1 install is not listed** — unknown whether it is on
+  7–10. minSdk 30 waits until that one is identified (Play Console → Statistics as a table, or *Reach and devices*).
 
 ### TB-2 · Delete disturbance entries from the phone
 `🐞 Bug` · `P1` · `Done` (shipped v1.9.0+18, rolled out on the Play Closed testing track 2026-09-02; **the delete never reached the server on that build** — fixed in [TB-33](#tb-33--delete-never-reached-the-server--ords-400-on-every-bodyless-delete)) · Reporter: Matjaž · Updated: 2026-09-02
