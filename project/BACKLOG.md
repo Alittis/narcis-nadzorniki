@@ -22,6 +22,26 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 
 ## Open
 
+### TB-58 · Sign in through Račun NarcIS in the browser (NV-554 P3) — admins with two-step can use the phone again
+`✨ Enhancement` · `P1` · `Doing` (built into **v1.16.0+26** 2026-11-07, pending upload + rollout) · Reporter: owner (NV-554) · Updated: 2026-11-07
+- **Problem:** since narcis-vibed's switch to Račun NarcIS (2026-11-07 16:48 UTC, its NV-554 P2) the installed builds
+  sign in through an interim password route that refuses any account owing a second factor with 426 (D-P2-2): the 4
+  admins who use the phone cannot.
+- **Want:** sign in in the browser (flutter_appauth), so the provider can ask the second factor; offline use and the
+  queue unchanged; old builds as P2 left them.
+- **Decided (owner, 2026-11-07):** Android today, iOS its own later task (no iOS app exists); a consent screen every
+  time (narcis-racun RN-12/RN-18); a sign-in needs signal, staying signed in does not.
+- **Built:** ARCHITECTURE §9.0 / §9bis (from 1.16.0). `lib/services/auth_service.dart` (browser step behind
+  `BrowserSignIn`, `prijava/koda`, the PBKDF2 cache removed), `lib/state/app_state.dart` (`login({confirmDiscard})`,
+  no in-memory password), `lib/screens/login_screen.dart` (one button), `android/app/build.gradle.kts`
+  (`appAuthRedirectScheme`), `AndroidManifest.xml` (no empty `taskAffinity`). Tests: `auth_service_test.dart` rewritten
+  for the browser flow; the login hint and owner-guard tests follow the new API — 243 pass.
+- **Proof (Android emulator, local narcis-racun + narcis-vibed, 2026-11-07):** sign-in + sync; offline cold start stays
+  signed in, an offline record syncs later; a lock cuts within 60 s; an admin enrols two-step and syncs; 1.15 → 1.16.0
+  upgrade keeps the session and the queue; 1.15 with a two-step account still gets 426. Screenshots in narcis-vibed
+  `misc/nv554-p3/`.
+- **Not done:** iOS (the app has never been configured for iOS: bundle id, signing, App Store record — its own task).
+
 ### TB-2 · Delete disturbance entries from the phone
 `🐞 Bug` · `P1` · `Done` (shipped v1.9.0+18, rolled out on the Play Closed testing track 2026-09-02; **the delete never reached the server on that build** — fixed in [TB-33](#tb-33--delete-never-reached-the-server--ords-400-on-every-bodyless-delete)) · Reporter: Matjaž · Updated: 2026-09-02
 - **Scope narrowed 2026-09-02.** This item was "edit / delete". Delete is what the report actually

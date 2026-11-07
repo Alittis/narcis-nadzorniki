@@ -22,6 +22,11 @@ OPERATIONS §21.8):
 flutter build apk --debug --dart-define=BELEZNICA_API=http://10.0.2.2:3101/api/beleznica/app/v1
 adb install -r build/app/outputs/flutter-apk/app-debug.apk     # installs si.terenska.beleznica.dev beside a store build
 ```
+**With a local Račun NarcIS (TB-58, 1.16.0+):** add `--dart-define=RACUN_ISSUER=http://127.0.0.1:3811` and run
+`adb reverse tcp:3811 tcp:3811`, so the emulator's browser reaches the provider at the issuer's own address (narcis-vibed
+`web/scripts/prijava-e2e.sh`'s provider; narcis-vibed BACKLOG NV-554 P3 has the whole local stack). Chrome's first-run
+screen appears once on a fresh emulator.
+
 Plain HTTP works in **debug builds only**: `android/app/src/debug/res/xml/network_security_config.xml` permits cleartext to
 `10.0.2.2`, `127.0.0.1` and `localhost`, and release builds never merge it. Uninstall the dev app afterwards
 (`adb uninstall si.terenska.beleznica.dev`): its stores hold whatever the scratch backend served.

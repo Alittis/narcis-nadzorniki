@@ -75,7 +75,10 @@ cutover (T0)**, and the shape of every call is theirs: the new API mirrors them 
 skip-if-exists creates, 204 deletes, 404 = done), so the sync engine is unchanged. What differs:
 - **Base URL** from `--dart-define=BELEZNICA_API=…` (`kBeleznicaApi`, `lib/data/remote_api.dart`), default production. **No
   trailing slash** on any path: that host answers `…/disturbances/` with a 308, which a POST does not follow.
-- **Auth:** the standard `Authorization` header (ORDS swallowed it; this host does not). Login is `POST prijava` with
+- **Auth:** the standard `Authorization` header (ORDS swallowed it; this host does not). **From 1.16.0 (TB-58, NV-554 P3)
+  sign-in is `POST prijava/koda` with JSON `{code, code_verifier, nonce}`** from the browser sign-in at Račun NarcIS (§9bis)
+  → the same `{authenticated, user, token, expiresAt}`; 400 for a missing field, 401 for a code the server will not redeem
+  (or `reason` as below), 503 when the provider cannot be asked. Builds ≤ 1.15: `POST prijava` with
   `Authorization: Basic …` → `{authenticated, user, token, expiresAt}`, the token a vibed token (30 days sliding, the web's).
   Logout is `POST odjava` with `Authorization: Bearer …` → `{revoked:true}`. Every other call: `Authorization: Bearer <token>`.
 - **A right password can still be refused, with a reason** (TB-28 half 2): 401 `reason: "not_authorized"` (no
@@ -216,6 +219,29 @@ A walk-around (Slovene "obhod") is a continuous GPS-tracked field session. Distu
 ## 9bis. Client Authentication (Flutter)
 
 Implemented in [lib/services/auth_service.dart](../lib/services/auth_service.dart), driven by [lib/state/app_state.dart](../lib/state/app_state.dart).
+
+**From 1.16.0 (TB-58, NV-554 P3, built 2026-11-07) — sign-in through Račun NarcIS in the browser.** This supersedes the
+password and offline-cache steps below, which stay as the record of builds ≤ 1.15.
+- The login screen has one button, *Prijava z Računom NarcIS*. `AppAuthBrowserSignIn` (flutter_appauth 12.1.0; 13.x needs
+  Flutter 3.44) runs **only the authorization step**: client `terenska-beleznica`, redirect `si.terenska.beleznica:/prijava`
+  (`appAuthRedirectScheme` in `android/app/build.gradle.kts`), scopes `openid email profile narcis`, PKCE (AppAuth) and a
+  nonce the app generates; endpoints `kRacunIssuer`/oidc/auth and /oidc/token (`--dart-define=RACUN_ISSUER`, default
+  `https://prijava.alittis.com`). Android: Chrome Custom Tabs.
+- Račun NarcIS asks the password (and the second factor where the account needs one) and the consent screen on **every**
+  sign-in (narcis-racun RN-18). The app sends `{code, code_verifier, nonce}` to `prijava/koda`; narcis-vibed redeems the
+  code with the client's secret, so the provider's tokens never reach the phone. The Bearer it returns is stored and used
+  exactly as before (`narcis_vibed_token`, email written last).
+- **Offline:** the app never sees the password, so there is no offline password check. A stored session opens the app
+  without signal (as before); only a new sign-in needs signal. The PBKDF2 keys of builds ≤ 1.15 are deleted on start
+  (`readStoredSession`) and at sign-in; a stored Bearer beside them is kept, so an upgrade does not sign anyone out and
+  the queue survives (proven on the emulator 2026-11-07: 1.15 signed in, offline record, 1.16.0 installed over it,
+  record sent).
+- Results: closed browser → *Prijava je bila preklicana*; *Zavrni* (`access_denied`) → its own message; 401 → message
+  (+ `reason` hint) and the stored session cleared; 426 → update screen; 503 / network → *Strežnik za prijavo trenutno ni
+  dosegljiv*. TB-48's foreign-queue question now names the account the server returned.
+- **`MainActivity` has no `android:taskAffinity=""`** (the Flutter template's default, removed in TB-58): with it AppAuth's
+  redirect activities started in a task of their own and the sign-in never returned to the app (seen on the emulator;
+  flutter_appauth README, *Troubleshooting*).
 
 **TB-46 (built 2026-10-13, ships with the cutover):** the steps below hold with `POST prijava` and `Authorization` in place of
 `GET app-auth/login` and `X-Narcis-Auth` (§9.0). Three additions:
