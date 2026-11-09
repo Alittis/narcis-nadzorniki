@@ -46,7 +46,9 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   **2026-12-07** (narcis-vibed NV-554).
 - **Follow-up 2026-11-09:** Play's *App access* review instructions (PLAY_CLOSED_TEST §4.2) still described the in-app
   password form and the 14-day offline digest; rewritten for the browser sign-in and the consent page. The demo
-  account's password changed the same day — the owner updates the Play Console form and `.credentials.local.md`.
+  account's password changed the same day; the owner updated the Play Console form, and the account (no organisation,
+  so `no_org`) was linked to ARSO in NarcIS — sign-in on the phone then passed. The password is kept only in the owner's
+  password manager, no longer in plain text in `.credentials.local.md`.
 - **Not done:** iOS (the app has never been configured for iOS: bundle id, signing, App Store record — its own task).
 - **Open — task hijacking on Android 7–10 (a side review, 2026-11-07):** removing `taskAffinity=""` drops the template's
   partial guard against task hijacking (StrandHogg) on Android 7–10; Android 11+ is patched in the OS, and Android's own

@@ -304,7 +304,7 @@ If a separate IGEA dev instance is available via the `Narcis razvoj IGEA` SQLcl 
 - Redeploy the previous `auth_login.sql` to revert the ORDS module.
 
 After deploying:
-- `bash tools/ords/test_auth_login.sh` (with creds) — failure paths + the 200 success path + the **bearer-token lifecycle** (mint → `Bearer` GET /disturbances/ → logout revoke → revoked-token 401). Creds: the demo account in `project/.credentials.local.md`. For **dev**, point it at the dev ORDS host, e.g. `APP_AUTH_URL=<dev>/app-auth/login APP_DISTURBANCES_URL=<dev>/disturbances/ APP_AUTH_EMAIL=... APP_AUTH_PASSWORD=... bash tools/ords/test_auth_login.sh`; for **prod** the script's defaults (narcis.gov.si) apply.
+- `bash tools/ords/test_auth_login.sh` (with creds) — failure paths + the 200 success path + the **bearer-token lifecycle** (mint → `Bearer` GET /disturbances/ → logout revoke → revoked-token 401). Creds: the demo account; its password is in the owner's password manager, not in a repo file. For **dev**, point it at the dev ORDS host, e.g. `APP_AUTH_URL=<dev>/app-auth/login APP_DISTURBANCES_URL=<dev>/disturbances/ APP_AUTH_EMAIL=... APP_AUTH_PASSWORD=... bash tools/ords/test_auth_login.sh`; for **prod** the script's defaults (narcis.gov.si) apply.
 - `bash tools/ords/test_disturbances.sh` (with creds) for the disturbance lifecycle.
 - `bash tools/ords/test_walks.sh` (with creds) for the walk lifecycle (POST 3-point walk → idempotent re-POST → GET list → GET points → PUT name+notes → DELETE → 404 checks).
 

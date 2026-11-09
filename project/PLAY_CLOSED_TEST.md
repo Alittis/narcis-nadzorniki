@@ -604,7 +604,7 @@ Add **Instructions for review** — the username and password go in their own fi
 **at most 500 characters** (the block below is 483):
 
 - Username: `axzrim+google@gmail.com`
-- Password: see `project/.credentials.local.md` (gitignored)
+- Password: in the owner's password manager — never written into a file in this repo
 - Instructions:
 
 ```
@@ -615,7 +615,7 @@ Add **Instructions for review** — the username and password go in their own fi
 Sign-in needs internet; then the app works offline. Walks use a foreground location service with a notification, only while a walk runs. No background location.
 ```
 
-> Provisioned 2026-05-07: NarcIS user `axzrim+google@gmail.com` (Gmail `+google` subaddress, mail still routes to the maintainer's main inbox) with `TERENSKA-BELEZNICA` authorization. Password lives in `project/.credentials.local.md` (gitignored) — copy from there into the Play Console **App access** form. Rotate or disable the account in NarcIS once the closed test ends.
+> Provisioned 2026-05-07: NarcIS user `axzrim+google@gmail.com` (Gmail `+google` subaddress, mail still routes to the maintainer's main inbox) with `TERENSKA-BELEZNICA` authorization. The password is kept only in the owner's password manager — copy it from there into the Play Console **App access** form (until 2026-11-09 it sat in plain text in the gitignored `project/.credentials.local.md`, never committed; deleted 2026-11-09 — the owner: no plain-text passwords). Rotate or disable the account in NarcIS once the closed test ends.
 >
 > 2026-11-09: password changed by the owner; the instructions above rewritten for 1.16.0's browser sign-in (TB-58). Labels checked against `lib/screens/login_screen.dart` and narcis-racun `web/src/pages/interakcija/[uid].tsx`. The account must not hold admin rights: Račun NarcIS then demands two-step sign-in, which a reviewer cannot complete.
 >
