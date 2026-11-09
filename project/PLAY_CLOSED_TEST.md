@@ -600,23 +600,24 @@ URL: `https://alittis.github.io/terenska-beleznica/privacy/`. Stable; served fro
 
 Play asks: *"Are all parts of your app available without restriction?"* → **No, all or some functionality is restricted.**
 
-Add **Instructions for review**:
+Add **Instructions for review** — the username and password go in their own fields; the instructions field takes
+**at most 500 characters** (the block below is 483):
+
+- Username: `axzrim+google@gmail.com`
+- Password: see `project/.credentials.local.md` (gitignored)
+- Instructions:
 
 ```
-Step 1. Tap "Prijava" on the launch screen.
-Step 2. Enter the demo credentials below.
-Step 3. After successful login the home map opens. The "+" button on the bottom right opens the disturbance entry flow (camera or codebook). The mode pill switches to "Obhodi" for walk-around recording.
-
-Demo email:    axzrim+google@gmail.com
-Demo password: see project/.credentials.local.md (gitignored)
-
-Notes for reviewer:
-- The account requires a server-side authorization in the Slovenian NarcIS system; this demo account is provisioned for Google Play review only and has limited test data.
-- Network access is required for the first login (HTTPS to narcis.gov.si). The app then permits offline use for up to 14 days against a local password digest.
-- Walk recording uses a foreground service typed "location" with a persistent notification. There is no background-location permission; tracking only runs while the user has explicitly started a walk.
+1. Tap "Prijava z Računom NarcIS". A browser page opens.
+2. Enter the email and password above in "E-naslov" and "Geslo", tap "Prijava".
+3. On "Dovolite dostop?" (Allow access?) tap "Dovoli". It shows on every sign-in, as intended.
+4. The home map opens. "+" (bottom right) adds a record; the "Obhodi" pill records a walk.
+Sign-in needs internet; then the app works offline. Walks use a foreground location service with a notification, only while a walk runs. No background location.
 ```
 
 > Provisioned 2026-05-07: NarcIS user `axzrim+google@gmail.com` (Gmail `+google` subaddress, mail still routes to the maintainer's main inbox) with `TERENSKA-BELEZNICA` authorization. Password lives in `project/.credentials.local.md` (gitignored) — copy from there into the Play Console **App access** form. Rotate or disable the account in NarcIS once the closed test ends.
+>
+> 2026-11-09: password changed by the owner; the instructions above rewritten for 1.16.0's browser sign-in (TB-58). Labels checked against `lib/screens/login_screen.dart` and narcis-racun `web/src/pages/interakcija/[uid].tsx`. The account must not hold admin rights: Račun NarcIS then demands two-step sign-in, which a reviewer cannot complete. Whether it holds any: STATUS: UNKNOWN – REQUIRES CONFIRMATION.
 
 ### 4.3 Ads
 
