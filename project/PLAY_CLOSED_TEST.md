@@ -617,7 +617,13 @@ Sign-in needs internet; then the app works offline. Walks use a foreground locat
 
 > Provisioned 2026-05-07: NarcIS user `axzrim+google@gmail.com` (Gmail `+google` subaddress, mail still routes to the maintainer's main inbox) with `TERENSKA-BELEZNICA` authorization. Password lives in `project/.credentials.local.md` (gitignored) — copy from there into the Play Console **App access** form. Rotate or disable the account in NarcIS once the closed test ends.
 >
-> 2026-11-09: password changed by the owner; the instructions above rewritten for 1.16.0's browser sign-in (TB-58). Labels checked against `lib/screens/login_screen.dart` and narcis-racun `web/src/pages/interakcija/[uid].tsx`. The account must not hold admin rights: Račun NarcIS then demands two-step sign-in, which a reviewer cannot complete. Whether it holds any: STATUS: UNKNOWN – REQUIRES CONFIRMATION.
+> 2026-11-09: password changed by the owner; the instructions above rewritten for 1.16.0's browser sign-in (TB-58). Labels checked against `lib/screens/login_screen.dart` and narcis-racun `web/src/pages/interakcija/[uid].tsx`. The account must not hold admin rights: Račun NarcIS then demands two-step sign-in, which a reviewer cannot complete.
+>
+> Checked 2026-11-09 in narcis-vibed's account mirror (`racun_ogledalo`, on the VPS): NarcIS user **4586**, role
+> `SPLOSNAJAVNOST`, codes `TERENSKA-BELEZNICA` only — no admin code, so no second factor. It had **no organisation**, so
+> the 1.16.0 sign-in was refused with `no_org` after a good password; the owner set ARSO (org 136) in NarcIS the same
+> day and the mirror carried it at 07:28 UTC. Accounts' organisations, roles and codes are still Oracle's (APEX p97)
+> until narcis-vibed NV-554 P5 ships its own admin; a p97 change reaches Račun NarcIS within ~16 minutes.
 
 ### 4.3 Ads
 
