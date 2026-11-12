@@ -10,9 +10,13 @@ Future<void> showObmocjaPicker(
   required Set<ZosKind> active,
   required void Function(ZosKind kind, bool on) onChanged,
 }) {
+  // Scroll-controlled: the default sheet stops at 9/16 of the screen, which
+  // the seven rows outgrow (TB-37 overflowed it by 3 px on the A56); the
+  // scroll view inside covers a screen too short for them.
   return showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
+    isScrollControlled: true,
     builder: (_) => _ObmocjaPicker(active: active, onChanged: onChanged),
   );
 }
@@ -34,7 +38,7 @@ class _ObmocjaPickerState extends State<_ObmocjaPicker> {
   Widget build(BuildContext context) {
     return SafeArea(
       top: false,
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.only(bottom: 12),
         child: Column(
           mainAxisSize: MainAxisSize.min,

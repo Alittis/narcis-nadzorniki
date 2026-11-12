@@ -339,7 +339,8 @@ An optional overlay of the protected-area sublayers — six source layers, seven
   - Drawing: `zosRenderStyle` adds `["!=" | "==", ["get", "_cls"], "naravni-spomenik"]` to the three ZO layers, joined to the served filter with `all`; nothing when both rows are on.
   - Identify: `zosHitTest` sorts each ZO feature into `zo` or `ns` by its `_cls`, so a tap never lists a monument that is hidden. A monument takes its colour from the ZO legend (`ZosKind.sourceLayer`).
   - `map_layers.json` carries `nsSplit: true`. A file without it (v1.16.0 and older) that had ZO on gets *Naravni spomeniki* on too, so the update hides nothing a warden saw before.
-  - Tests: `test/zos_render_style_test.dart`, `test/obmocja_store_test.dart` (fixture `z15-17797-11596.mvt`, Frajhajm, saved 2026-11-12), `test/map_layers_store_test.dart`.
+  - The picker sheet is scroll-controlled with a scroll view inside: the default sheet (at most 9/16 of the screen) cut the seventh row off by 3 px on the A56.
+  - Tests: `test/zos_render_style_test.dart`, `test/obmocja_store_test.dart` (fixture `z15-17797-11596.mvt`, Frajhajm, saved 2026-11-12), `test/map_layers_store_test.dart`, `test/obmocja_picker_test.dart`. Checked on the A56 2026-11-12.
 
 - **Source** (public, `kZosOrigin` = `https://narcis.alittis.com` in every build, whatever `BELEZNICA_API` points at):
   - `GET /api/layers/zos-tiles` — PMTiles v3, MVT z5–15, ~32.5 MB, byte ranges, strong ETag (narcis-vibed NV-400). Six source layers `n2k zo epo nv nvj mvo` (`ZosKind` names; `ns` reads `zo`). Features carry `IME_OBM`, `KODA_OBM`, `TIP_ZOS`, `_cls` (the legend class) and class fields; feature id = `NARCIS_ZOS.ID`. Every feature is in every zoom.
