@@ -193,6 +193,13 @@
       "status": "BUILT 2026-10-13, NOT LIVE: the app's backend from the cutover (T0). Server dormant (503 not_live) until narcis-vibed sets BELEZNICA_SOURCE=postgres at T0. Gate met on an Android emulator against a scratch backend; owner-accepted 2026-10-13. Until T0 the ORDS service above stays production.",
       "auth": "POST prijava with Authorization: Basic -> vibed token; Authorization: Bearer on every other call; POST odjava revokes. 401 only for a rejected token (or no TERENSKA-BELEZNICA / no org); 503 when NarcIS auth is unreachable",
       "contract": "mirrors ORDS disturbances/ + walks/ (same JSON, statuses, skip-if-exists POST, 204/404 DELETE); PUT 405; no trailing slash (308)",
+      "failure_reports": {
+        "item": "TB-59 (narcis-racun RN-22 S3)",
+        "route": "POST tezave {tezave:[{pot,koda,stevilo}]}, 1-50 entries, stevilo 1-1000; 204 = taken",
+        "client": "lib/data/tezave_store.dart + RemoteApi.sendTezave; counted in AppState._handleSyncException (+ photo_lost, photo_upload); reported unawaited after a syncAll whose records pull succeeded; kept in tezave.json until a 204; max 50 kinds, count caps at 1000",
+        "koda": "network | http_5xx | http_<status> | photo_lost | photo_upload",
+        "status": "built and unit-tested 2026-11-12; proven on the Android emulator against a local stub of the contract (count kept on 500 and across a cold start, cleared on 204, no report when nothing is counted). STATUS: UNKNOWN – REQUIRES CONFIRMATION that narcis-vibed's route answers; not in any released build"
+      },
       "headers": "X-Beleznica-Generation on both list GETs (dataset-generation guard); X-App-Build sent on every call, 426 below BELEZNICA_APP_MIN_BUILD -> UpdateRequiredScreen"
     },
     {

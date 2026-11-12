@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:narcis_nadzorniki/app_version.dart';
+import 'package:narcis_nadzorniki/data/tezave_store.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
 import 'package:narcis_nadzorniki/models/disturbance_photo.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
@@ -53,11 +54,25 @@ class RemoteList<T> {
 /// 401 (password no longer accepted) from transient/network failures so they
 /// can decide whether to keep retrying.
 class RemoteApiException implements Exception {
-  RemoteApiException({this.statusCode, this.body, this.cause});
+  RemoteApiException({this.statusCode, this.body, this.cause, this.pot});
 
   final int? statusCode;
   final String? body;
   final Object? cause;
+
+  /// TB-59: the path that failed, ids folded ([RemoteApi.foldPath]). Null when
+  /// the exception was not raised by a request.
+  final String? pot;
+
+  /// TB-59: the failure kind reported to `POST /tezave`: `network`, `http_5xx`
+  /// for any 5xx, otherwise `http_<status>` (`http_401`, `http_404`,
+  /// `http_426`, …).
+  String get koda {
+    final s = statusCode;
+    if (s == null) return 'network';
+    if (s >= 500 && s <= 599) return 'http_5xx';
+    return 'http_$s';
+  }
 
   bool get isUnauthorized => statusCode == 401;
 
@@ -300,10 +315,12 @@ class RemoteApi {
   Future<RemoteList<RemoteDisturbance>> fetchRecords(
     SyncCredentials credentials,
   ) async {
+    final url = _recordsUrl;
     final response = await _send(
-      () => _client.get(_recordsUrl, headers: _authHeaders(credentials)),
+      url,
+      () => _client.get(url, headers: _authHeaders(credentials)),
     );
-    _ensureStatus(response, const {200});
+    _ensureStatus(response, url, const {200});
     final decoded = jsonDecode(response.body);
     final List<dynamic> records;
     if (decoded is Map<String, dynamic> && decoded['records'] is List) {
@@ -314,6 +331,7 @@ class RemoteApi {
       throw RemoteApiException(
         statusCode: response.statusCode,
         body: response.body,
+        pot: foldPath(url),
       );
     }
     return RemoteList(
@@ -328,41 +346,47 @@ class RemoteApi {
     Disturbance disturbance,
     SyncCredentials credentials,
   ) async {
+    final url = _recordsUrl;
     final response = await _send(
+      url,
       () => _client.post(
-        _recordsUrl,
+        url,
         headers: _jsonHeaders(credentials),
         body: jsonEncode(_payload(disturbance)),
       ),
     );
-    _ensureStatus(response, const {200, 201});
+    _ensureStatus(response, url, const {200, 201});
   }
 
   Future<void> updateRecord(
     Disturbance disturbance,
     SyncCredentials credentials,
   ) async {
+    final url = _recordUri(disturbance.id);
     final response = await _send(
+      url,
       () => _client.put(
-        _recordUri(disturbance.id),
+        url,
         headers: _jsonHeaders(credentials),
         body: jsonEncode(_payload(disturbance)),
       ),
     );
-    _ensureStatus(response, const {200});
+    _ensureStatus(response, url, const {200});
   }
 
   Future<void> deleteRecord(
     String id,
     SyncCredentials credentials,
   ) async {
+    final url = _recordUri(id);
     final response = await _send(
+      url,
       () => _client.delete(
-        _recordUri(id),
+        url,
         headers: _authHeaders(credentials),
       ),
     );
-    _ensureStatus(response, const {200, 204, 404});
+    _ensureStatus(response, url, const {200, 204, 404});
   }
 
   Future<void> uploadPhoto({
@@ -372,9 +396,11 @@ class RemoteApi {
     required String mimeType,
     required SyncCredentials credentials,
   }) async {
+    final url = _photoUri(motnjaId, photoId);
     final response = await _send(
+      url,
       () => _client.post(
-        _photoUri(motnjaId, photoId),
+        url,
         headers: {
           'Authorization': credentials.authHeaderValue,
           'X-App-Build': '$kAppBuild',
@@ -384,7 +410,7 @@ class RemoteApi {
         body: bytes,
       ),
     );
-    _ensureStatus(response, const {200, 201});
+    _ensureStatus(response, url, const {200, 201});
   }
 
   Future<Uint8List> downloadPhoto({
@@ -392,9 +418,11 @@ class RemoteApi {
     required String photoId,
     required SyncCredentials credentials,
   }) async {
+    final url = _photoUri(motnjaId, photoId);
     final response = await _send(
+      url,
       () => _client.get(
-        _photoUri(motnjaId, photoId),
+        url,
         headers: {
           'Authorization': credentials.authHeaderValue,
           'X-App-Build': '$kAppBuild',
@@ -402,7 +430,7 @@ class RemoteApi {
         },
       ),
     );
-    _ensureStatus(response, const {200});
+    _ensureStatus(response, url, const {200});
     return response.bodyBytes;
   }
 
@@ -411,22 +439,26 @@ class RemoteApi {
     required String photoId,
     required SyncCredentials credentials,
   }) async {
+    final url = _photoUri(motnjaId, photoId);
     final response = await _send(
+      url,
       () => _client.delete(
-        _photoUri(motnjaId, photoId),
+        url,
         headers: _authHeaders(credentials),
       ),
     );
-    _ensureStatus(response, const {200, 204, 404});
+    _ensureStatus(response, url, const {200, 204, 404});
   }
 
   Future<RemoteList<RemoteWalk>> fetchWalks(
     SyncCredentials credentials,
   ) async {
+    final url = _walksUrl;
     final response = await _send(
-      () => _client.get(_walksUrl, headers: _authHeaders(credentials)),
+      url,
+      () => _client.get(url, headers: _authHeaders(credentials)),
     );
-    _ensureStatus(response, const {200});
+    _ensureStatus(response, url, const {200});
     final decoded = jsonDecode(response.body);
     final List<dynamic> walks;
     if (decoded is Map<String, dynamic> && decoded['walks'] is List) {
@@ -435,6 +467,7 @@ class RemoteApi {
       throw RemoteApiException(
         statusCode: response.statusCode,
         body: response.body,
+        pot: foldPath(url),
       );
     }
     return RemoteList(
@@ -447,13 +480,15 @@ class RemoteApi {
     String walkId,
     SyncCredentials credentials,
   ) async {
+    final url = _walkPointsUri(walkId);
     final response = await _send(
+      url,
       () => _client.get(
-        _walkPointsUri(walkId),
+        url,
         headers: _authHeaders(credentials),
       ),
     );
-    _ensureStatus(response, const {200});
+    _ensureStatus(response, url, const {200});
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
     final pts = decoded['points'] as List<dynamic>? ?? const [];
     return pts
@@ -462,37 +497,43 @@ class RemoteApi {
   }
 
   Future<void> createWalk(Walk walk, SyncCredentials credentials) async {
+    final url = _walksUrl;
     final response = await _send(
+      url,
       () => _client.post(
-        _walksUrl,
+        url,
         headers: _jsonHeaders(credentials),
         body: jsonEncode(_walkPayload(walk)),
       ),
     );
-    _ensureStatus(response, const {200, 201});
+    _ensureStatus(response, url, const {200, 201});
   }
 
   /// Updates the walk's name + notes. Server rejects any attempt to mutate
   /// times or points; we don't even send them.
   Future<void> updateWalk(Walk walk, SyncCredentials credentials) async {
+    final url = _walkUri(walk.id);
     final response = await _send(
+      url,
       () => _client.put(
-        _walkUri(walk.id),
+        url,
         headers: _jsonHeaders(credentials),
         body: jsonEncode({'name': walk.name, 'notes': walk.notes}),
       ),
     );
-    _ensureStatus(response, const {200});
+    _ensureStatus(response, url, const {200});
   }
 
   Future<void> deleteWalk(String id, SyncCredentials credentials) async {
+    final url = _walkUri(id);
     final response = await _send(
+      url,
       () => _client.delete(
-        _walkUri(id),
+        url,
         headers: _authHeaders(credentials),
       ),
     );
-    _ensureStatus(response, const {200, 204, 404});
+    _ensureStatus(response, url, const {200, 204, 404});
   }
 
   Uri _walkUri(String id) => _at(['walks', id]);
@@ -559,22 +600,70 @@ class RemoteApi {
         'obhodId': d.obhodId,
       };
 
-  Future<http.Response> _send(Future<http.Response> Function() request) async {
+  /// TB-59 (narcis-racun RN-22 S3): reports the counted failures. Completes
+  /// only on the 204 the route answers when it took them; any other answer,
+  /// or none, throws, and the caller keeps the counts for the next report.
+  Future<void> sendTezave(
+    List<Tezava> tezave,
+    SyncCredentials credentials,
+  ) async {
+    final url = _at(['tezave']);
+    final response = await _send(
+      url,
+      () => _client.post(
+        url,
+        headers: _jsonHeaders(credentials),
+        body: jsonEncode({
+          'tezave': [for (final t in tezave) t.toJson()],
+        }),
+      ),
+    );
+    _ensureStatus(response, url, const {204});
+  }
+
+  /// TB-59: the `pot` a photo upload is counted under when it fails before
+  /// any request (`photo_lost`, `photo_upload`).
+  String get photoPot => foldPath(_photoUri(':id', ':id'));
+
+  static const _resources = {'disturbances', 'photos', 'walks', 'points'};
+
+  /// TB-59: [url]'s path with every id folded: the API base is kept as it is,
+  /// and after it any segment that is not one of the API's resource names
+  /// becomes `:id` — `…/disturbances/<uuid>/photos/<uuid>` →
+  /// `…/disturbances/:id/photos/:id`. No query string, ever.
+  String foldPath(Uri url) {
+    final base = _apiBase.pathSegments.where((s) => s.isNotEmpty).toList();
+    final segments = url.pathSegments.where((s) => s.isNotEmpty).toList();
+    var i = 0;
+    while (i < base.length && i < segments.length && segments[i] == base[i]) {
+      i++;
+    }
+    return '/${[
+      ...segments.take(i),
+      for (final s in segments.skip(i)) _resources.contains(s) ? s : ':id',
+    ].join('/')}';
+  }
+
+  Future<http.Response> _send(
+    Uri url,
+    Future<http.Response> Function() request,
+  ) async {
     try {
       return await request().timeout(_timeout);
     } on TimeoutException catch (e) {
-      throw RemoteApiException(cause: e);
+      throw RemoteApiException(cause: e, pot: foldPath(url));
     } catch (e) {
       // Socket / DNS / TLS / etc. — surfaces as a network error to the caller.
-      throw RemoteApiException(cause: e);
+      throw RemoteApiException(cause: e, pot: foldPath(url));
     }
   }
 
-  void _ensureStatus(http.Response response, Set<int> acceptable) {
+  void _ensureStatus(http.Response response, Uri url, Set<int> acceptable) {
     if (!acceptable.contains(response.statusCode)) {
       throw RemoteApiException(
         statusCode: response.statusCode,
         body: response.body,
+        pot: foldPath(url),
       );
     }
   }

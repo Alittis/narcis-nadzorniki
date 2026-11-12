@@ -22,6 +22,39 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 
 ## Open
 
+### TB-59 · The phone counts the sync and upload failures a signed-in person hits and reports them (narcis-racun RN-22 S3)
+`✨ Enhancement` · `P2` · `Doing` · Reporter: owner (narcis-racun RN-22, decided 2026-11-11) · Updated: 2026-11-12
+- **Problem:** nothing about a failed sync or upload reaches the server — only `debugPrint` to logcat. User support
+  cannot see that a warden's records have been failing to send.
+- **Want:** count failures per (folded path, kind) on the device and report the counts to narcis-vibed's
+  `POST /api/beleznica/app/v1/tezave` after the next successful sync, in the background; narcis-vibed forwards them to
+  prijava's problem sink (RN-22 S2) under the account id. Never record contents, coordinates, photos or typed text.
+- **Built (2026-11-12):** ARCHITECTURE §9.0 (`POST tezave`) and §13 (*failure counts for user support*).
+  `lib/data/tezave_store.dart` (counts per `pot`+`koda`, max 50 kinds, each ≤ 1000, `tezave.json`, owner-tagged,
+  send-then-subtract); `lib/data/remote_api.dart` (`RemoteApiException.pot`/`koda`, `foldPath`, `sendTezave`; every call
+  threads its URL); `lib/state/app_state.dart` (counted in `_handleSyncException`, plus `photo_lost`/`photo_upload`;
+  reported unawaited after a sync whose records pull succeeded; cleared on logout). Kinds: `network`, `http_5xx`,
+  `http_<status>` (`http_401`, `http_404`, `http_426`, any other status as its number), `photo_lost`, `photo_upload`.
+- **Tests:** `test/tezave_test.dart`, 20 (counting, refused pot/koda, account switch, restart, the cap, send-then-clear
+  incl. a failure counted mid-flight, folding, the wire shape, AppState end to end: a 5xx create reported after the next
+  sync with nothing of the record, a refused photo upload and a lost photo, no report while the pull fails, a hanging
+  report does not hold the sync, logout clears). `logout_guard_test` and `record_delete_test` inject a store with no
+  documents directory, as for TB-46 (under `testWidgets` the path_provider call never answers). Full suite 263 pass.
+- **Discussion:** `photo_upload` means the file could not be read, so nothing was sent; an upload the server refused is
+  counted under the photo path with its HTTP kind. `http_<status>` for statuses outside the brief's list is allowed by the
+  route's `koda` regex and by prijava's sink (`lib/racun/tezava.ts`: regex, not an enum) — narcis-vibed must not narrow it
+  to an enum, or one such entry makes every report 400 until the counts are cleared.
+- **Proof (Android emulator, 2026-11-12, against a local stub of Račun's `/oidc/auth` and the phone API that checks
+  `POST tezave` strictly against the contract):** browser sign-in, then a sync whose walks pull got 503 → the report
+  `{"tezave":[{"pot":"/api/beleznica/app/v1/walks","koda":"http_5xx","stevilo":1}]}` (stub: contract ok) answered 500 →
+  `tezave.json` on the device kept it; a cold start with the 503 still on → reported with `stevilo: 2`, 500, kept as 2;
+  the stub fixed → the same report answered 204 and `tezave.json` was gone; one more cold start → walks and records pulled,
+  no report. The owner allowed accepting Chrome's first-run Terms for this (*"Yes, accept them"*); Chrome's usage
+  reporting was switched off, Google's Location Accuracy declined. Dev app uninstalled afterwards.
+- **Waits on:** narcis-vibed's route deployed (the real route not seen answering yet; everything above ran against the
+  stub); a release with the owner, and before it the Play **Data safety** update (PLAY_CLOSED_TEST §4.11, Diagnostics →
+  collected).
+
 ### TB-58 · Sign in through Račun NarcIS in the browser (NV-554 P3) — admins with two-step can use the phone again
 `✨ Enhancement` · `P1` · `Done` (**v1.16.0+26 ROLLED OUT LIVE on the Play Closed testing track 2026-11-07**; the owner signed in on a real phone through the browser 19:39 UTC) · Reporter: owner (NV-554) · Updated: 2026-11-07
 - **Problem:** since narcis-vibed's switch to Račun NarcIS (2026-11-07 16:48 UTC, its NV-554 P2) the installed builds

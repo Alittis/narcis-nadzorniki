@@ -21,6 +21,7 @@ import 'package:http/testing.dart';
 import 'package:narcis_nadzorniki/data/dataset_generation_store.dart';
 import 'package:narcis_nadzorniki/data/local_store.dart';
 import 'package:narcis_nadzorniki/data/remote_api.dart';
+import 'package:narcis_nadzorniki/data/tezave_store.dart';
 import 'package:narcis_nadzorniki/data/walks_local_store.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
 import 'package:narcis_nadzorniki/models/disturbance_photo.dart';
@@ -181,6 +182,10 @@ class _Harness {
       // TB-46: no documents directory under testWidgets; the store reads
       // null and saves nothing, as on a device whose write fails.
       generationStore: DatasetGenerationStore(
+        directory: () => Future.error(UnsupportedError('no documents dir')),
+      ),
+      // TB-59: the same; the failure counts live in memory only.
+      tezaveStore: TezaveStore(
         directory: () => Future.error(UnsupportedError('no documents dir')),
       ),
     );

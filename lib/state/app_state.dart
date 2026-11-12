@@ -9,6 +9,7 @@ import 'package:narcis_nadzorniki/data/dataset_generation_store.dart';
 import 'package:narcis_nadzorniki/data/disturbance_types.dart';
 import 'package:narcis_nadzorniki/data/local_store.dart';
 import 'package:narcis_nadzorniki/data/remote_api.dart';
+import 'package:narcis_nadzorniki/data/tezave_store.dart';
 import 'package:narcis_nadzorniki/data/walks_local_store.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
 import 'package:narcis_nadzorniki/models/disturbance_photo.dart';
@@ -30,13 +31,15 @@ class AppState extends ChangeNotifier {
     AuthService? authService,
     PhotoStorage? photoStorage,
     DatasetGenerationStore? generationStore,
+    TezaveStore? tezaveStore,
   })  : _localStore = localStore ?? LocalStore(),
         _walksStore = walksStore ?? WalksLocalStore(),
         _remoteApi = remoteApi ?? RemoteApi(),
         _connectivity = connectivity ?? Connectivity(),
         _authService = authService ?? AuthService(),
         _photoStorage = photoStorage ?? PhotoStorage(),
-        _generationStore = generationStore ?? DatasetGenerationStore();
+        _generationStore = generationStore ?? DatasetGenerationStore(),
+        _tezave = tezaveStore ?? TezaveStore();
 
   final LocalStore _localStore;
   final WalksLocalStore _walksStore;
@@ -45,6 +48,8 @@ class AppState extends ChangeNotifier {
   final AuthService _authService;
   final PhotoStorage _photoStorage;
   final DatasetGenerationStore _generationStore;
+  // TB-59 (narcis-racun RN-22 S3): the failures counted since the last report.
+  final TezaveStore _tezave;
   final _uuid = const Uuid();
 
   List<Disturbance> _records = [];
@@ -99,6 +104,9 @@ class AppState extends ChangeNotifier {
   String? _knownGeneration;
   // What the current sync re-queued; anything sends in a second pass at once.
   int _requeued = 0;
+  // TB-59: the current sync's records pull succeeded, so the counted failures
+  // are reported once it ends.
+  bool _pulled = false;
   // TB-46: the server answered 426 — this build is below its minimum. Sync
   // stops (canSync), main.dart shows UpdateRequiredScreen at the root, and the
   // queue stays for the updated build. Not persisted: the server says it again.
@@ -219,6 +227,7 @@ class AppState extends ChangeNotifier {
     await _localStore.save(_records);
     await _walksStore.save(_walks);
     await _photoStorage.deleteAll();
+    await _tezave.clear();
     _lastRemoteIds = null;
     _lastRemoteWalkIds = null;
   }
@@ -354,6 +363,7 @@ class AppState extends ChangeNotifier {
       }
       _walks = await _walksStore.load();
       _knownGeneration = await _generationStore.load();
+      await _tezave.load();
       // Resume any in-progress walk. The FGS background isolate is the
       // source of truth for points; if its FGS is still running (Samsung
       // Freecess froze main but kept the FGS alive), just rebuild the
@@ -652,6 +662,7 @@ class AppState extends ChangeNotifier {
     }
     _isSyncing = true;
     _requeued = 0;
+    _pulled = false;
     notifyListeners();
     try {
       // 1. Walks first. The disturbance FK on TB_MOTNJE.OBHOD_ID requires
@@ -730,6 +741,25 @@ class AppState extends ChangeNotifier {
       _requeued = 0;
       unawaited(syncAll());
     }
+    // TB-59: in the background; it never fails or holds up the sync.
+    if (_pulled && canSync) unawaited(_reportTezave());
+  }
+
+  /// TB-59 (narcis-racun RN-22 S3): sends the failures counted since the last
+  /// report to narcis-vibed, which files them under this account. Anything but
+  /// its 204 keeps the counts for the next sync.
+  Future<void> _reportTezave() async {
+    final user = _currentUser;
+    final creds = _credentials;
+    if (user == null || creds == null) return;
+    await _tezave.flush(user, (t) => _remoteApi.sendTezave(t, creds));
+  }
+
+  /// TB-59: counts a failure the signed-in person hit.
+  void _countFailure(String pot, String koda) {
+    final user = _currentUser;
+    if (user == null) return;
+    _tezave.record(account: user, pot: pot, koda: koda);
   }
 
   /// Backwards-compatible alias: existing call sites (connectivity tick,
@@ -795,6 +825,7 @@ class AppState extends ChangeNotifier {
         } catch (_) {
           // The file exists but could not be read: leave it pending for the
           // next drain. A file that is gone was dropped above (TB-52).
+          _countFailure(_remoteApi.photoPot, 'photo_upload');
         }
       }
     }
@@ -848,6 +879,7 @@ class AppState extends ChangeNotifier {
       );
     }).toList(growable: false);
     final record = _records.firstWhere((r) => r.id == motnjaId);
+    _countFailure(_remoteApi.photoPot, 'photo_lost');
     _lostPhotoCount++;
     _lostPhotoRecords
       ..removeWhere((r) => r.id == motnjaId)
@@ -873,6 +905,7 @@ class AppState extends ChangeNotifier {
     if (creds == null) return null;
     try {
       final remote = await _remoteApi.fetchRecords(creds);
+      _pulled = true;
       _lastRemoteIds = remote.items.map((r) => r.id).toSet();
       final renewed = _isNewGeneration(remote.generation);
       final onDisk = renewed
@@ -1497,6 +1530,8 @@ class AppState extends ChangeNotifier {
   // -------------------------------------------------------------------------
 
   void _handleSyncException(RemoteApiException e) {
+    final pot = e.pot;
+    if (pot != null) _countFailure(pot, e.koda);
     if (e.isUpdateRequired && !_updateRequired) {
       // TB-46: keep the session and the queue; the updated build sends it.
       _updateRequired = true;

@@ -89,6 +89,11 @@ skip-if-exists creates, 204 deletes, 404 = done), so the sync engine is unchange
 - **`X-App-Build`** on every call (`kAppBuild`, `lib/app_version.dart`); below the server's minimum the answer is **426** and
   the app shows `UpdateRequiredScreen` (§13).
 - PUT is not served (405): neither `updateRecord` nor `updateWalk` has a caller in the app.
+- **`POST tezave` (TB-59, narcis-racun RN-22 S3):** `{tezave: [{pot, koda, stevilo}]}`, 1–50 entries, `stevilo` 1–1000,
+  `pot` `^/[A-Za-z0-9/_:.[\]-]{0,199}$`, `koda` `^[A-Za-z0-9_.:-]{1,60}$`; Bearer as every call; **204** when taken.
+  narcis-vibed forwards each entry to prijava's problem sink (`/api/tezava`) under the account id. The phone's side is §13,
+  *failure counts for user support*. STATUS: UNKNOWN – REQUIRES CONFIRMATION — built in narcis-vibed by a parallel
+  session; not yet seen answering (2026-11-12, the app was proven against a stub of this contract).
 
 ### 9.1 `GET https://narcis.gov.si/ords/narcis/app-auth/login` (production login)
 - Auth: `X-Narcis-Auth: Basic <base64(email:password)>` over HTTPS only. (Custom header, not the standard `Authorization` — see note below.)
@@ -483,6 +488,32 @@ sends it as `X-Beleznica-Generation` on both list GETs; `DatasetGenerationStore`
 (`canSync` false) without touching the session or the queue, and `main.dart` shows `UpdateRequiredScreen` at the root only
 — a form open above it can still be saved, and the record is queued for the updated build. Not persisted: the server says it
 again. `kAppBuild` must equal pubspec's `+N` ([test/app_version_test.dart](../test/app_version_test.dart) fails otherwise).
+
+**Failure counts for user support (TB-59, narcis-racun RN-22 S3; owner decision 2026-11-11).** The phone counts the
+failures a signed-in person hits and reports the counts, so user support sees them in the person's record (superadmins
+only, kept 12 months, on prijava's side). [lib/data/tezave_store.dart](../lib/data/tezave_store.dart) holds them.
+- **What is counted:** every `RemoteApiException` that reaches `AppState._handleSyncException` — the sync's pushes, photo
+  uploads, deletes and pulls, the walk-point prefetch, and the photo/walk lazy fetches — plus two local photo failures:
+  `photo_lost` (TB-52's drop, the file is gone) and `photo_upload` (the file exists but could not be read). Sign-in,
+  logout (`AuthService`) and the report itself are not counted.
+- **Key = (`pot`, `koda`).** `pot` is the request path with ids folded by `RemoteApi.foldPath`: the API base kept, every
+  later segment that is not `disturbances`/`photos`/`walks`/`points` becomes `:id`, never a query string
+  (`/api/beleznica/app/v1/disturbances/:id/photos/:id`). The two local photo kinds use that photo path. `koda` is
+  `network` (timeout, socket, TLS), `http_5xx`, otherwise `http_<status>` (`http_401`, `http_404`, `http_426`, …), or the
+  photo kind. Nothing else is stored or sent: no record contents, coordinates, photo bytes, notes or typed text.
+- **Bounded:** at most 50 kinds (a new kind beyond them is not counted) and each count stops at 1000, the route's own
+  limits, so one report always carries everything. Kept in `tezave.json` in the documents directory with the account it
+  belongs to (lowercased e-mail); unreadable or unwritable, the counts live in memory for the run. Writes are coalesced.
+- **Owner only:** a failure counted for another account drops the old counts; a report for an account that does not own
+  them discards them unsent (the 401 → someone else signs in case); `_discardLocalData` (logout, TB-48's discard) clears
+  them.
+- **Reported** after a `syncAll` whose records pull succeeded and that still `canSync`, unawaited, after the sync's
+  `finally`: it never holds up or fails the sync, changes no session state, and is not itself counted. One report at a
+  time. On the 204 the sent counts are subtracted (a failure counted while it was in flight stays); any other answer or a
+  timeout keeps them for the next sync.
+- Tests: [test/tezave_test.dart](../test/tezave_test.dart) (counting, folding, the cap, send-then-clear, the wire shape,
+  and AppState end to end against a stub). On the Android emulator against a local stub of the contract (2026-11-12): a
+  refused report kept the count on the device and across a cold start, a 204 cleared it (BACKLOG TB-59).
 
 **`syncAll` (the sync icon's tap-target).** Single entry point that runs four phases under one `_isSyncing` flag:
 1. **Push pending records.** Drain `_records.where(pendingSync)` via POST `/disturbances/`. Server's idempotent-on-UUID semantics mean retries are safe. Rows also carrying `pendingDelete` are **skipped** — see the delete queue below.
