@@ -224,7 +224,25 @@ The app is intended for nature-protection wardens and authorised collaborators o
 This release is part of a closed test. Participation requires an invitation from the administrator and an existing NarcIS account with the appropriate authorization. For access or feedback, write to admin@alittis.com.
 ```
 
-### 3.3 Release notes — v1.16.0+26 (current)
+### 3.3 Release notes — v1.17.0+27 (current)
+
+**Slovene** (max 500 chars — 418 counted):
+```
+Različica 1.17.0 (build 27)
+• Naravni spomeniki imajo pod „Območja“ svojo vrstico: vklopite in izklopite jih lahko ločeno od drugih zavarovanih območij.
+• Zapisi, narejeni med obhodom, ki ste ga nato zavrgli, se zdaj pošljejo kot običajni zapisi.
+• Če pošiljanje zapisov ali fotografij ne uspe, aplikacija podpori sporoči, kolikokrat in zakaj (brez vsebine zapisov, lokacij in fotografij), da vam lahko hitreje pomaga.
+```
+
+**English** (max 500 chars — 390 counted):
+```
+Version 1.17.0 (build 27)
+• Natural monuments have their own row under "Območja": switch them on and off separately from the other protected areas.
+• Records made during a walk you then discarded are now sent as ordinary records.
+• When sending records or photos fails, the app tells support how often and why (never the records' contents, locations or photos), so they can help you sooner.
+```
+
+### 3.3a Release notes — v1.16.0+26 (historical, superseded)
 
 **Slovene** (max 500 chars — 400 counted):
 ```
@@ -244,7 +262,7 @@ Version 1.16.0 (build 26)
 • Unsent records stay on the phone through the update.
 ```
 
-### 3.3a Release notes — v1.15.0+25 (historical, superseded)
+### 3.3b Release notes — v1.15.0+25 (historical, superseded)
 
 **Slovene** (max 500 chars — 333 counted):
 ```
@@ -262,7 +280,7 @@ Version 1.15.0 (build 25)
 • On the satellite basemap the area colours are adjusted so they stay easy to see.
 ```
 
-### 3.3b Release notes — v1.14.0+24 (historical, superseded)
+### 3.3c Release notes — v1.14.0+24 (historical, superseded)
 
 **Held under managed publishing until the NV-259 cutover (T0)** — publish it only at T0 step 9 (narcis-vibed OPERATIONS §21.9).
 
@@ -284,7 +302,7 @@ Version 1.14.0 (build 24)
 • If a newer version is required, the app tells you and keeps your unsent records.
 ```
 
-### 3.3c Release notes — v1.13.0+23 (historical, superseded)
+### 3.3d Release notes — v1.13.0+23 (historical, superseded)
 
 **Slovene** (max 500 chars — 485 counted):
 ```
@@ -304,7 +322,7 @@ Version 1.13.0 (build 23)
 • Even in the rare case where saving a photo fails, it is sent without hidden data (GPS location, phone model).
 ```
 
-### 3.3d Release notes — v1.12.0+22 (historical, superseded)
+### 3.3e Release notes — v1.12.0+22 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -326,7 +344,7 @@ Version 1.12.0 (build 22)
 • If another user logs in on a phone holding unsent data, the app asks first what to do with it.
 ```
 
-### 3.3e Release notes — v1.11.0+21 (historical, superseded)
+### 3.3f Release notes — v1.11.0+21 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -346,7 +364,7 @@ Version 1.11.0 (build 21)
 • The disturbance-type search also finds a type by its explanation.
 ```
 
-### 3.3f Release notes — v1.10.1+20 (historical, superseded)
+### 3.3g Release notes — v1.10.1+20 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -362,7 +380,7 @@ Version 1.10.1 (build 20)
 • The same fix applies to deleting a patrol (obhod).
 ```
 
-### 3.3g Release notes — v1.10.0+19 (historical, superseded)
+### 3.3h Release notes — v1.10.0+19 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -380,7 +398,7 @@ Version 1.10.0 (build 19)
 • You can now delete a record from its details view too, not only from "Seznam zapisov".
 ```
 
-### 3.3h Release notes — v1.9.0+18 (historical, superseded)
+### 3.3i Release notes — v1.9.0+18 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -398,7 +416,7 @@ Version 1.9.0 (build 18)
 • A record the office has already taken into review cannot be deleted. The app explains why.
 ```
 
-### 3.3i Release notes — v1.8.0+17 (historical, superseded)
+### 3.3j Release notes — v1.8.0+17 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -416,7 +434,7 @@ Version 1.8.0 (build 17)
 • Fix: double-tapping the save button could create two identical records. Now only one is saved.
 ```
 
-### 3.3j Release notes — v1.7.0+16 (historical, superseded)
+### 3.3k Release notes — v1.7.0+16 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -436,7 +454,7 @@ Version 1.7.0 (build 16)
 • The "Starost" filter is gone; pick a period with the "Obdobje" slider.
 ```
 
-### 3.3k Release notes — v1.6.0+15 (historical, superseded)
+### 3.3l Release notes — v1.6.0+15 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -454,7 +472,7 @@ Version 1.6.0 (build 15)
 • A disturbance's details now show who handled the case and when.
 ```
 
-### 3.3l Release notes — v1.5.0+14 (historical, superseded)
+### 3.3m Release notes — v1.5.0+14 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -470,7 +488,7 @@ Version 1.5.0 (build 14)
 • Easier marker selection on the map: the touch target is larger, so dots are easier to tap.
 ```
 
-### 3.3m Release notes — v1.4.0+13 (historical, superseded)
+### 3.3n Release notes — v1.4.0+13 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -488,7 +506,7 @@ Version 1.4.0 (build 13)
 • On the map, tracks no longer draw straight "phantom" lines across gaps between distant points.
 ```
 
-### 3.3n Release notes — v1.3.1+12 (historical, superseded)
+### 3.3o Release notes — v1.3.1+12 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -504,7 +522,7 @@ Version 1.3.1 (build 12)
 • Walk-around tracks on the map are more accurate and smoother: points with a weak GPS signal are filtered out and the track is smoothed to reduce zig-zag.
 ```
 
-### 3.3o Release notes — v1.3.0+11 (historical, superseded)
+### 3.3p Release notes — v1.3.0+11 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -520,7 +538,7 @@ Version 1.3.0 (build 11)
 • Your own walk-arounds are now coloured differently from your colleagues' on the map.
 ```
 
-### 3.3p Release notes — v1.2.3+10 (historical, superseded)
+### 3.3q Release notes — v1.2.3+10 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -536,7 +554,7 @@ Version 1.2.3 (build 10)
 • The LIFE Tršca project (no. 101114184) is co-funded by the European Union (LIFE programme) and the Slovenian Ministry of Natural Resources and Spatial Planning.
 ```
 
-### 3.3q Release notes — v1.2.0+7 (historical, superseded)
+### 3.3r Release notes — v1.2.0+7 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -552,7 +570,7 @@ Version 1.2.0 (build 7)
 • Password is not stored on the device: after the first login the app uses a revocable token that expires after 30 days of inactivity. Signing out also revokes it server-side.
 ```
 
-### 3.3r Release notes — v1.1.3+6 (historical, superseded)
+### 3.3s Release notes — v1.1.3+6 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
@@ -572,7 +590,7 @@ Version 1.1.3 (build 6)
 • Historical Notranjska Regional Park entries are now part of the regular Motnje layer.
 ```
 
-### 3.3s Release notes — v1.0.1+2 (historical, superseded)
+### 3.3t Release notes — v1.0.1+2 (historical, superseded)
 
 **Slovene** (max 500 chars):
 ```
