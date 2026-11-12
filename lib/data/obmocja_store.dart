@@ -6,19 +6,38 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:narcis_nadzorniki/data/zos_render_style.dart'
-    show parseZosColor;
+    show kZoMonumentClass, parseZosColor;
 import 'package:narcis_nadzorniki/data/zos_style_store.dart';
 import 'package:vector_tile/vector_tile.dart' as vt;
 
-/// The six "Območja s statusom" (protected-area) sublayers. Each name is the
-/// slug narcis-vibed uses: the tileset's source layer and the legend's key.
-enum ZosKind { n2k, zo, epo, nv, nvj, mvo }
+/// The "Območja s statusom" (protected-area) sublayers. Each name but `ns` is
+/// the slug narcis-vibed uses: the tileset's source layer and the legend's key.
+/// `ns` is the natural monuments, split out of ZO on the phone (TB-37): it
+/// draws from the `zo` source layer, and `zo` then leaves them out.
+enum ZosKind { n2k, zo, ns, epo, nv, nvj, mvo }
 
-/// Picker and identify order: the app's original five, then the international
+extension ZosKindSource on ZosKind {
+  /// The tileset's source layer, which is also the served legend's key.
+  String get sourceLayer => this == ZosKind.ns ? 'zo' : name;
+}
+
+/// The sublayer a feature of [sourceLayer] belongs to, by its `_cls` [cls]
+/// for ZO; null for a source layer the phone does not know.
+ZosKind? zosKindOf(String sourceLayer, Object? cls) {
+  if (sourceLayer == 'zo') {
+    return cls == kZoMonumentClass ? ZosKind.ns : ZosKind.zo;
+  }
+  if (sourceLayer == ZosKind.ns.name) return null;
+  return ZosKind.values.where((k) => k.name == sourceLayer).firstOrNull;
+}
+
+/// Picker and identify order: the app's original five (natural monuments
+/// right under ZO, where they came from), then the international
 /// designations (the web's toggle order puts them last too).
 const List<ZosKind> zosOrder = [
   ZosKind.n2k,
   ZosKind.zo,
+  ZosKind.ns,
   ZosKind.epo,
   ZosKind.nv,
   ZosKind.nvj,
@@ -79,6 +98,7 @@ class ObmocjeFeature {
         add('Biogeografska regija',
             either('n2k_biogeo_region', 'N2K_BIOGEO_REGION'));
       case ZosKind.zo:
+      case ZosKind.ns:
         add('Vrsta', either('zo_vrsta', 'ZO_VRSTA'));
         add('Pomen', either('zo_pomen', 'ZO_POMEN'));
       case ZosKind.epo:
@@ -201,7 +221,7 @@ class ObmocjaStore {
           isPoint: ordered[i].isPoint,
           props: ordered[i].props,
           detail: details[i],
-          legend: legend[ordered[i].kind.name] ?? const [],
+          legend: legend[ordered[i].kind.sourceLayer] ?? const [],
         ),
     ];
   }
@@ -265,12 +285,22 @@ List<ZosTileHit> zosHitTest(
   final metres = _tileMeters(tap, kZosIdentifyZoom);
   final out = <ZosTileHit>[];
   for (final layer in tile.layers) {
-    final kind = ZosKind.values.where((k) => k.name == layer.name).firstOrNull;
-    if (kind == null || !active.contains(kind)) continue;
+    // ZO's features split by class (TB-37): skip the layer only when neither
+    // half is on, and each feature below when its own half is off.
+    if (!active.any((k) => k.sourceLayer == layer.name)) continue;
     final ext = layer.extent.toDouble();
     final x = (wx - tx) * ext, y = (wy - ty) * ext;
     final tol = radiusM / metres * ext;
     for (final f in layer.features) {
+      final props = {
+        for (final e in f.decodeProperties().entries)
+          e.key: e.value.dartStringValue ??
+              e.value.dartIntValue?.toInt() ??
+              e.value.dartDoubleValue ??
+              e.value.dartBoolValue,
+      };
+      final kind = zosKindOf(layer.name, props['_cls']);
+      if (kind == null || !active.contains(kind)) continue;
       final g = f.decodeGeometry();
       final bool hit;
       var isPoint = false;
@@ -297,13 +327,7 @@ List<ZosTileHit> zosHitTest(
         kind: kind,
         id: f.id.toInt(),
         isPoint: isPoint,
-        props: {
-          for (final e in f.decodeProperties().entries)
-            e.key: e.value.dartStringValue ??
-                e.value.dartIntValue?.toInt() ??
-                e.value.dartDoubleValue ??
-                e.value.dartBoolValue,
-        },
+        props: props,
       ));
     }
   }

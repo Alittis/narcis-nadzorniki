@@ -172,6 +172,70 @@ void main() {
           '106b1f98a980-r$kZosRendererRevision');
     });
 
+    group('TB-37: natural monuments split out of ZO', () {
+      List<Map<String, dynamic>> zoLayers(Set<String> active) =>
+          (zosRenderStyle(_fixture('light'), active).theme['layers'] as List)
+              .cast<Map<String, dynamic>>()
+              .where((l) => l['source-layer'] == 'zo')
+              .toList();
+      const not = ['!=', ['get', '_cls'], kZoMonumentClass];
+      const only = ['==', ['get', '_cls'], kZoMonumentClass];
+
+      test('the slug is the kind', () {
+        expect(ZosKind.ns.name, kZosMonumentSlug);
+        expect(ZosKind.ns.sourceLayer, 'zo');
+      });
+
+      test('ZO alone leaves them out, on every ZO layer', () {
+        final ls = zoLayers({'zo'});
+        expect(ls.map((l) => l['id']),
+            ['zos-zo-fill', 'zos-zo-line', 'zos-zo-pt']);
+        expect(_layer({'layers': ls}, 'zos-zo-fill')['filter'], [
+          'all', ['==', ['geometry-type'], 'Polygon'], not, //
+        ]);
+        expect(_layer({'layers': ls}, 'zos-zo-pt')['filter'], [
+          'all', ['==', ['geometry-type'], 'Point'], not, //
+        ]);
+      });
+
+      test('ns alone draws only them, from the ZO layers', () {
+        final ls = zoLayers({'ns'});
+        expect(ls, hasLength(3));
+        expect(ls.every((l) => (l['filter'] as List).last.toString() ==
+            only.toString()), isTrue);
+      });
+
+      test('both on: ZO as served', () {
+        final served = (_fixture('light')['layers'] as List)
+            .cast<Map<String, dynamic>>()
+            .where((l) => l['source-layer'] == 'zo')
+            .map((l) => l['filter'])
+            .toList();
+        expect(zoLayers({'zo', 'ns'}).map((l) => l['filter']).toList(), served);
+      });
+
+      test('each half has its own theme id, so its own tile cache', () {
+        String id(Set<String> a) =>
+            '${zosRenderStyle(_fixture('light'), a).theme['id']}';
+        expect({id({'zo'}), id({'ns'}), id({'zo', 'ns'})}, hasLength(3));
+      });
+
+      for (final active in [
+        {'zo'},
+        {'ns'},
+        {'n2k', 'ns', 'nv'},
+      ]) {
+        test('$active goes through the renderer whole', () {
+          final converted = zosRenderStyle(_fixture('light'), active);
+          final log = _Warnings();
+          final theme = vtr.ThemeReader(logger: log).read(converted.theme);
+          expect(log.seen, isEmpty);
+          expect(theme.layers.length,
+              (converted.theme['layers'] as List).length);
+        });
+      }
+    });
+
     test('the served style is left as it came', () {
       final style = _fixture('light');
       final before = jsonEncode(style);

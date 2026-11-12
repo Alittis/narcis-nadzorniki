@@ -2,7 +2,9 @@
 // tap, plus a neighbour near its edge — then each hit's detail from the VPS
 // register. The tiles are real ones saved from narcis-vibed's zos.pmtiles
 // (test/fixtures/zos), so the geometry and properties are the live schema;
-// the network is a MockClient.
+// the network is a MockClient. z15-17797-11596 (Frajhajm, near Fram) was saved
+// on 2026-11-12, archive version 106b1f98a980, for its ZO natural monuments
+// (TB-37); the others on 2026-11-04.
 
 import 'dart:convert';
 import 'dart:io';
@@ -40,6 +42,8 @@ const _cerknica = LatLng(45.75, 14.37);
 // A cave of the Kras fixture tile (#9393, Sežansko brezno).
 const _cave = LatLng(45.706235, 13.854323);
 const _metresPerDegreeLat = 111320.0;
+// Korošičeve lipe v Frajhajmu (#101639), a ZO natural monument (a point).
+const _lipe = LatLng(46.4681, 15.5319);
 
 void main() {
   group('zosTilesAround', () {
@@ -76,6 +80,28 @@ void main() {
       final hits = zosHitTest(_tile(17691, 11690), 17691, 11690, _cerknica,
           {ZosKind.zo}, 50);
       expect(hits.map((h) => h.id), [102835]);
+    });
+
+    test('TB-37: a natural monument hits as ns, and only when ns is on', () {
+      List<(int, ZosKind)> hits(Set<ZosKind> active) =>
+          zosHitTest(_tile(17797, 11596), 17797, 11596, _lipe, active, 50)
+              .where((h) => h.id == 101639)
+              .map((h) => (h.id, h.kind))
+              .toList();
+
+      expect(hits({ZosKind.ns}), [(101639, ZosKind.ns)]);
+      expect(hits({ZosKind.zo, ZosKind.ns}), [(101639, ZosKind.ns)]);
+      expect(hits({ZosKind.zo}), isEmpty, reason: 'ZO alone leaves them out');
+    });
+
+    test('TB-37: the rest of ZO hits as zo, never as ns', () {
+      List<int> ids(Set<ZosKind> active) => zosHitTest(_tile(17691, 11690),
+              17691, 11690, _cerknica, active, 50)
+          .map((h) => h.id)
+          .toList();
+
+      expect(ids({ZosKind.ns}), isEmpty);
+      expect(ids({ZosKind.zo, ZosKind.ns}), [102835]);
     });
 
     test('a point counts within the radius, not beyond it', () {
@@ -151,6 +177,20 @@ void main() {
       final epo = feats.singleWhere((f) => f.id == 401);
       expect(epo.cls, '');
       expect(epo.color, 0xFFFBFB7F); // single-class legend row
+    });
+
+    test('TB-37: a natural monument is coloured from the ZO legend', () async {
+      final feats = await ObmocjaStore(
+        client: MockClient((_) async => http.Response('', 404)),
+      ).identify(_lipe, {ZosKind.ns}, readTile: _readFixture, legend: _legend);
+
+      final lipe = feats.singleWhere((f) => f.id == 101639);
+      expect(lipe.kind, ZosKind.ns);
+      expect(lipe.isPoint, isTrue);
+      expect(lipe.ime, 'Korošičeve lipe v Frajhajmu');
+      expect(lipe.color, 0xFFCD4E1B); // the legend's naravni-spomenik row
+      expect(lipe.rows.any((e) => e.key == 'Vrsta'), isTrue);
+      expect(feats.every((f) => f.kind == ZosKind.ns), isTrue);
     });
 
     test('nothing active reads no tile and returns nothing', () async {

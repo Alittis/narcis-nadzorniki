@@ -331,12 +331,18 @@ Optional translucent overlay of Slovenian cadastral parcel boundaries with parce
 - Implementation: `parceleOverlayTileLayers()` in `lib/widgets/basemap.dart` (returns the two stacked `TileLayer`s); toggle state `_showParcele` in `home_screen.dart`, remembered across launches with the other layer choices (TB-40, `lib/data/map_layers_store.dart`).
 
 ### 10.2 Overlay: Protected Areas ("Območja s statusom", VPS vector tiles — TB-47)
-**Built 2026-11-04, not yet released.** The Play build 1.14.0+24 still draws these layers as WMS tiles from the NarcIS GeoServer (`https://narcis.gov.si/ows/ows`, GetMap + GetFeatureInfo; STATE.json keeps that entry). The GeoServer has refused connections since ~2026-10-29, so on that build Območja draws nothing. From the next release the phone draws the narcis-vibed tileset itself, in the web map's own style.
+**Released in v1.15.0+25** (TB-47, Play Closed testing, confirmed by the owner 2026-11-05): the phone draws the narcis-vibed tileset itself, in the web map's own style. Builds up to 1.14.0+24 drew WMS tiles from the NarcIS GeoServer (`https://narcis.gov.si/ows/ows`; STATE.json keeps that entry).
 
-An optional overlay of the six protected-area sublayers, reached through the "Območja" chip → a **layer picker** (`showObmocjaPicker`, `lib/widgets/obmocja_picker.dart`). The active set `_activeZos` (`Set<ZosKind>`) is remembered across launches (TB-40); N2k is on by default.
+An optional overlay of the protected-area sublayers — six source layers, seven picker rows — reached through the "Območja" chip → a **layer picker** (`showObmocjaPicker`, `lib/widgets/obmocja_picker.dart`). The active set `_activeZos` (`Set<ZosKind>`) is remembered across launches (TB-40); N2k is on by default.
+
+- **Natural monuments, a row of their own (TB-37; built 2026-11-12, not yet released).** `ZosKind.ns` (*Naravni spomeniki*) is not a source layer: it is the ZO features whose `_cls` is `naravni-spomenik` (`kZoMonumentClass`), and `ZosKind.zo` (*Zavarovana območja*) is ZO without them. *Spomenik oblikovane narave* is a class of its own and stays with ZO. Client-only; the tileset and the style are unchanged.
+  - Drawing: `zosRenderStyle` adds `["!=" | "==", ["get", "_cls"], "naravni-spomenik"]` to the three ZO layers, joined to the served filter with `all`; nothing when both rows are on.
+  - Identify: `zosHitTest` sorts each ZO feature into `zo` or `ns` by its `_cls`, so a tap never lists a monument that is hidden. A monument takes its colour from the ZO legend (`ZosKind.sourceLayer`).
+  - `map_layers.json` carries `nsSplit: true`. A file without it (v1.16.0 and older) that had ZO on gets *Naravni spomeniki* on too, so the update hides nothing a warden saw before.
+  - Tests: `test/zos_render_style_test.dart`, `test/obmocja_store_test.dart` (fixture `z15-17797-11596.mvt`, Frajhajm, saved 2026-11-12), `test/map_layers_store_test.dart`.
 
 - **Source** (public, `kZosOrigin` = `https://narcis.alittis.com` in every build, whatever `BELEZNICA_API` points at):
-  - `GET /api/layers/zos-tiles` — PMTiles v3, MVT z5–15, ~32.5 MB, byte ranges, strong ETag (narcis-vibed NV-400). Six source layers `n2k zo epo nv nvj mvo` (`ZosKind` names). Features carry `IME_OBM`, `KODA_OBM`, `TIP_ZOS`, `_cls` (the legend class) and class fields; feature id = `NARCIS_ZOS.ID`. Every feature is in every zoom.
+  - `GET /api/layers/zos-tiles` — PMTiles v3, MVT z5–15, ~32.5 MB, byte ranges, strong ETag (narcis-vibed NV-400). Six source layers `n2k zo epo nv nvj mvo` (`ZosKind` names; `ns` reads `zo`). Features carry `IME_OBM`, `KODA_OBM`, `TIP_ZOS`, `_cls` (the legend class) and class fields; feature id = `NARCIS_ZOS.ID`. Every feature is in every zoom.
   - `GET /api/layers/zos-style?tone=light|dark` — the web map's MapLibre style v8 (narcis-vibed NV-546). `metadata.version` changes with the style, the sprite or the tileset's content; `metadata["narcis:legend"]` lists `{key, label, color}` per sublayer.
   - `GET /api/layers/zos-sprite/sprite@2x.json|png` — the web map's icons.
   - `GET /api/layers/detail/<id>` — one area's record from the VPS register.

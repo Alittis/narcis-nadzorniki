@@ -265,16 +265,16 @@
     },
     {
       "name": "narcis-vibed ZOS layers (VPS) — Območja overlay (TB-47)",
-      "status": "built 2026-11-04, NOT RELEASED: in the code from the next release on; the Play build 1.14.0+24 still reads the GeoServer entry above",
+      "status": "released in v1.15.0+25 (Play Closed testing; confirmed by the owner 2026-11-05). TB-37 (natural monuments as their own picker row) built 2026-11-12, not yet released",
       "base_url": "https://narcis.alittis.com (kZosOrigin in lib/data/zos_style_store.dart; every build, whatever BELEZNICA_API points at)",
-      "purpose": "'Območja s statusom' overlay, all six sublayers (n2k zo epo nv nvj mvo), drawn on the device from the web map's tileset in the web map's own style; tap-to-identify from the tile data plus the VPS register's detail",
+      "purpose": "'Območja s statusom' overlay: six source layers (n2k zo epo nv nvj mvo), seven picker rows (TB-37: ns = ZO features with _cls 'naravni-spomenik', zo = ZO without them), drawn on the device from the web map's tileset in the web map's own style; tap-to-identify from the tile data plus the VPS register's detail",
       "requests": [
         {"request": "GET /api/layers/zos-tiles", "use": "PMTiles v3 archive (MVT, z5-15, ~32.5 MB), HTTP byte ranges, strong ETag (narcis-vibed NV-400); opened by pmtiles 1.3.0, drawn by vector_map_tiles 9.0.0-beta.9 in raster mode; z16-18 built on the device from z15 (zosOverzoomTile)"},
         {"request": "GET /api/layers/zos-style?tone=light|dark", "use": "MapLibre style v8 of the web map (narcis-vibed NV-546); metadata.version = hash over style, sprite and tileset content; metadata[\"narcis:legend\"] = class rows; revalidated by ETag on start, tone change, resume and after a failed tile read"},
         {"request": "GET /api/layers/zos-sprite/sprite@2x.json|png", "use": "the web map's icons (triangles, caves, POV hatch), fetched when the style changes"},
         {"request": "GET /api/layers/detail/<id>", "use": "one call per identified area (id = NARCIS_ZOS.ID = the MVT feature id), in parallel; a failure leaves that area's rows to the tile fields"}
       ],
-      "client_conversion": "zosRenderStyle (lib/data/zos_render_style.dart): circle -> symbol with dot sprites; the N2k POV fill-pattern hatch dropped (outline kept); a paint block added to icon-only symbol layers. kZosRendererRevision = 2 (bump when the conversion or the sprite drawing changes)",
+      "client_conversion": "zosRenderStyle (lib/data/zos_render_style.dart): circle -> symbol with dot sprites; the N2k POV fill-pattern hatch dropped (outline kept); a paint block added to icon-only symbol layers; TB-37: when only one of zo/ns is on, the three ZO layers get [\"!=\"|\"==\", [\"get\", \"_cls\"], \"naravni-spomenik\"] joined to the served filter with all. kZosRendererRevision = 3 (bump when the conversion or the sprite drawing changes)",
       "device_storage": "documents/zos_style/ (last style + sprite per tone); <temp>/zos_tiles/<style version>/ (vector_map_tiles raster + tile-byte cache, 30-day TTL, 50 MB cap; per version because the library keys tile bytes by z/x/y only; older versions deleted on a version change)",
       "drift_guard": "narcis-vibed web/scripts/verify-zos-style-phone.ts + test/zos_render_style_test.dart (fixtures; ZOS_LIVE=1 checks the live style)",
       "auth": "none (public)",

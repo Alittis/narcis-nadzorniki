@@ -42,6 +42,8 @@ class MapLayers {
         'obhodi': showObhodi,
         'parcele': showParcele,
         'obmocja': [for (final k in zosOrder) if (zos.contains(k)) k.name],
+        // TB-37: `zo` no longer includes the natural monuments (`ns`).
+        'nsSplit': true,
       };
 
   /// Tolerant: a missing or unknown value falls back to [defaults], so a file
@@ -53,6 +55,12 @@ class MapLayers {
     }
 
     final rawZos = json['obmocja'];
+    final zos = rawZos is List
+        ? {
+            for (final k in ZosKind.values)
+              if (rawZos.contains(k.name)) k,
+          }
+        : defaults.zos;
     return MapLayers(
       basemap: BasemapMode.values.firstWhere(
         (m) => m.name == json['basemap'],
@@ -61,12 +69,10 @@ class MapLayers {
       showMotnje: flag('motnje', defaults.showMotnje),
       showObhodi: flag('obhodi', defaults.showObhodi),
       showParcele: flag('parcele', defaults.showParcele),
-      zos: rawZos is List
-          ? {
-              for (final k in ZosKind.values)
-                if (rawZos.contains(k.name)) k,
-            }
-          : defaults.zos,
+      // A file written before TB-37 meant ZO with its natural monuments.
+      zos: json['nsSplit'] != true && zos.contains(ZosKind.zo)
+          ? {...zos, ZosKind.ns}
+          : zos,
     );
   }
 }

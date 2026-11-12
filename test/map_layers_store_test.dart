@@ -61,8 +61,10 @@ void main() {
   });
 
   test('only layers are stored — never the Motnje filter', () {
-    expect(MapLayers.defaults.toJson().keys,
-        unorderedEquals(['basemap', 'motnje', 'obhodi', 'parcele', 'obmocja']));
+    expect(
+        MapLayers.defaults.toJson().keys,
+        unorderedEquals(
+            ['basemap', 'motnje', 'obhodi', 'parcele', 'obmocja', 'nsSplit']));
   });
 
   test('a damaged file is ignored, so the map opens with the defaults',
@@ -83,5 +85,36 @@ void main() {
     expect(restored.showObhodi, isTrue);
     expect(restored.showParcele, MapLayers.defaults.showParcele);
     expect(restored.zos, {ZosKind.n2k, ZosKind.nvj});
+  });
+
+  test('TB-37: a file from before the split keeps ZO with its monuments',
+      () async {
+    // Written by v1.16.0 and older: `zo` then drew the natural monuments too.
+    await writeRaw('{"basemap":"osm","motnje":true,"obhodi":false,'
+        '"parcele":false,"obmocja":["n2k","zo"]}');
+    expect((await store.load())!.zos, {ZosKind.n2k, ZosKind.zo, ZosKind.ns});
+  });
+
+  test('TB-37: after the split, ZO without monuments stays that way',
+      () async {
+    for (final zos in [
+      {ZosKind.zo},
+      {ZosKind.ns},
+      {ZosKind.zo, ZosKind.ns},
+    ]) {
+      await store.save(MapLayers(
+        basemap: BasemapMode.osm,
+        showMotnje: true,
+        showObhodi: false,
+        showParcele: false,
+        zos: zos,
+      ));
+      expect((await store.load())!.zos, zos);
+    }
+  });
+
+  test('TB-37: an older file without ZO gains nothing', () async {
+    await writeRaw('{"obmocja":["n2k"]}');
+    expect((await store.load())!.zos, {ZosKind.n2k});
   });
 }

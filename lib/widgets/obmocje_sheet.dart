@@ -40,6 +40,7 @@ ZosSymbol zosSymbol(ObmocjeFeature f) {
       return ZosSymbol(color, ZosShape.cave);
     case ZosKind.n2k:
     case ZosKind.zo:
+    case ZosKind.ns:
     case ZosKind.mvo:
       return ZosSymbol(color, ZosShape.circle);
   }
@@ -52,6 +53,8 @@ String zosTitle(ZosKind k) {
       return 'Natura 2000';
     case ZosKind.zo:
       return 'Zavarovana območja';
+    case ZosKind.ns:
+      return 'Naravni spomeniki';
     case ZosKind.epo:
       return 'Ekološko pomembna območja';
     case ZosKind.nv:
@@ -70,6 +73,8 @@ String zosShort(ZosKind k) {
       return 'Natura 2000';
     case ZosKind.zo:
       return 'Zavarovano območje';
+    case ZosKind.ns:
+      return 'Naravni spomenik';
     case ZosKind.epo:
       return 'EPO';
     case ZosKind.nv:

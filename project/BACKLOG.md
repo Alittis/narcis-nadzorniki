@@ -1444,7 +1444,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-37 · Natural-monument filter in the Območja layer picker
-`✨ Enhancement` · `P2` · `Todo` (quick win) · Reporter: Matjaž · Updated: 2026-10-12
+`✨ Enhancement` · `P2` · `Doing` (built 2026-11-12; ships with the next release) · Reporter: Matjaž · Updated: 2026-11-12
 - **Want:** *"dodan filter pri slojih za naravne spomenike"*. The web already has it: NV-84 gave the ZO
   layer a Vrsta filter that includes `naravni-spomenik`.
 - **Reading (confirm with Matjaž):** natural monuments are shown and hidden separately from the rest of
@@ -1459,6 +1459,27 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   carry the same filter, or a tap lists monuments that are hidden on the map. `CQL_FILTER` takes one
   value per entry in `LAYERS`.
 - Pairs with TB-40: the picker selection should be remembered.
+- **Superseded 2026-11-12:** the `CQL_FILTER` shape above was for the GeoServer. Since TB-47 (v1.15.0+25) the phone
+  draws the narcis-vibed tileset with the web's style, so the split is a style filter on `_cls`, still client-only.
+- **Built (2026-11-12):** the picker's ZO row is now two rows, *Zavarovana območja* and *Naravni spomeniki* right under
+  it (ARCHITECTURE *Območja s statusom*).
+  - `ZosKind.ns` = the ZO features whose `_cls` is `naravni-spomenik`; `zo` = ZO without them. *Spomenik oblikovane
+    narave* is a separate class and stays with ZO.
+  - [`zos_render_style.dart`](../lib/data/zos_render_style.dart): when only one of the two is on, the three ZO layers
+    get `["!=" | "==", ["get", "_cls"], "naravni-spomenik"]`, joined to the served filter with `all`.
+    `kZosRendererRevision` 2 → 3, so no phone shows ZO tiles cached before the split.
+  - [`obmocja_store.dart`](../lib/data/obmocja_store.dart): identify sorts each ZO feature into `zo` or `ns` by its
+    `_cls`, so a tap never lists a hidden monument; the colour comes from the ZO legend.
+  - [`map_layers_store.dart`](../lib/data/map_layers_store.dart): remembered as before (TB-40), plus `nsSplit: true`.
+    A file from v1.16.0 or older that had ZO on gets *Naravni spomeniki* on too, so the update hides nothing.
+- **Tests:** 14 new — `zos_render_style_test` (the filter per active set, a theme id per half, each split set through
+  the renderer with no warning and no layer lost), `obmocja_store_test` (a monument hits as `ns` only when `ns` is on;
+  the rest of ZO never as `ns`; the monument's legend colour) on a new real tile `z15-17797-11596.mvt` (Frajhajm,
+  saved 2026-11-12 from the live archive, version `106b1f98a980`, the fixtures' own), `map_layers_store_test` (the
+  pre-split file, the post-split round trip). Each verified by removing the code it covers. Live drift guard
+  (`ZOS_LIVE=1`) passes. Full suite 283 pass, 1 skipped (network).
+- **Reply to Matjaž (when released):** natural monuments are their own row; the remaining open question in this item
+  (whether he meant a Vrsta filter like the web's NV-84, with all seven classes) only matters if he asks for more.
 - **Shipped:** —
 
 ### TB-38 · Forward a record to the head of supervision by e-mail (opt-in)

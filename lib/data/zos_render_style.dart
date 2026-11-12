@@ -2,7 +2,17 @@ import 'dart:convert';
 
 /// Bump whenever [zosRenderStyle] or the circle sprites' drawing changes: the
 /// map's cached raster tiles are keyed on the theme version, which carries it.
-const int kZosRendererRevision = 2;
+/// 3: TB-37 took the natural monuments out of the `zo` set.
+const int kZosRendererRevision = 3;
+
+/// TB-37: natural monuments are shown and hidden on their own. They are one
+/// class (`_cls`) of the ZO source layer, so the phone's [kZosMonumentSlug]
+/// sublayer draws from `zo`, and `zo` on its own leaves them out.
+const String kZosMonumentSlug = 'ns';
+
+/// The ZO `_cls` of a natural monument (*naravni spomenik*). Not *spomenik
+/// oblikovane narave*, which is a class of its own and stays with ZO.
+const String kZoMonumentClass = 'naravni-spomenik';
 
 /// A dot standing in for one colour of a MapLibre `circle` layer, drawn as
 /// MapLibre does: [color] fill of [radius], with a [strokeWidth] ring of
@@ -56,12 +66,23 @@ class ZosRenderStyle {
 /// - a `symbol` layer without `paint` gets one, because the renderer skips a
 ///   symbol layer that has none (re-checked 2026-11-04: it draws 0 px).
 ///
+/// [kZosMonumentSlug] in [sourceLayers] draws ZO's natural monuments; `zo`
+/// without it draws ZO without them (TB-37). The split is an added filter on
+/// the ZO layers, in the expression form the renderer reads.
+///
 /// The theme id names the active set, because the map's raster cache is keyed
 /// on it: tiles drawn for one set must not be served for another.
 ZosRenderStyle zosRenderStyle(
   Map<String, dynamic> style,
   Set<String> sourceLayers,
 ) {
+  final zo = sourceLayers.contains('zo');
+  final ns = sourceLayers.contains(kZosMonumentSlug);
+  final drawn = {...sourceLayers, if (ns) 'zo'};
+  // Null when both halves of ZO are on (or neither): no split to draw.
+  final List<Object>? zoSplit = zo == ns
+      ? null
+      : [zo ? '!=' : '==', ['get', '_cls'], kZoMonumentClass];
   final layers = <Map<String, dynamic>>[];
   final circles = <ZosCircleSprite>[];
   final dropped = <String>[];
@@ -69,7 +90,11 @@ ZosRenderStyle zosRenderStyle(
     if (raw is! Map) continue;
     // Deep copy: the served style stays as it came.
     final l = (jsonDecode(jsonEncode(raw)) as Map).cast<String, dynamic>();
-    if (!sourceLayers.contains(l['source-layer'])) continue;
+    if (!drawn.contains(l['source-layer'])) continue;
+    if (zoSplit != null && l['source-layer'] == 'zo') {
+      final f = l['filter'];
+      l['filter'] = f == null ? zoSplit : ['all', f, zoSplit];
+    }
     final id = '${l['id']}';
     final paint = l['paint'];
     switch (l['type']) {
