@@ -629,7 +629,7 @@ Implemented across [lib/state/app_state.dart](../lib/state/app_state.dart), [lib
 **Mode pill.** The bottom-bar mode pill on `HomeScreen` carries an `Obhodi` mode (replaces the placeholder `Sprehod` mode that was disabled in earlier builds). Tapping the mode swaps the FAB:
 - **Motnje mode**: existing speed-dial (Foto + Šifrant). FAB icon `+`, rotates to ✕ when expanded.
 - **Obhodi mode + no active walk**: single-tap `directions_walk` FAB → `AppState.startWalk()`. Generates a UUID, stamps `pendingSync=true`, persists the active-walk file, subscribes to `LocationService.watchPosition()` (5 m distance filter, same as the live-dot stream), starts buffering `WalkPoint`s.
-- **Obhodi mode + active walk**: single-tap `stop` FAB → `_EndWalkSheet` bottom sheet (optional name + notes, "Shrani" or "Zavrzi" with confirm). On Shrani the walk moves into `_walks` queued for push; on Zavrzi it's wiped via `cancelWalk()` (no upload, no local row).
+- **Obhodi mode + active walk**: single-tap `stop` FAB → `_EndWalkSheet` bottom sheet (optional name + notes, "Shrani" or "Zavrzi" with confirm). On Shrani the walk moves into `_walks` queued for push; on Zavrzi it's wiped via `cancelWalk()` (no upload, no local row). The records captured during it are kept (TB-55, below).
 - **Pause / resume (TB-8)**: while a walk exists, a mini button above the `stop` FAB reads *Premor* (⏸) or *Nadaljuj* (▶).
   - `AppState.pauseWalk()` stops the FGS, so the GPS stream and the "Snemanje obhoda" notification stop too. It re-reads `active_walk.json` for points the port never delivered, and saves the walk there with `Walk.pausedAt` set. The walk stays open: records captured during the pause still link to it, and the live track draws grey.
   - `resumeWalk()` clears `pausedAt` in the file first, then restarts the FGS. The handler reloads the walk, points and all.
@@ -641,6 +641,8 @@ Implemented across [lib/state/app_state.dart](../lib/state/app_state.dart), [lib
   - Tests: [test/walk_pause_test.dart](../test/walk_pause_test.dart).
 
 Disturbances captured during a walk are linked automatically: `AppState.addRecord` stamps `record.obhodId = _activeWalk?.id` if one is running, regardless of which mode the user is in when they tap "+". Switching back to Motnje mode mid-walk preserves the link.
+
+**A discarded walk lets go of its records (TB-55; built 2026-11-12, not yet released).** A walk that is discarded — *Zavrzi* (`cancelWalk`), or `endWalk`'s automatic discard of a walk with no points — never reaches the server. `_unlinkFromDiscardedWalk` clears `obhodId` on the records that carry its id (`Disturbance.copyWith(clearObhodId: true)`), saves them, and sends the unsent ones at once when online; offline, the next sync does. Before, they kept the dead id and failed the walk FK (`motnja_obhod_id_fkey`) on every POST until a logout discarded them. Records stranded that way by an older build are not repaired; TB-59's failure counts would show them as `http_5xx` on `/api/beleznica/app/v1/disturbances`. Tests: [test/walk_discard_test.dart](../test/walk_discard_test.dart).
 
 **Live polyline.** While `state.hasActiveWalk` is true, the active-walk path renders as a green polyline on the home map (alpha 0.85, stroke 5). Always shown — the mode you're in only affects the FAB, not the rendering.
 

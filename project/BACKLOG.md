@@ -2438,7 +2438,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   is taken.
 
 ### TB-55 · A record captured during a walk that is then discarded can never be sent
-`🐞 Bug` · `P2` · `Triage` · Reporter: Claude (found in the NV-259 P4 gate, 2026-10-13) · Updated: 2026-10-13
+`🐞 Bug` · `P2` · `Doing` (built 2026-11-12; ships with the next release) · Reporter: Claude (found in the NV-259 P4 gate, 2026-10-13) · Updated: 2026-11-12
 - **Problem:** `addRecord` stamps a record with the active walk's id (`obhodId: record.obhodId ?? _activeWalk?.id`,
   [`app_state.dart`](../lib/state/app_state.dart) ~491). If that walk is then discarded — *Zavrzi* in the end-walk sheet, or
   the automatic *Obhod brez točk — zavržen* when GPS gave no points — `cancelWalk()` drops the walk but leaves the id on the
@@ -2448,7 +2448,19 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   auto-discarded, and the record made during it stayed queued with `motnja_obhod_id_fkey` errors on every sync.
 - **Fix shape (to decide):** when a walk is discarded, clear `obhodId` on the records that carry it (they stay as ordinary
   records), or ask whether to keep them. Test with the booted-`AppState` harness; verify by removal.
-- **Discussion:** open.
+- **Decided 2026-11-12 by Claude while building (overrule freely):** clear the link, keep the records, no question asked —
+  a discarded walk is the warden's choice about the track, not about what they recorded.
+- **Built (2026-11-12):** [`app_state.dart`](../lib/state/app_state.dart) `_unlinkFromDiscardedWalk`, called from
+  `cancelWalk` (*Zavrzi*) and from `endWalk`'s discard of a walk with no points: clears `obhodId`
+  (`Disturbance.copyWith(clearObhodId: true)`), saves, and sends the unsent records at once when online; offline, the
+  next sync does. ARCHITECTURE *A discarded walk lets go of its records*.
+- **Tests:** [`walk_discard_test.dart`](../test/walk_discard_test.dart), 6, against a mock server that refuses a record
+  naming a walk it has not received (as `motnja_obhod_id_fkey` does): *Zavrzi* online, the no-points discard, offline
+  then the next sync, other walks' records keep their link, a saved walk keeps its records linked (control), copyWith.
+  Each discard path verified by removing its call.
+- **Not repaired:** records already stranded by an older build keep the dead id. None is known outside the emulator;
+  TB-59's counts would show them as `http_5xx` on `/api/beleznica/app/v1/disturbances`.
+- **Discussion:** closed.
 
 ### TB-56 · The `tools/ords` test scripts put the login credentials and the bearer token in curl's argv
 `🐞 Bug` · `P3` · `Done` · Reporter: Claude (VPS-71 follow-up, 2026-11-03) · Updated: 2026-11-03

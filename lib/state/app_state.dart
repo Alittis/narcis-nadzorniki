@@ -1206,6 +1206,7 @@ class AppState extends ChangeNotifier {
       await _walksStore.clearActive();
       debugPrint('[walk] endWalk ${active.id}: no points, discarded');
       notifyListeners();
+      await _unlinkFromDiscardedWalk(active.id);
       return null;
     }
 
@@ -1302,6 +1303,35 @@ class AppState extends ChangeNotifier {
     await _walksStore.clearActive();
     notifyListeners();
     debugPrint('[walk] cancelWalk $id');
+    await _unlinkFromDiscardedWalk(id);
+  }
+
+  /// TB-55: a discarded walk never reaches the server, so a record still
+  /// pointing at it would fail the walk FK on every POST, for ever. The
+  /// records captured during it stay, as ordinary records with no walk, and
+  /// go out now if they can.
+  Future<void> _unlinkFromDiscardedWalk(String walkId) async {
+    final linked = {
+      for (final r in _records)
+        if (r.obhodId == walkId) r.id,
+    };
+    if (linked.isEmpty) return;
+    _records = _records
+        .map((r) => linked.contains(r.id) ? r.copyWith(clearObhodId: true) : r)
+        .toList(growable: false);
+    await _localStore.save(_records);
+    notifyListeners();
+    debugPrint('[walk] $walkId discarded: '
+        '${linked.length} record(s) no longer linked to it');
+    if (!isOnline || !canSync) return;
+    final unsent = _records
+        .where((r) =>
+            linked.contains(r.id) && r.pendingSync && !r.pendingDelete)
+        .toList();
+    for (final r in unsent) {
+      await _sendAndMarkSynced(r);
+    }
+    await _drainPendingPhotos();
   }
 
   Future<void> updateWalk(Walk walk) async {

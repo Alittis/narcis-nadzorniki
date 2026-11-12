@@ -95,6 +95,7 @@ class Disturbance {
     String? proposedType,
     String? createdBy,
     String? obhodId,
+    bool clearObhodId = false,
     String? reviewedBy,
     DateTime? reviewedAt,
   }) {
@@ -116,7 +117,7 @@ class Disturbance {
       createdAt: createdAt ?? this.createdAt,
       proposedType: proposedType ?? this.proposedType,
       createdBy: createdBy ?? this.createdBy,
-      obhodId: obhodId ?? this.obhodId,
+      obhodId: clearObhodId ? null : (obhodId ?? this.obhodId),
       reviewedBy: reviewedBy ?? this.reviewedBy,
       reviewedAt: reviewedAt ?? this.reviewedAt,
     );
