@@ -92,8 +92,10 @@ skip-if-exists creates, 204 deletes, 404 = done), so the sync engine is unchange
 - **`POST tezave` (TB-59, narcis-racun RN-22 S3):** `{tezave: [{pot, koda, stevilo}]}`, 1–50 entries, `stevilo` 1–1000,
   `pot` `^/[A-Za-z0-9/_:.[\]-]{0,199}$`, `koda` `^[A-Za-z0-9_.:-]{1,60}$`; Bearer as every call; **204** when taken.
   narcis-vibed forwards each entry to prijava's problem sink (`/api/tezava`) under the account id. The phone's side is §13,
-  *failure counts for user support*. STATUS: UNKNOWN – REQUIRES CONFIRMATION — built in narcis-vibed by a parallel
-  session; not yet seen answering (2026-11-12, the app was proven against a stub of this contract).
+  *failure counts for user support*. **Live** since narcis-vibed NV-567 (deployed 2026-11-12 07:35 UTC): without a token
+  it answers 401 and an unknown path 404 (probed 2026-11-12). The phone side shipped in v1.17.0+27 (rolled out
+  2026-11-13); a 204 from it to a released phone: STATUS: UNKNOWN – REQUIRES CONFIRMATION (the app was proven against a
+  stub of this contract).
 
 ### 9.1 `GET https://narcis.gov.si/ords/narcis/app-auth/login` (production login)
 - Auth: `X-Narcis-Auth: Basic <base64(email:password)>` over HTTPS only. (Custom header, not the standard `Authorization` — see note below.)
@@ -253,7 +255,7 @@ password and offline-cache steps below, which stay as the record of builds ≤ 1
   first variant, and Android's own mitigation is `minSdkVersion 30`. Keeping the empty affinity would need AppAuth's
   redirect handling forked: its `AuthorizationManagementActivity` is started for a result inside the app's task, and
   the redirect arrives from Chrome in a new task that can find it only by affinity. **Decided (owner, 2026-11-07):
-  minSdk 30** (`android/app/build.gradle.kts`) from the build after 1.16.0+26 (1.16.0 itself ships with minSdk 24).
+  minSdk 30** (`android/app/build.gradle.kts`) from **v1.17.0+27** (rolled out 2026-11-13); 1.16.0+26 and older ship with minSdk 24.
   Play's statistics showed 33 of 34 installs on Android 11+; the 34th could not be identified. A tester on Android ≤ 10,
   if any, can still install 1.16.0 (browser sign-in, so unaffected when the interim password route retires) but gets
   no later update.
@@ -335,7 +337,7 @@ Optional translucent overlay of Slovenian cadastral parcel boundaries with parce
 
 An optional overlay of the protected-area sublayers — six source layers, seven picker rows — reached through the "Območja" chip → a **layer picker** (`showObmocjaPicker`, `lib/widgets/obmocja_picker.dart`). The active set `_activeZos` (`Set<ZosKind>`) is remembered across launches (TB-40); N2k is on by default.
 
-- **Natural monuments, a row of their own (TB-37; built 2026-11-12, not yet released).** `ZosKind.ns` (*Naravni spomeniki*) is not a source layer: it is the ZO features whose `_cls` is `naravni-spomenik` (`kZoMonumentClass`), and `ZosKind.zo` (*Zavarovana območja*) is ZO without them. *Spomenik oblikovane narave* is a class of its own and stays with ZO. Client-only; the tileset and the style are unchanged.
+- **Natural monuments, a row of their own (TB-37; released in v1.17.0+27, 2026-11-13).** `ZosKind.ns` (*Naravni spomeniki*) is not a source layer: it is the ZO features whose `_cls` is `naravni-spomenik` (`kZoMonumentClass`), and `ZosKind.zo` (*Zavarovana območja*) is ZO without them. *Spomenik oblikovane narave* is a class of its own and stays with ZO. Client-only; the tileset and the style are unchanged.
   - Drawing: `zosRenderStyle` adds `["!=" | "==", ["get", "_cls"], "naravni-spomenik"]` to the three ZO layers, joined to the served filter with `all`; nothing when both rows are on.
   - Identify: `zosHitTest` sorts each ZO feature into `zo` or `ns` by its `_cls`, so a tap never lists a monument that is hidden. A monument takes its colour from the ZO legend (`ZosKind.sourceLayer`).
   - `map_layers.json` carries `nsSplit: true`. A file without it (v1.16.0 and older) that had ZO on gets *Naravni spomeniki* on too, so the update hides nothing a warden saw before.
@@ -649,7 +651,7 @@ Implemented across [lib/state/app_state.dart](../lib/state/app_state.dart), [lib
 
 Disturbances captured during a walk are linked automatically: `AppState.addRecord` stamps `record.obhodId = _activeWalk?.id` if one is running, regardless of which mode the user is in when they tap "+". Switching back to Motnje mode mid-walk preserves the link.
 
-**A discarded walk lets go of its records (TB-55; built 2026-11-12, not yet released).** A walk that is discarded — *Zavrzi* (`cancelWalk`), or `endWalk`'s automatic discard of a walk with no points — never reaches the server. `_unlinkFromDiscardedWalk` clears `obhodId` on the records that carry its id (`Disturbance.copyWith(clearObhodId: true)`), saves them, and sends the unsent ones at once when online; offline, the next sync does. Before, they kept the dead id and failed the walk FK (`motnja_obhod_id_fkey`) on every POST until a logout discarded them. Records stranded that way by an older build are not repaired; TB-59's failure counts would show them as `http_5xx` on `/api/beleznica/app/v1/disturbances`. Tests: [test/walk_discard_test.dart](../test/walk_discard_test.dart).
+**A discarded walk lets go of its records (TB-55; released in v1.17.0+27, 2026-11-13).** A walk that is discarded — *Zavrzi* (`cancelWalk`), or `endWalk`'s automatic discard of a walk with no points — never reaches the server. `_unlinkFromDiscardedWalk` clears `obhodId` on the records that carry its id (`Disturbance.copyWith(clearObhodId: true)`), saves them, and sends the unsent ones at once when online; offline, the next sync does. Before, they kept the dead id and failed the walk FK (`motnja_obhod_id_fkey`) on every POST until a logout discarded them. Records stranded that way by an older build are not repaired; TB-59's failure counts would show them as `http_5xx` on `/api/beleznica/app/v1/disturbances`. Tests: [test/walk_discard_test.dart](../test/walk_discard_test.dart).
 
 **Live polyline.** While `state.hasActiveWalk` is true, the active-walk path renders as a green polyline on the home map (alpha 0.85, stroke 5). Always shown — the mode you're in only affects the FAB, not the rendering.
 

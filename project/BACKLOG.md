@@ -23,7 +23,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 ## Open
 
 ### TB-59 · The phone counts the sync and upload failures a signed-in person hits and reports them (narcis-racun RN-22 S3)
-`✨ Enhancement` · `P2` · `Doing` (**built into v1.17.0+27 2026-11-12 — pending the Data safety update, upload + rollout**) · Reporter: owner (narcis-racun RN-22, decided 2026-11-11) · Updated: 2026-11-12
+`✨ Enhancement` · `P2` · `Done` (**v1.17.0+27 rolled out on the Play Closed testing track, confirmed by the owner 2026-11-13**) · Reporter: owner (narcis-racun RN-22, decided 2026-11-11) · Updated: 2026-11-13
 - **Problem:** nothing about a failed sync or upload reaches the server — only `debugPrint` to logcat. User support
   cannot see that a warden's records have been failing to send.
 - **Want:** count failures per (folded path, kind) on the device and report the counts to narcis-vibed's
@@ -54,10 +54,11 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Waits on:** ~~narcis-vibed's route deployed~~ — **live 2026-11-12** (narcis-vibed NV-567, deployed 07:35 UTC;
   `POST /api/beleznica/app/v1/tezave` without a token answers 401, an unknown path 404, probed 2026-11-12; not yet seen
   answering a real phone). Still owed before upload: the Play **Data safety** update (PLAY_CLOSED_TEST §4.11,
-  Diagnostics → collected) and the owner's call on the privacy policy, whose list item *"Aplikacija ne pošilja
-  telemetrije, beleženja zrušitev ali drugih diagnostičnih podatkov tretjim osebam"* says nothing of these counts.
-- **Shipped:** built into **v1.17.0+27** 2026-11-12, archived `~/Releases/terenska-beleznica-1.17.0+27.aab` (signed with
-  the upload key) — pending the Data safety update, upload + rollout (owner).
+  Diagnostics → collected). The privacy policy, whose list item *"Aplikacija ne pošilja telemetrije, beleženja zrušitev
+  ali drugih diagnostičnih podatkov tretjim osebam"* says nothing of these counts, **stays as it is (owner, 2026-11-12)**.
+- **Shipped:** **v1.17.0+27**, archived `~/Releases/terenska-beleznica-1.17.0+27.aab` (signed with the upload key);
+  **rolled out on the Play Closed testing track, confirmed by the owner 2026-11-13**, after the Data safety form declared
+  Diagnostics as collected, purpose *App functionality* (owner). Not yet seen: a real report from a released phone.
 
 ### TB-58 · Sign in through Račun NarcIS in the browser (NV-554 P3) — admins with two-step can use the phone again
 `✨ Enhancement` · `P1` · `Done` (**v1.16.0+26 ROLLED OUT LIVE on the Play Closed testing track 2026-11-07**; the owner signed in on a real phone through the browser 19:39 UTC) · Reporter: owner (NV-554) · Updated: 2026-11-07
@@ -1448,7 +1449,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-37 · Natural-monument filter in the Območja layer picker
-`✨ Enhancement` · `P2` · `Doing` (**built into v1.17.0+27 2026-11-12 — pending upload + rollout**) · Reporter: Matjaž · Updated: 2026-11-12
+`✨ Enhancement` · `P2` · `Done` (**v1.17.0+27 rolled out on the Play Closed testing track, confirmed by the owner 2026-11-13**) · Reporter: Matjaž · Updated: 2026-11-13
 - **Want:** *"dodan filter pri slojih za naravne spomenike"*. The web already has it: NV-84 gave the ZO
   layer a Vrsta filter that includes `naravni-spomenik`.
 - **Reading (confirm with Matjaž):** natural monuments are shown and hidden separately from the rest of
@@ -1494,9 +1495,9 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
     on screen at the A56's size, and a 360 × 480 screen scrolls to the last row, which toggles. The second fails
     without the fix (overflow 177 px); the first does not, because the test font draws shorter rows than the phone.
     Suite 285 pass, 1 skipped. The release AAB was rebuilt with the fix (same 1.17.0+27, never uploaded).
-- **Shipped:** built into **v1.17.0+27** 2026-11-12, archived `~/Releases/terenska-beleznica-1.17.0+27.aab` (signed with
-  the upload key) — pending upload + rollout (owner).
-- **Reply to Matjaž (when released):** natural monuments are their own row; the remaining open question in this item
+- **Shipped:** **v1.17.0+27**, archived `~/Releases/terenska-beleznica-1.17.0+27.aab` (signed with the upload key);
+  **rolled out on the Play Closed testing track, confirmed by the owner 2026-11-13**.
+- **Reply to Matjaž (due — released 2026-11-13):** natural monuments are their own row; the remaining open question in this item
   (whether he meant a Vrsta filter like the web's NV-84, with all seven classes) only matters if he asks for more.
 
 ### TB-38 · Forward a record to the head of supervision by e-mail (opt-in)
@@ -2476,7 +2477,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   is taken.
 
 ### TB-55 · A record captured during a walk that is then discarded can never be sent
-`🐞 Bug` · `P2` · `Doing` (**built into v1.17.0+27 2026-11-12 — pending upload + rollout**) · Reporter: Claude (found in the NV-259 P4 gate, 2026-10-13) · Updated: 2026-11-12
+`🐞 Bug` · `P2` · `Done` (**v1.17.0+27 rolled out on the Play Closed testing track, confirmed by the owner 2026-11-13**) · Reporter: Claude (found in the NV-259 P4 gate, 2026-10-13) · Updated: 2026-11-13
 - **Problem:** `addRecord` stamps a record with the active walk's id (`obhodId: record.obhodId ?? _activeWalk?.id`,
   [`app_state.dart`](../lib/state/app_state.dart) ~491). If that walk is then discarded — *Zavrzi* in the end-walk sheet, or
   the automatic *Obhod brez točk — zavržen* when GPS gave no points — `cancelWalk()` drops the walk but leaves the id on the
@@ -2499,8 +2500,8 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Not repaired:** records already stranded by an older build keep the dead id. None is known outside the emulator;
   TB-59's counts would show them as `http_5xx` on `/api/beleznica/app/v1/disturbances`.
 - **Discussion:** closed.
-- **Shipped:** built into **v1.17.0+27** 2026-11-12, archived `~/Releases/terenska-beleznica-1.17.0+27.aab` (signed with
-  the upload key) — pending upload + rollout (owner).
+- **Shipped:** **v1.17.0+27**, archived `~/Releases/terenska-beleznica-1.17.0+27.aab` (signed with the upload key);
+  **rolled out on the Play Closed testing track, confirmed by the owner 2026-11-13**.
 
 ### TB-56 · The `tools/ords` test scripts put the login credentials and the bearer token in curl's argv
 `🐞 Bug` · `P3` · `Done` · Reporter: Claude (VPS-71 follow-up, 2026-11-03) · Updated: 2026-11-03

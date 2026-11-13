@@ -722,7 +722,7 @@ For **every** entry below: collection is **required for app functionality** (or 
 | **Photos and videos** | Photos | Yes | No | Optional | App functionality (evidence photos attached to disturbance records) |
 | **App activity** | Other user-generated content | Yes | No | Optional | App functionality (the record's description, the walk's name and notes — every one marked *neobvezno*). **Added 2026-10-15** (owner; NV-259 B5), in Play review |
 | **App info and performance** | Crash logs | No | — | — | (No Crashlytics / Sentry / Firebase wired in) |
-| **App info and performance** | Diagnostics | No | — | — | (No analytics SDK; only local debug-prints during development) **— changes with TB-59, see the note below** |
+| **App info and performance** | Diagnostics | Yes | No | Required | App functionality (TB-59: counts of failed syncs and photo uploads per API path and failure kind, never content, filed under the account for user support). **Declared 2026-11-13 (owner)**, with v1.17.0+27 |
 | **Device or other IDs** | Device or other IDs | No | — | — | (No advertising-ID, no install-ID, no GAID; only Android Keystore-backed secure storage) |
 | **Files and docs** | Files and docs | No | — | — | |
 | **Calendar** | — | No | — | — | |
@@ -739,12 +739,12 @@ For **every** entry below: collection is **required for app functionality** (or 
 >
 > **Re-check at the NV-259 cutover (TB-46):** *"encrypted in transit"* then means HTTPS to `narcis.alittis.com` (and from there to `narcis.gov.si`), not only to `narcis.gov.si`. Alittis and Hostinger hold the data **on ARSO's behalf**, which Play counts as a service provider, not as sharing, so *Shared? No* stands. Also consider, at that review, whether the free-text description and walk notes belong under **App activity → Other user-generated content**, which this form has never declared. **Done 2026-10-15 (owner):** the other answers stand, and *Other user-generated content* is declared (the row above). The form is under Play Console → the app → Policy and programs → App content → **Actioned** tab → Data safety → **Manage**.
 
-> **Before the first build carrying TB-59 is uploaded (owner):** from TB-59 the app counts the sync and upload failures
+> **Done 2026-11-13 (owner), before v1.17.0+27 was rolled out — Diagnostics declared, purpose *App functionality*.** The original note: from TB-59 the app counts the sync and upload failures
 > a signed-in person hits (failure kind and API path, ids folded — never content) and sends the counts to
 > `narcis.alittis.com`, which files them under the person's account at Račun NarcIS for user support (narcis-racun RN-22,
 > owner decision 2026-11-11: superadmins only, 12 months). That is **App info and performance → Diagnostics: collected**,
-> linked to the user, not shared, not optional. Which Play purpose to tick (*Analytics* and/or *App functionality*) and
-> whether the app's privacy policy needs a sentence: STATUS: UNKNOWN – REQUIRES CONFIRMATION (owner).
+> linked to the user, not shared, not optional. The privacy policy gets no new sentence (**owner, 2026-11-12**). Purpose:
+> *App functionality* (owner, 2026-11-13).
 
 #### Children's data
 
