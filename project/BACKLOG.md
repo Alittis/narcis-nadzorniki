@@ -33,7 +33,8 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   two views (monuments alone, ZO without them).
 - **Scope:** the picker only. What the map draws, what a tap lists and `map_layers.json` stay as in TB-37
   (`zo`/`ns`), so there is no migration and no server change.
-- **Discussion:** describe the layout in the reply to Matjaž (TB-37) and ask whether it matches what he meant.
+- **Discussion:** layout described to Matjaž in the TB-37 reply (mail sent by Alexis 2026-11-13), asking whether it
+  matches what he meant or whether he wants every ZO class as a filter. Awaiting his answer.
 - **Built (2026-11-13), pending the next release:** [`obmocja_picker.dart`](../lib/widgets/obmocja_picker.dart) draws
   the parent (`tristate`, "–" when one half is on; a tap on none or some turns both on, on all turns both off) and the
   two indented rows; [`obmocje_sheet.dart`](../lib/widgets/obmocje_sheet.dart) `zosTitle(zo)` is now *Ostala zavarovana
@@ -1523,8 +1524,9 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
     Suite 285 pass, 1 skipped. The release AAB was rebuilt with the fix (same 1.17.0+27, never uploaded).
 - **Shipped:** **v1.17.0+27**, archived `~/Releases/terenska-beleznica-1.17.0+27.aab` (signed with the upload key);
   **rolled out on the Play Closed testing track, confirmed by the owner 2026-11-13**.
-- **Reply to Matjaž (due — released 2026-11-13):** natural monuments are their own row; the remaining open question in this item
-  (whether he meant a Vrsta filter like the web's NV-84, with all seven classes) only matters if he asks for more.
+- **Reporter informed 2026-11-13** (mail to Matjaž, sent by Alexis): natural monuments are their own row in v1.17.0; the
+  next version makes *Zavarovana območja* a parent row over them (TB-60). Asked whether that matches what he meant, or
+  whether he wants a filter by every ZO class like the web's (NV-84). Awaiting his answer.
 
 ### TB-38 · Forward a record to the head of supervision by e-mail (opt-in)
 `✨ Enhancement` · `P2` · `Blocked` · Reporter: Matjaž · Updated: 2026-10-12
