@@ -46,13 +46,14 @@ ZosSymbol zosSymbol(ObmocjeFeature f) {
   }
 }
 
-/// Full name, for the picker rows.
+/// Full name, for the picker rows. ZO's row sits under the *Zavarovana
+/// območja* parent row, next to *Naravni spomeniki* (TB-60).
 String zosTitle(ZosKind k) {
   switch (k) {
     case ZosKind.n2k:
       return 'Natura 2000';
     case ZosKind.zo:
-      return 'Zavarovana območja';
+      return 'Ostala zavarovana območja';
     case ZosKind.ns:
       return 'Naravni spomeniki';
     case ZosKind.epo:

@@ -22,6 +22,32 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 
 ## Open
 
+### TB-60 · Zavarovana območja becomes a parent row over Naravni spomeniki and the rest (TB-37 follow-up)
+`✨ Enhancement` · `P2` · `Doing` · Reporter: owner (2026-11-13, on v1.17.0+27) · Updated: 2026-11-13
+- **Problem:** since TB-37 the picker lists *Zavarovana območja* and *Naravni spomeniki* as two equal rows. Ticking
+  *Zavarovana območja* alone draws ZO **without** its natural monuments, and a tap there lists none. That is
+  misleading: natural monuments are protected areas, so someone ticking ZO expects them.
+- **Want (proposed by Claude, accepted by the owner 2026-11-13):** *Zavarovana območja* as a parent row with a
+  three-state checkbox (all / none / some), and two indented rows under it, *Naravni spomeniki* and *Ostala
+  zavarovana območja*. Ticking the parent turns both on, or both off when both are on. The rows below keep Matjaž's
+  two views (monuments alone, ZO without them).
+- **Scope:** the picker only. What the map draws, what a tap lists and `map_layers.json` stay as in TB-37
+  (`zo`/`ns`), so there is no migration and no server change.
+- **Discussion:** describe the layout in the reply to Matjaž (TB-37) and ask whether it matches what he meant.
+- **Built (2026-11-13), pending the next release:** [`obmocja_picker.dart`](../lib/widgets/obmocja_picker.dart) draws
+  the parent (`tristate`, "–" when one half is on; a tap on none or some turns both on, on all turns both off) and the
+  two indented rows; [`obmocje_sheet.dart`](../lib/widgets/obmocje_sheet.dart) `zosTitle(zo)` is now *Ostala zavarovana
+  območja*. `onChanged` reports the whole active set, so a parent tap is one redraw and one `map_layers.json` write
+  ([`home_screen.dart`](../lib/screens/home_screen.dart)). ARCHITECTURE *Območja s statusom*.
+- **Tests:** `test/obmocja_picker_test.dart`, 5 new (indented under the parent; the parent from none, from some, from
+  all; a half alone, the parent following), the two TB-37 ones kept. Two mutations checked: the parent following
+  Flutter's own tristate cycle (some → none) and the halves not indented each fail a test. Full suite 290 pass,
+  1 skipped.
+- **On the emulator (2026-11-13, `misc/tb37-check/` harness, live VPS tiles):** the eight rows fit; ticking *Ostala
+  zavarovana območja* shows "–" on the parent and saves `["n2k","zo"]`; the parent then saves `["n2k","zo","ns"]` and
+  the monument dots appear, and a second tap saves `["n2k"]`. Screenshots in `misc/tb60-check/`. Not yet checked on
+  the A56.
+
 ### TB-59 · The phone counts the sync and upload failures a signed-in person hits and reports them (narcis-racun RN-22 S3)
 `✨ Enhancement` · `P2` · `Done` (**v1.17.0+27 rolled out on the Play Closed testing track, confirmed by the owner 2026-11-13**) · Reporter: owner (narcis-racun RN-22, decided 2026-11-11) · Updated: 2026-11-13
 - **Problem:** nothing about a failed sync or upload reaches the server — only `debugPrint` to logcat. User support

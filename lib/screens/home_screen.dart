@@ -594,12 +594,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 onObmocjaToggle: () => showObmocjaPicker(
                   context,
                   active: _activeZos,
-                  onChanged: (k, on) => _setLayers(() {
-                    if (on) {
-                      _activeZos.add(k);
-                    } else {
-                      _activeZos.remove(k);
-                    }
+                  onChanged: (zos) => _setLayers(() {
+                    _activeZos
+                      ..clear()
+                      ..addAll(zos);
                   }),
                 ),
               ),

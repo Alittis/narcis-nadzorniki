@@ -335,7 +335,7 @@ Optional translucent overlay of Slovenian cadastral parcel boundaries with parce
 ### 10.2 Overlay: Protected Areas ("Območja s statusom", VPS vector tiles — TB-47)
 **Released in v1.15.0+25** (TB-47, Play Closed testing, confirmed by the owner 2026-11-05): the phone draws the narcis-vibed tileset itself, in the web map's own style. Builds up to 1.14.0+24 drew WMS tiles from the NarcIS GeoServer (`https://narcis.gov.si/ows/ows`; STATE.json keeps that entry).
 
-An optional overlay of the protected-area sublayers — six source layers, seven picker rows — reached through the "Območja" chip → a **layer picker** (`showObmocjaPicker`, `lib/widgets/obmocja_picker.dart`). The active set `_activeZos` (`Set<ZosKind>`) is remembered across launches (TB-40); N2k is on by default.
+An optional overlay of the protected-area sublayers — six source layers, seven sublayers, eight picker rows (TB-60) — reached through the "Območja" chip → a **layer picker** (`showObmocjaPicker`, `lib/widgets/obmocja_picker.dart`). The active set `_activeZos` (`Set<ZosKind>`) is remembered across launches (TB-40); N2k is on by default.
 
 - **Natural monuments, a row of their own (TB-37; released in v1.17.0+27, 2026-11-13).** `ZosKind.ns` (*Naravni spomeniki*) is not a source layer: it is the ZO features whose `_cls` is `naravni-spomenik` (`kZoMonumentClass`), and `ZosKind.zo` (*Zavarovana območja*) is ZO without them. *Spomenik oblikovane narave* is a class of its own and stays with ZO. Client-only; the tileset and the style are unchanged.
   - Drawing: `zosRenderStyle` adds `["!=" | "==", ["get", "_cls"], "naravni-spomenik"]` to the three ZO layers, joined to the served filter with `all`; nothing when both rows are on.
@@ -343,6 +343,10 @@ An optional overlay of the protected-area sublayers — six source layers, seven
   - `map_layers.json` carries `nsSplit: true`. A file without it (v1.16.0 and older) that had ZO on gets *Naravni spomeniki* on too, so the update hides nothing a warden saw before.
   - The picker sheet is scroll-controlled with a scroll view inside: the default sheet (at most 9/16 of the screen) cut the seventh row off by 3 px on the A56.
   - Tests: `test/zos_render_style_test.dart`, `test/obmocja_store_test.dart` (fixture `z15-17797-11596.mvt`, Frajhajm, saved 2026-11-12), `test/map_layers_store_test.dart`, `test/obmocja_picker_test.dart`. Checked on the A56 2026-11-12.
+- **Zavarovana območja is a parent row over its two halves (TB-60; built 2026-11-13, not yet released).** With TB-37's two equal rows, ticking *Zavarovana območja* alone hid its natural monuments. The picker now shows *Zavarovana območja* with a three-state checkbox (all / none / "–" for some), and under it, indented, *Naravni spomeniki* (`ns`) and *Ostala zavarovana območja* (`zo`; `zosTitle(zo)`). Ticking the parent turns both on, or both off when both are on; each half still toggles alone.
+  - Picker only: drawing, identify and `map_layers.json` are as in TB-37, so no migration.
+  - `showObmocjaPicker`'s `onChanged` reports the whole active set, so a parent tap is one redraw and one `map_layers.json` write, not two racing writes.
+  - Tests: `test/obmocja_picker_test.dart` (7). Checked on the emulator 2026-11-13 (harness `misc/tb37-check/`): "–" with one half on, the parent turns both on and then off, each saved.
 
 - **Source** (public, `kZosOrigin` = `https://narcis.alittis.com` in every build, whatever `BELEZNICA_API` points at):
   - `GET /api/layers/zos-tiles` — PMTiles v3, MVT z5–15, ~32.5 MB, byte ranges, strong ETag (narcis-vibed NV-400). Six source layers `n2k zo epo nv nvj mvo` (`ZosKind` names; `ns` reads `zo`). Features carry `IME_OBM`, `KODA_OBM`, `TIP_ZOS`, `_cls` (the legend class) and class fields; feature id = `NARCIS_ZOS.ID`. Every feature is in every zoom.
