@@ -34,7 +34,8 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Scope:** the picker only. What the map draws, what a tap lists and `map_layers.json` stay as in TB-37
   (`zo`/`ns`), so there is no migration and no server change.
 - **Discussion:** layout described to Matjaž in the TB-37 reply (mail sent by Alexis 2026-11-13), asking whether it
-  matches what he meant or whether he wants every ZO class as a filter. Awaiting his answer.
+  matches what he meant or whether he wants every ZO class as a filter. **Matjaž agreed 2026-11-16** (reply mail):
+  the layout makes sense to him; no filter by every ZO class asked for. Resolved.
 - **Built (2026-11-13):** [`obmocja_picker.dart`](../lib/widgets/obmocja_picker.dart) draws
   the parent (`tristate`, "–" when one half is on; a tap on none or some turns both on, on all turns both off) and the
   two indented rows; [`obmocje_sheet.dart`](../lib/widgets/obmocje_sheet.dart) `zosTitle(zo)` is now *Ostala zavarovana
@@ -1478,7 +1479,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-37 · Natural-monument filter in the Območja layer picker
-`✨ Enhancement` · `P2` · `Done` (**v1.17.0+27 rolled out on the Play Closed testing track, confirmed by the owner 2026-11-13**) · Reporter: Matjaž · Updated: 2026-11-13
+`✨ Enhancement` · `P2` · `Done` (**v1.17.0+27 rolled out on the Play Closed testing track, confirmed by the owner 2026-11-13**) · Reporter: Matjaž · Updated: 2026-11-16
 - **Want:** *"dodan filter pri slojih za naravne spomenike"*. The web already has it: NV-84 gave the ZO
   layer a Vrsta filter that includes `naravni-spomenik`.
 - **Reading (confirm with Matjaž):** natural monuments are shown and hidden separately from the rest of
@@ -1528,7 +1529,9 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   **rolled out on the Play Closed testing track, confirmed by the owner 2026-11-13**.
 - **Reporter informed 2026-11-13** (mail to Matjaž, sent by Alexis): natural monuments are their own row in v1.17.0; the
   next version makes *Zavarovana območja* a parent row over them (TB-60). Asked whether that matches what he meant, or
-  whether he wants a filter by every ZO class like the web's (NV-84). Awaiting his answer.
+  whether he wants a filter by every ZO class like the web's (NV-84).
+- **Reporter confirmed 2026-11-16** (his reply mail): checked on his phone, the monuments row works; he agrees with
+  the TB-60 parent-row layout. No filter by every ZO class asked for, so the open reading above is settled.
 
 ### TB-38 · Forward a record to the head of supervision by e-mail (opt-in)
 `✨ Enhancement` · `P2` · `Blocked` · Reporter: Matjaž · Updated: 2026-10-12
