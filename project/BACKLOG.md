@@ -22,6 +22,31 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 
 ## Open
 
+### TB-61 · Android backup is left at its default, Play Console two-step is unconfirmed, and no code scan covers the app
+`🐞 Bug` · `P2` · `Triage` · Reporter: Claude (2026-11-16, security overview of the VPS and the ARSO apps for ARSO management, VPS repo session) · Updated: 2026-11-16
+- **Problem, three parts.**
+  1. **Android Auto Backup is on by default.** `android/app/src/main/AndroidManifest.xml` sets no `android:allowBackup`,
+     `fullBackupContent` or `dataExtractionRules` (checked 2026-11-16). By Android's documented default, an app's
+     private folders go into the user's Google backup, `getDir()` folders included. The records, walks and photos are
+     in `getApplicationDocumentsDirectory()` (`lib/data/local_store.dart:10`), the `app_flutter` folder. These hold
+     disturbance records with exact locations, photos and observer names (ARSO is the controller). Logout deletes them on
+     the phone (TB-45, TB-49), but a backup taken earlier stays in the person's Google account and can be restored onto
+     another phone. Device-to-device transfer on Android 12+ copies the same folders.
+  2. **Play Console two-step sign-in is unconfirmed.** DEPLOYMENT.md:116 calls it "strongly recommended", and nothing
+     records whether it is on. Whoever holds that account can publish an update to every warden's phone.
+  3. **No code security scan**, and the app is not in the monthly scan rotation. The rotation is
+     `~/.claude/scheduled-tasks/monthly-security-scan`, recorded in `claude general` CG-17. It lists narcis-vibed,
+     arso-obrazci, arso-inv, arso-hidrolog, narcis-MBP and two non-ARSO sites. Dependabot alerts are on (GitHub API 204,
+     2026-11-16), and the weekly digest covers every Alittis repo.
+- **Want:**
+  1. Set `android:allowBackup="false"` and `android:dataExtractionRules` excluding everything, in the next release.
+     Check it on the emulator: `adb shell bmgr backupnow si.terenska.beleznica` should report the app as not eligible.
+  2. The owner confirms two-step on the Play Console account and records it in DEPLOYMENT.
+  3. Add this repo to the monthly scan rotation.
+- **Not measured:** whether an existing tester's Google backup already holds records. `STATUS: UNKNOWN – REQUIRES
+  CONFIRMATION`.
+- **Discussion:** none yet.
+
 ### TB-60 · Zavarovana območja becomes a parent row over Naravni spomeniki and the rest (TB-37 follow-up)
 `✨ Enhancement` · `P2` · `Done` (**v1.18.0+28 rolled out on the Play Closed testing track, confirmed by the owner 2026-11-16**) · Reporter: owner (2026-11-13, on v1.17.0+27) · Updated: 2026-11-16
 - **Problem:** since TB-37 the picker lists *Zavarovana območja* and *Naravni spomeniki* as two equal rows. Ticking
