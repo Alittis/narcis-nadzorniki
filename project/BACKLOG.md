@@ -23,7 +23,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 ## Open
 
 ### TB-60 · Zavarovana območja becomes a parent row over Naravni spomeniki and the rest (TB-37 follow-up)
-`✨ Enhancement` · `P2` · `Doing` · Reporter: owner (2026-11-13, on v1.17.0+27) · Updated: 2026-11-13
+`✨ Enhancement` · `P2` · `Doing` (**built into v1.18.0+28 2026-11-16 — pending upload + rollout**) · Reporter: owner (2026-11-13, on v1.17.0+27) · Updated: 2026-11-16
 - **Problem:** since TB-37 the picker lists *Zavarovana območja* and *Naravni spomeniki* as two equal rows. Ticking
   *Zavarovana območja* alone draws ZO **without** its natural monuments, and a tap there lists none. That is
   misleading: natural monuments are protected areas, so someone ticking ZO expects them.
@@ -35,7 +35,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   (`zo`/`ns`), so there is no migration and no server change.
 - **Discussion:** layout described to Matjaž in the TB-37 reply (mail sent by Alexis 2026-11-13), asking whether it
   matches what he meant or whether he wants every ZO class as a filter. Awaiting his answer.
-- **Built (2026-11-13), pending the next release:** [`obmocja_picker.dart`](../lib/widgets/obmocja_picker.dart) draws
+- **Built (2026-11-13):** [`obmocja_picker.dart`](../lib/widgets/obmocja_picker.dart) draws
   the parent (`tristate`, "–" when one half is on; a tap on none or some turns both on, on all turns both off) and the
   two indented rows; [`obmocje_sheet.dart`](../lib/widgets/obmocje_sheet.dart) `zosTitle(zo)` is now *Ostala zavarovana
   območja*. `onChanged` reports the whole active set, so a parent tap is one redraw and one `map_layers.json` write
@@ -48,6 +48,8 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   zavarovana območja* shows "–" on the parent and saves `["n2k","zo"]`; the parent then saves `["n2k","zo","ns"]` and
   the monument dots appear, and a second tap saves `["n2k"]`. Screenshots in `misc/tb60-check/`. Not yet checked on
   the A56.
+- **Shipped:** **v1.18.0+28**, archived `~/Releases/terenska-beleznica-1.18.0+28.aab` (signed with the upload key) —
+  pending upload + rollout (owner). No Data safety change.
 
 ### TB-59 · The phone counts the sync and upload failures a signed-in person hits and reports them (narcis-racun RN-22 S3)
 `✨ Enhancement` · `P2` · `Done` (**v1.17.0+27 rolled out on the Play Closed testing track, confirmed by the owner 2026-11-13**) · Reporter: owner (narcis-racun RN-22, decided 2026-11-11) · Updated: 2026-11-13
