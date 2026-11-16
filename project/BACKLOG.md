@@ -23,7 +23,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 ## Open
 
 ### TB-60 · Zavarovana območja becomes a parent row over Naravni spomeniki and the rest (TB-37 follow-up)
-`✨ Enhancement` · `P2` · `Doing` (**built into v1.18.0+28 2026-11-16 — pending upload + rollout**) · Reporter: owner (2026-11-13, on v1.17.0+27) · Updated: 2026-11-16
+`✨ Enhancement` · `P2` · `Done` (**v1.18.0+28 rolled out on the Play Closed testing track, confirmed by the owner 2026-11-16**) · Reporter: owner (2026-11-13, on v1.17.0+27) · Updated: 2026-11-16
 - **Problem:** since TB-37 the picker lists *Zavarovana območja* and *Naravni spomeniki* as two equal rows. Ticking
   *Zavarovana območja* alone draws ZO **without** its natural monuments, and a tap there lists none. That is
   misleading: natural monuments are protected areas, so someone ticking ZO expects them.
@@ -47,10 +47,11 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   1 skipped.
 - **On the emulator (2026-11-13, `misc/tb37-check/` harness, live VPS tiles):** the eight rows fit; ticking *Ostala
   zavarovana območja* shows "–" on the parent and saves `["n2k","zo"]`; the parent then saves `["n2k","zo","ns"]` and
-  the monument dots appear, and a second tap saves `["n2k"]`. Screenshots in `misc/tb60-check/`. Not yet checked on
-  the A56.
-- **Shipped:** **v1.18.0+28**, archived `~/Releases/terenska-beleznica-1.18.0+28.aab` (signed with the upload key) —
-  pending upload + rollout (owner). No Data safety change.
+  the monument dots appear, and a second tap saves `["n2k"]`. Screenshots in `misc/tb60-check/`.
+- **On the A56 (2026-11-16, owner, Play build v1.18.0+28):** OK — *Ostala zavarovana območja* alone shows "–" on the
+  parent; the parent then ticks both rows and the natural monuments appear on the map.
+- **Shipped:** **v1.18.0+28**, archived `~/Releases/terenska-beleznica-1.18.0+28.aab` (signed with the upload key);
+  **rolled out on the Play Closed testing track, confirmed by the owner 2026-11-16**. No Data safety change.
 
 ### TB-59 · The phone counts the sync and upload failures a signed-in person hits and reports them (narcis-racun RN-22 S3)
 `✨ Enhancement` · `P2` · `Done` (**v1.17.0+27 rolled out on the Play Closed testing track, confirmed by the owner 2026-11-13**) · Reporter: owner (narcis-racun RN-22, decided 2026-11-11) · Updated: 2026-11-13
