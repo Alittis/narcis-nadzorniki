@@ -22,6 +22,20 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 
 ## Open
 
+### TB-62 · Gradle 8.14 cannot run on Java 25, so Android builds are pinned to Temurin 21
+`🔧 Chore` · `P3` · `Todo` · Reporter: Claude (2026-11-20, Android Studio update, claude general CG-28) · Updated: 2026-11-20
+- **Problem:** [`gradle-wrapper.properties`](../android/gradle/wrapper/gradle-wrapper.properties) pins Gradle 8.14
+  (AGP 8.11.1, Kotlin 2.2.20, target Java 17). Gradle 8.14 runs on Java 24 at most; Java 25 needs Gradle 9.1.0 or
+  later (Gradle's compatibility matrix). Android Studio bundles JBR 25 from 2026.1.3 on, and Flutter builds with
+  Studio's JBR unless `flutter config --jdk-dir` names another JDK. Since 2026-11-20 it names Temurin 21
+  (DEPLOYMENT §2), so the builds work, but on a JDK kept apart from Studio's.
+- **Want:** Gradle ≥ 9.1 with an AGP that supports it, so the build runs on Java 25 and the `jdk-dir` pin can go.
+  Do it with the next Flutter upgrade (3.41.4 today; flutter_appauth 13 needs 3.44, ARCHITECTURE § sign-in), whose
+  own minimum Gradle and AGP versions apply then. Prove it with a release AAB on the emulator and the A56 before the
+  next Play upload.
+- **Not urgent:** Temurin 21 is an LTS with updates until 2029-12-31 (endoflife.date, 2026-11-20).
+- **Discussion:** none yet.
+
 ### TB-61 · Android backup is left at its default, Play Console two-step is unconfirmed, and no code scan covers the app
 `🐞 Bug` · `P2` · `Triage` · Reporter: Claude (2026-11-16, security overview of the VPS and the ARSO apps for ARSO management, VPS repo session) · Updated: 2026-11-16
 - **Problem, three parts.**

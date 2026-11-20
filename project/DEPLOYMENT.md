@@ -15,6 +15,14 @@ flutter test                    # unit/widget tests
 flutter analyze                 # static analysis
 ```
 
+**Android builds run on Temurin 21** (Homebrew cask `temurin@21`, `/Library/Java/JavaVirtualMachines/temurin-21.jdk`),
+set machine-wide on 2026-11-20 with `flutter config --jdk-dir=<that JDK>/Contents/Home`. Without it Flutter takes
+Android Studio's bundled JBR, which is Java 25 from Studio 2026.1.3 on, and Gradle 8.14 runs on Java 24 at most: the
+build fails with a Java/Gradle incompatibility. Check with `flutter doctor -v` → `Java binary at: …temurin-21…`.
+Lifting the pin: TB-62. `flutter doctor`'s "Android license status unknown" since 2026-11-20 is harmless: SDK Command-line
+Tools 23.0 dropped `sdkmanager --licenses`, which Flutter 3.41.4 still calls; the licences are accepted
+(`~/Library/Android/sdk/licenses/`) and builds pass.
+
 **Against a scratch backend (TB-46).** The field-app API's base URL is a compile-time define, production by default. A
 debug build for the Android emulator, pointed at a narcis-vibed `next start` on this Mac (its runbook: narcis-vibed
 OPERATIONS §21.8):
