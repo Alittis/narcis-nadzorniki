@@ -1893,7 +1893,8 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   3. ~~**Owner decision once Play shows that build live:** raise narcis-vibed's `BELEZNICA_APP_MIN_BUILD` to its build
      number, or leave it off.~~ — **decided 2026-11-23 (owner): raised to 29.**
      - `BELEZNICA_APP_MIN_BUILD=29` appended to the box's `web/.env.local`; `narcis-vibed.service` restarted 12:28:15 UTC.
-       The file as it was: `~/env.local.pre-minbuild29` (0600). Rollback: delete the line, restart.
+       Rollback: delete the line, restart. The copy of the file taken before was deleted after the check, since the file
+       holds the app's secrets (narcis-vibed DEPLOYMENT §3.5b).
      - Checked through Caddy: `…/app/v1/walks` and `POST …/app/v1/prijava` answer 426 `update_required` (`minBuild`
        29) with no `X-App-Build` and with 28, and 401 with 29.
      - "Required" holds only for walks saved by the new build. The server accepts a walk without `transportModes`
