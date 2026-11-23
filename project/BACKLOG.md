@@ -22,6 +22,22 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 
 ## Open
 
+### TB-63 · The record form's dropdowns and the *Tipi motnje* tile header overflow at 320 dp with large text (widget-test font)
+`🐞 Bug` · `P3` · `Triage` · Reporter: Claude (2026-11-23, found by the TB-42 narrow-phone check) · Updated: 2026-11-23
+- **Problem:** at 320 dp with text scale 1.3, a probe over the whole `FormScreen` reports RenderFlex overflows in four
+  places. Measured on code without the TB-42 change and again with it; they are the same four:
+  - the *Ukrepanje* dropdown, +428 px;
+  - *Zakonska podlaga*, +135 px;
+  - *Status obravnave*, +219 px;
+  - the *Tipi motnje* tile header Row (`_typesTile`), +16 px.
+  The TB-42 change fixed the two overflows on its own path (`_Pill`, the `_section` title) and left these.
+- **Unknown:** the widget-test font draws every glyph a full em wide, far wider than Roboto. Whether any of the four
+  overflows on a real phone, at the font sizes wardens use, is `STATUS: UNKNOWN – REQUIRES CONFIRMATION`.
+- **Want:** check on the A56 with the system font size raised to the maximum. If they overflow there, let the
+  dropdowns' selected text ellipsize (`isExpanded: true`) and make the tile header's text `Flexible`. Then add a
+  narrow-phone test for the whole form, like the TB-42 ones in `test/vplivi_sredstva_test.dart`.
+- **Discussion:** none yet.
+
 ### TB-62 · Gradle 8.14 cannot run on Java 25, so Android builds are pinned to Temurin 21
 `🔧 Chore` · `P3` · `Todo` · Reporter: Claude (2026-11-20, Android Studio update, claude general CG-28) · Updated: 2026-11-20
 - **Problem:** [`gradle-wrapper.properties`](../android/gradle/wrapper/gradle-wrapper.properties) pins Gradle 8.14
@@ -1854,6 +1870,14 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   2. then the release carrying TB-42/43, with TB-61 in the same upload. On the A56 (owner, 2026-11-23): end a walk
      (nothing preselected, *Shrani* disabled until a tap), save a record with two impacts (the exclusive pair), then
      see both in the web's details.
+  3. **Owner decision once Play shows that build live:** raise narcis-vibed's `BELEZNICA_APP_MIN_BUILD` to its build
+     number, or leave it off.
+     - "Required" holds only for walks saved by the new build. The server accepts a walk without `transportModes`
+       (it has to, for older builds), so a phone still on 1.18.0+28 keeps saving walks that read *ni navedeno*.
+     - Raising the minimum shows older phones the blocking update screen (426); their unsent work stays queued on
+       the phone (ARCHITECTURE §9.0).
+     - narcis-vibed's rule is to raise it only after the build is live on Play (its DEPLOYMENT, the TB-46 minimum
+       build). Off today.
   A build released earlier would lose every walk's transport for good: the old server drops the key, and walks
   have no update call.
 - **Not proven: a real phone or the emulator.** Since TB-58 an emulator run needs a local Račun NarcIS
