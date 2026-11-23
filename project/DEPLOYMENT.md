@@ -69,6 +69,16 @@ These fingerprints are public (they're the public-key cert digest). Not the same
 **Hardware features (`<uses-feature>`) philosophy:**
 - The manifest also declares `android.hardware.camera`, `android.hardware.camera.autofocus`, `android.hardware.location`, and `android.hardware.location.gps` as `required="false"`. Without those explicit lines, Google Play implicitly infers them as **required=true** from the `CAMERA` and `ACCESS_FINE_LOCATION` permissions, and silently filters the listing off devices whose system feature manifest (`/system/etc/permissions/*.xml`) doesn't declare every sub-feature — even when the hardware is physically present. This bit a real opted-in internal tester on a Blackview Active 8 Pro (Play showed "Ta izdelek ni na voljo" / "This app is not available for your device" despite the device having both camera and GNSS). Marking the features optional widens device coverage; the app already degrades gracefully at runtime if a feature is genuinely absent. To diagnose future "tester can't install" reports, look up the device model in Play Console → Test and release → Reach and devices → Device catalog — the exclusion reason is shown in plain text.
 
+**Android backup is off (TB-61, from the release after v1.18.0+28):**
+- The manifest sets `android:allowBackup="false"` and `android:dataExtractionRules="@xml/data_extraction_rules"`. The rules file
+  (`android/app/src/main/res/xml/`) excludes every domain from both `<cloud-backup>` and `<device-transfer>`.
+- Both are needed. `allowBackup="false"` stops the Google cloud backup. On the emulator's android-37.0 image it did
+  **not** stop device-to-device transfer, and the docs say the same of some makers' phones. The rules alone kept that
+  transfer empty.
+- Proved 2026-11-23 on the emulator with the docs' `bmgr` test scripts (LocalTransport and D2dTransport). Before the
+  change, a probe file in `app_flutter` survived backup → uninstall → reinstall. After it, the probe was absent. A
+  backup made by the old build was not restored into the new one either. TB-61 has the full matrix.
+
 ### 3.2 Per-release build
 
 Bump `version: X.Y.Z+B` in `pubspec.yaml` (Play requires monotonic `versionCode` = `+B`) **and `kAppBuild` in
@@ -102,6 +112,12 @@ grep -rhoE 'android:version(Code|Name)="[^"]*"' build/app/intermediates/packaged
 ```
 Expected: `android:versionCode="<B>"` and `android:versionName="<X.Y.Z>"` matching `pubspec.yaml`. Note the path is `build/app/intermediates/…` (not `android/app/build/…`) because `android/build.gradle.kts` redirects the Gradle build directory to the repo root. If the build tree has been cleaned, `pubspec.yaml` is the only remaining source and Play's monotonic-`versionCode` rejection is the backstop.
 
+The same packaged manifest shows that backup stays off (TB-61). The binary manifest in the AAB holds the attribute names but not their values:
+```bash
+grep -rhoE 'android:(allowBackup|dataExtractionRules)="[^"]*"' build/app/intermediates/packaged_manifests/release/ | sort -u
+```
+Expected: `android:allowBackup="false"` and `android:dataExtractionRules="@xml/data_extraction_rules"`. Checked 2026-11-23 on a throwaway `flutter build appbundle --release` (lint passed; the AAB was deleted, not uploaded).
+
 Upload the AAB to **Google Play Console → Internal testing → Create new release**, attach the testers list, and roll out. Play App Signing re-signs with the app-signing key automatically.
 
 ### 3.3 Closed testing — store-listing copy, App Content, tester onboarding
@@ -121,7 +137,7 @@ flutter build appbundle --release
 |---|---|---|
 | Upload keystore (`.jks`) | `~/keystores/narcis_nadzorniki_upload.jks` | NEVER commit; back up offline |
 | `key.properties` | `android/key.properties` (gitignored, `0600`) | Plain-text passwords by Gradle's design |
-| Play Console account | `admin@alittis.com` (Alittis) | 2FA strongly recommended |
+| Play Console account | `admin@alittis.com` (Alittis) | 2FA on (owner confirmed 2026-11-23, TB-61) |
 | Play trader status (EEA/UK) | Play Console, account-wide | **Non-trader**, declared 2026-11-05 under Google's EEA/UK marketplace rules (in force 2027-03-01). Basis: the apps on this account are unpaid, have no price, ads or in-app purchases, and are not part of the owner's s.p.; "Alittis" is a personal nickname, not a trade name. EEA/UK listings show only email + country, plus a consumer-law notice. |
 
 ## 5. Deployment Risks

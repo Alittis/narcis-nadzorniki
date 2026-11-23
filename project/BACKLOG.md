@@ -37,7 +37,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Discussion:** none yet.
 
 ### TB-61 · Android backup is left at its default, Play Console two-step is unconfirmed, and no code scan covers the app
-`🐞 Bug` · `P2` · `Triage` · Reporter: Claude (2026-11-16, security overview of the VPS and the ARSO apps for ARSO management, VPS repo session) · Updated: 2026-11-16
+`🐞 Bug` · `P2` · `Doing` (all three parts done 2026-11-23; part 1 ships in the next release) · Reporter: Claude (2026-11-16, security overview of the VPS and the ARSO apps for ARSO management, VPS repo session) · Updated: 2026-11-23
 - **Problem, three parts.**
   1. **Android Auto Backup is on by default.** `android/app/src/main/AndroidManifest.xml` sets no `android:allowBackup`,
      `fullBackupContent` or `dataExtractionRules` (checked 2026-11-16). By Android's documented default, an app's
@@ -46,7 +46,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
      disturbance records with exact locations, photos and observer names (ARSO is the controller). Logout deletes them on
      the phone (TB-45, TB-49), but a backup taken earlier stays in the person's Google account and can be restored onto
      another phone. Device-to-device transfer on Android 12+ copies the same folders.
-  2. **Play Console two-step sign-in is unconfirmed.** DEPLOYMENT.md:116 calls it "strongly recommended", and nothing
+  2. **Play Console two-step sign-in is unconfirmed.** DEPLOYMENT §4 (the accounts table) calls it "strongly recommended", and nothing
      records whether it is on. Whoever holds that account can publish an update to every warden's phone.
   3. **No code security scan**, and the app is not in the monthly scan rotation. The rotation is
      `~/.claude/scheduled-tasks/monthly-security-scan`, recorded in `claude general` CG-17. It lists narcis-vibed,
@@ -58,7 +58,47 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   2. The owner confirms two-step on the Play Console account and records it in DEPLOYMENT.
   3. Add this repo to the monthly scan rotation.
 - **Not measured:** whether an existing tester's Google backup already holds records. `STATUS: UNKNOWN – REQUIRES
-  CONFIRMATION`.
+  CONFIRMATION`. The change stops new backups and does not remove earlier ones.
+- **Done 2026-11-23, part 1 (code, unreleased):**
+  - `AndroidManifest.xml` sets `android:allowBackup="false"` and `android:dataExtractionRules="@xml/data_extraction_rules"`.
+  - The new `android/app/src/main/res/xml/data_extraction_rules.xml` excludes all nine domains with `path="."` from both
+    `<cloud-backup>` and `<device-transfer>`. `fullBackupContent` is not set. minSdk is 30, so Android 11 is the only
+    version before 12 that the app runs on. Android's 12 behaviour-change page presents the D2D gap as new in 12, which
+    implies `allowBackup="false"` covered transfer on 11. Not tested on an Android 11 device.
+  - No plugin sets `allowBackup` in the merged manifest.
+- **Proof on the emulator (2026-11-23).**
+  - Setup: `Terenska_beleznica` AVD, android-37.0 Play image, debug build `si.terenska.beleznica.dev`. The test followed
+    developer.android.com's `test_cloud_backup.sh` / `test_d2d.sh`: install, launch, plant a probe file in `app_flutter`,
+    `bmgr backupnow`, uninstall, reinstall, look for the probe.
+  - Results:
+
+    | build | cloud (LocalTransport) | device-to-device (D2dTransport) |
+    |---|---|---|
+    | before (v1.18.0+28 source) | probe **and** `FlutterSecureKeyStorage.xml` backed up and restored | probe **and** `FlutterSecureKeyStorage.xml` backed up and restored |
+    | rules only, temporary (`allowBackup` unset) | `Transport rejected package because it wasn't able to process it at the time`, probe absent | `doesn't have any backup data`, probe absent |
+    | final (both) | `Backup is not allowed`, probe absent | `doesn't have any backup data`, probe absent |
+    | backup by *before*, reinstall *final* (the update case) | probe absent | probe absent |
+    | control in the same boot: backup by *before*, reinstall *before* | probe restored | probe restored |
+
+  - The final build's D2D row is why both settings are needed. With `allowBackup="false"` the app still went through
+    device-to-device transfer, and only the rules kept it empty.
+  - Two traps cost a run each, and `bmgr` reported them as results:
+    - A force-stopped app gives `Backup is not allowed` whatever its manifest says.
+    - The debug build's ~150 MB `flutter_assets` gives `Size quota exceeded`. The test deleted them before each backup.
+  - Release path: a throwaway `flutter build appbundle --release` passed lint, and its packaged manifest carries both
+    attributes. The AAB was deleted, since it carried the live 1.18.0+28 version. DEPLOYMENT §3.2 now runs that check
+    on every release.
+  - Not tested: a real phone, with Google's restore or a maker's own transfer tool.
+- **Done 2026-11-23, part 3:**
+  - The repo is #6 in the `monthly-security-scan` task's rotation: after narcis-MBP, ahead of the two non-ARSO sites.
+    Updated through the scheduled-tasks tool.
+  - narcis-vibed and arso-obrazci already have reports, so it comes up after arso-inv, arso-hidrolog and narcis-MBP:
+    March 2027 if no month is skipped.
+  - `claude general` CG-17, the rotation's only record (the task file is not versioned), has a matching paragraph
+    from the same day.
+- **Done 2026-11-23, part 2:** the owner confirmed two-step sign-in is on for the Play Console account
+  (`admin@alittis.com`), recorded in DEPLOYMENT §4.
+- **Left:** the next release carries part 1, after which this item is `Done`.
 - **Discussion:** none yet.
 
 ### TB-60 · Zavarovana območja becomes a parent row over Naravni spomeniki and the rest (TB-37 follow-up)
@@ -792,7 +832,18 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   signed with the upload key); rolled out on the Play Closed testing track 2026-06-24.
 
 ### TB-20 · Auth-token audit timestamps stored local, mislabeled UTC (TB-14 sibling)
-`🐞 Bug` (latent, audit-only) · `P3` · `Triage` (backend) · Reporter: Claude (found during TB-14, 2026-06-22) · Updated: 2026-06-22
+`🐞 Bug` (latent, audit-only) · `P3` · `Done` (closed without a change 2026-11-23: the table left the phone's path; the same pattern lives on in narcis-vibed, see **Closed**) · Reporter: Claude (found during TB-14, 2026-06-22) · Updated: 2026-11-23
+- **Closed (2026-11-23).**
+  - `TB_AUTH_TOKENS` and `pkg_tb_auth` stopped serving the phone at the TB-46 cutover (2026-10-15).
+  - The `app-auth` module answers 410 since TB-57 (2026-11-05), and narcis-vibed's D8 deletes the table and the package.
+  - Nothing in this repo is left to fix.
+- **Where the pattern went.** The phone's Bearer is now a vibed token (narcis-vibed `web/src/lib/beleznica/app.ts`,
+  checked by `verifyBearer`). It is stored in Oracle `VIBED_AUTH_TOKENS`:
+  - `ords/vibed_auth_schema.sql`: tz-naive `TIMESTAMP` columns, `DEFAULT SYSTIMESTAMP`.
+  - `ords/vibed_auth_pkg.sql`: the stamps and expiry comparisons seen (a grep, not a full read) use `SYSTIMESTAMP`.
+
+  That is the same local-digits shape as this item. Not checked: whether anything there sends those values out labelled
+  UTC. No NV item covered it on 2026-11-23, so it belongs in narcis-vibed's backlog.
 - **Problem:** `TB_AUTH_TOKENS.CREATED_AT`/`EXPIRES_AT`/`LAST_USED_AT`/`REVOKED_AT` are stamped from
   `SYSTIMESTAMP` into TZ-naive `TIMESTAMP` columns ([`auth_token_schema.sql:44`](../tools/ords/auth_token_schema.sql);
   [`disturbance_auth_pkg.sql:157`](../tools/ords/disturbance_auth_pkg.sql)`-158`, `:296-297`, `:315`) — local

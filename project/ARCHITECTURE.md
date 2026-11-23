@@ -452,6 +452,14 @@ STATUS: deployed to ARSO prod (`narcis.gov.si`, NARCIS schema) 2026-05-28 via AP
 
 **Session credentials.** The disturbance endpoints re-authenticate every call via `X-Narcis-Auth`. The preferred credential is the bearer token (§12bis): set on a successful online login, persisted in secure storage, restored on app start, and sent as `Bearer <token>`. `AppState._sessionToken` holds it. `_sessionPassword` is a fallback that holds the plaintext password **in memory only** for the session, used only when the backend didn't mint a token (older deploy). Both are cleared on logout and on a sync 401; the token is also wiped from disk then, never otherwise written. `AppState.canSync` is true iff `_currentUser != null && (_sessionToken != null || _sessionPassword != null)` — note this is now true immediately after a cold-start token restore, so queued records sync as soon as connectivity returns, without a manual re-login (previously, an offline login left `canSync` false until the next online login).
 
+**Nothing leaves the phone through Android backup (TB-61, from the release after v1.18.0+28).** The app's data
+directory is excluded from Google cloud backup and from device-to-device transfer. That covers the stores and photos
+in `app_flutter` and the `flutter_secure_storage` file `shared_prefs/FlutterSecureKeyStorage.xml` with the session
+token. Before this change, both kinds of backup carried them to a new phone (emulator, 2026-11-23). The manifest
+sets `allowBackup="false"` plus `dataExtractionRules`, with every domain excluded (DEPLOYMENT §3.1). On the emulator,
+a backup made by the v1.18.0+28 source was not restored into the new build either. Backups that earlier builds already
+placed in a Google account are not deleted by this change.
+
 **Logout guards unsent work (TB-45).** `AppState.logout()` wipes both local stores, the active walk and
 (TB-49) every photo file under `<docs>/disturbance_photos/` (`PhotoStorage.deleteAll`), so the next user
 of the device never sees the previous user's data. Unsent work goes with them. *Odjava*
