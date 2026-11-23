@@ -1751,7 +1751,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** **v1.11.0+21**, archived `~/Releases/terenska-beleznica-1.11.0+21.aab` (signed with the upload key); **rolled out on the Play Closed testing track 2026-10-12** and checked on the A56 by the owner. Web half: narcis-vibed **NV-419**, deployed 2026-10-12.
 
 ### TB-42 · New field *Vplivi in posledice* (impacts and consequences)
-`✨ Enhancement` · `P2` · `Doing` (built 2026-11-23 in both repos; waits on the narcis-vibed NV-615 deploy, then the next release) · Reporter: Matjaž · Updated: 2026-11-23
+`✨ Enhancement` · `P2` · `Doing` (built 2026-11-23; server half narcis-vibed NV-615 live 2026-11-23; the app ships in the next release) · Reporter: Matjaž · Updated: 2026-11-23
 - **Want:** a field directly under the šifrant in the form, with these options: (1) Splašene in
   vznemirjene živali · (2) Poškodovan habitat · (3) Poškodovana naravna vrednota · (4) Okrnjena krajina ·
   (5) Onesnaženje okolja · (6) Kršen varstveni režim · (7) Domnevna kršitev varstvenega režima ·
@@ -1814,7 +1814,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-43 · Means of transport for a patrol (*sredstvo obhoda*)
-`✨ Enhancement` · `P2` · `Doing` (built 2026-11-23 in both repos; waits on the narcis-vibed NV-615 deploy, then the next release) · Reporter: Matjaž · Updated: 2026-11-23
+`✨ Enhancement` · `P2` · `Doing` (built 2026-11-23; server half narcis-vibed NV-615 live 2026-11-23; the app ships in the next release) · Reporter: Matjaž · Updated: 2026-11-23
 - **Want:** when ending an obhod, choose how it was done (peš, avto, kolo, čoln, konj, dron), more
   than one allowed. Filter and export by it later.
 - **Shape:** a chip row in the existing end-walk sheet (`_EndWalkSheet`,
@@ -1849,8 +1849,11 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   - The walk store and the wire both ways.
   - The negative control (*Shrani* always enabled) goes red.
 - **Rollout order:**
-  1. narcis-vibed NV-615 live (schema v2 first, then the build);
-  2. then the release carrying TB-42/43, with TB-61 in the same upload.
+  1. ~~narcis-vibed NV-615 live (schema v2 first, then the build)~~ — **done 2026-11-23**: v2 at 09:10:21 UTC, the
+     restart at 09:12:57 UTC (narcis-vibed DEPLOYMENT, NV-615 record);
+  2. then the release carrying TB-42/43, with TB-61 in the same upload. On the A56 (owner, 2026-11-23): end a walk
+     (nothing preselected, *Shrani* disabled until a tap), save a record with two impacts (the exclusive pair), then
+     see both in the web's details.
   A build released earlier would lose every walk's transport for good: the old server drops the key, and walks
   have no update call.
 - **Not proven: a real phone or the emulator.** Since TB-58 an emulator run needs a local Račun NarcIS

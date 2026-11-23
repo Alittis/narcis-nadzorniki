@@ -93,7 +93,8 @@ skip-if-exists creates, 204 deletes, 404 = done), so the sync engine is unchange
   string arrays of the fixed lists `kDisturbanceImpacts` and `kWalkTransportModes`. Absent-on-null both ways: the app
   sends the key only when something is chosen, and reads an absent key as "not stated". **NV-615 must be live before a
   build that sends them ships:** an older server drops unknown keys and answers 201, and a walk has no update call.
-  STATUS (2026-11-23): built in narcis-vibed, not deployed.
+  STATUS: **NV-615 live on production since 2026-11-23** (schema v2 applied 09:10:21 UTC, the service restarted 09:12:57
+  UTC). The app build that sends the keys is not released yet.
 - **`POST tezave` (TB-59, narcis-racun RN-22 S3):** `{tezave: [{pot, koda, stevilo}]}`, 1–50 entries, `stevilo` 1–1000,
   `pot` `^/[A-Za-z0-9/_:.[\]-]{0,199}$`, `koda` `^[A-Za-z0-9_.:-]{1,60}$`; Bearer as every call; **204** when taken.
   narcis-vibed forwards each entry to prijava's problem sink (`/api/tezava`) under the account id. The phone's side is §13,
