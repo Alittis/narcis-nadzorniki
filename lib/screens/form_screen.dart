@@ -8,6 +8,7 @@ import 'package:narcis_nadzorniki/data/disturbance_group_colors.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
 import 'package:narcis_nadzorniki/models/disturbance_photo.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
+import 'package:narcis_nadzorniki/models/option_lists.dart';
 import 'package:narcis_nadzorniki/screens/detail_screen.dart';
 import 'package:narcis_nadzorniki/screens/location_picker_screen.dart';
 import 'package:narcis_nadzorniki/screens/type_selection_screen.dart';
@@ -56,6 +57,7 @@ class _FormScreenState extends State<FormScreen> {
   List<DisturbancePhoto> _photos = [];
   List<String> _observers = [];
   String _actionTaken = 'Brez ukrepa';
+  List<String> _impacts = const []; // TB-42
   String? _legalBasis;
   String _caseStatus = 'Odprto';
   bool _previewOpen = false;
@@ -383,6 +385,7 @@ class _FormScreenState extends State<FormScreen> {
       photos: _photos,
       observers: _observers,
       actionTaken: _actionTaken,
+      impacts: _impacts,
       legalBasis: _legalBasis,
       caseStatus: _caseStatus,
       pendingSync: true,
@@ -457,6 +460,33 @@ class _FormScreenState extends State<FormScreen> {
               ),
             ),
             const SizedBox(height: 16),
+            // TB-42: directly under the šifrant, several allowed, optional.
+            _section(
+              colors: colors,
+              icon: Icons.report_gmailerrorred_rounded,
+              title: 'Vplivi in posledice',
+              subtitle: 'Neobvezno – izberete lahko več.',
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  for (final v in kDisturbanceImpacts)
+                    FilterChip(
+                      label: Text(v),
+                      selected: _impacts.contains(v),
+                      onSelected: (_) => setState(() {
+                        _impacts = toggleInOrder(
+                          _impacts,
+                          v,
+                          kDisturbanceImpacts,
+                          exclusive: kExclusiveImpacts,
+                        );
+                      }),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
             _section(
               colors: colors,
               icon: Icons.notes_rounded,
@@ -791,13 +821,17 @@ class _FormScreenState extends State<FormScreen> {
               children: [
                 Icon(icon, size: 20, color: colors.primary),
                 const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: colors.primary,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.2,
-                      ),
+                // Wraps on a narrow phone with large text instead of
+                // overflowing (TB-42's longer title found it).
+                Flexible(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: colors.primary,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.2,
+                        ),
+                  ),
                 ),
               ],
             ),

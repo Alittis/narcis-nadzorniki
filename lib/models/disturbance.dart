@@ -1,5 +1,27 @@
 import 'package:narcis_nadzorniki/models/disturbance_photo.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
+import 'package:narcis_nadzorniki/models/option_lists.dart';
+
+/// TB-42 (Matjaž, 2026-10): *Vplivi in posledice*, several per record,
+/// optional. The web keeps the same list (narcis-vibed `MOTNJA_VPLIVI`,
+/// NV-615): widen both in the same task, in the same order.
+const List<String> kDisturbanceImpacts = [
+  'Splašene in vznemirjene živali',
+  'Poškodovan habitat',
+  'Poškodovana naravna vrednota',
+  'Okrnjena krajina',
+  'Onesnaženje okolja',
+  'Kršen varstveni režim',
+  'Domnevna kršitev varstvenega režima',
+  'Posledice motenj drugo',
+];
+
+/// TB-42: a breach is either established or suspected, never both. Ticking
+/// one drops the other ([toggleInOrder]).
+const List<String> kExclusiveImpacts = [
+  'Kršen varstveni režim',
+  'Domnevna kršitev varstvenega režima',
+];
 
 class Disturbance {
   Disturbance({
@@ -23,6 +45,7 @@ class Disturbance {
     this.obhodId,
     this.reviewedBy,
     this.reviewedAt,
+    this.impacts = const [],
   });
 
   final String id;
@@ -64,6 +87,9 @@ class Disturbance {
   // arrives as UTC, like every other instant here -- `.toLocal()` to display.
   final String? reviewedBy;
   final DateTime? reviewedAt;
+  // TB-42: values of [kDisturbanceImpacts], in that list's order. Empty = not
+  // stated: optional on the form, and absent on records from before TB-42.
+  final List<String> impacts;
 
   bool get hasPendingPhotoUploads => photos.any((p) => p.pendingUpload);
 
@@ -98,6 +124,7 @@ class Disturbance {
     bool clearObhodId = false,
     String? reviewedBy,
     DateTime? reviewedAt,
+    List<String>? impacts,
   }) {
     return Disturbance(
       id: id,
@@ -120,6 +147,7 @@ class Disturbance {
       obhodId: clearObhodId ? null : (obhodId ?? this.obhodId),
       reviewedBy: reviewedBy ?? this.reviewedBy,
       reviewedAt: reviewedAt ?? this.reviewedAt,
+      impacts: impacts ?? this.impacts,
     );
   }
 
@@ -144,6 +172,7 @@ class Disturbance {
         'obhodId': obhodId,
         'reviewedBy': reviewedBy,
         'reviewedAt': reviewedAt?.toIso8601String(),
+        'impacts': impacts,
       };
 
   factory Disturbance.fromJson(Map<String, dynamic> json) {
@@ -179,6 +208,8 @@ class Disturbance {
       reviewedAt: json['reviewedAt'] != null
           ? DateTime.parse(json['reviewedAt'] as String)
           : null,
+      // Absent on every record cached before TB-42: not stated.
+      impacts: readStringList(json['impacts']),
     );
   }
 

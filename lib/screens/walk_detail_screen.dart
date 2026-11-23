@@ -218,6 +218,14 @@ class _MetaSection extends StatelessWidget {
             '${walk.displayPointCount} točk',
             style: Theme.of(context).textTheme.bodySmall,
           ),
+          // TB-43: absent on walks from before it ("not stated").
+          if (walk.transportModes.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Sredstvo obhoda: ${walk.transportModes.join(', ')}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
           if (walk.pendingSync) ...[
             const SizedBox(height: 4),
             const Text(

@@ -1,5 +1,6 @@
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:narcis_nadzorniki/models/option_lists.dart';
 
 /// One GPS sample taken during a walk-around. `seq` is a 0-based monotonic
 /// integer assigned by the client; `(walkId, seq)` is the server-side PK.
@@ -54,6 +55,9 @@ class WalkPoint {
 ///   when the user opens the detail screen — the bulk of the wire payload
 ///   doesn't need to live in memory or in `walks_store.json` for every walk.
 /// - [pausedAt] is set while the in-progress walk is paused (TB-8).
+/// - [transportModes] is how the walk was done (TB-43), chosen in the
+///   *Končaj obhod* sheet. Empty = not stated: walks from before TB-43, and
+///   every walk pulled from a server older than narcis-vibed NV-615.
 class Walk {
   const Walk({
     required this.id,
@@ -67,6 +71,7 @@ class Walk {
     this.pointCount,
     this.disturbanceCount,
     this.pausedAt,
+    this.transportModes = const [],
   });
 
   final String id;
@@ -90,6 +95,10 @@ class Walk {
   /// sent — `RemoteApi._walkPayload` builds the wire body.
   final DateTime? pausedAt;
 
+  /// TB-43: values of [kWalkTransportModes], in that list's order. Sent once,
+  /// with the walk's POST: walks have no update call, so it cannot change later.
+  final List<String> transportModes;
+
   Duration get duration => endedAt.difference(startedAt);
 
   /// Best-effort point count for display, falling back to the embedded list
@@ -108,6 +117,7 @@ class Walk {
     int? disturbanceCount,
     DateTime? pausedAt,
     bool clearPausedAt = false,
+    List<String>? transportModes,
   }) {
     return Walk(
       id: id,
@@ -121,6 +131,7 @@ class Walk {
       pointCount: pointCount ?? this.pointCount,
       disturbanceCount: disturbanceCount ?? this.disturbanceCount,
       pausedAt: clearPausedAt ? null : (pausedAt ?? this.pausedAt),
+      transportModes: transportModes ?? this.transportModes,
     );
   }
 
@@ -136,6 +147,7 @@ class Walk {
         'pointCount': pointCount,
         'disturbanceCount': disturbanceCount,
         'pausedAt': pausedAt?.toIso8601String(),
+        'transportModes': transportModes,
       };
 
   factory Walk.fromJson(Map<String, dynamic> json) {
@@ -155,9 +167,24 @@ class Walk {
       pausedAt: json['pausedAt'] == null
           ? null
           : DateTime.parse(json['pausedAt'] as String),
+      // Absent on every walk stored before TB-43: not stated.
+      transportModes: readStringList(json['transportModes']),
     );
   }
 }
+
+/// TB-43 (Matjaž, 2026-10): how a walk was done, several allowed, required in
+/// the *Končaj obhod* sheet. The web keeps the same list (narcis-vibed
+/// `OBHOD_SREDSTVA`, NV-615): widen both in the same task, in the same order.
+/// *Dron*: the recorded track is the pilot's position, not the drone's.
+const List<String> kWalkTransportModes = [
+  'Peš',
+  'Avto',
+  'Kolo',
+  'Čoln',
+  'Konj',
+  'Dron',
+];
 
 /// Human label for a walk: its name, or its **local** start time when unnamed —
 /// which walks usually are. Shared by Seznam obhodov and the obhod link in

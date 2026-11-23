@@ -89,6 +89,11 @@ skip-if-exists creates, 204 deletes, 404 = done), so the sync engine is unchange
 - **`X-App-Build`** on every call (`kAppBuild`, `lib/app_version.dart`); below the server's minimum the answer is **426** and
   the app shows `UpdateRequiredScreen` (§13).
 - PUT is not served (405): neither `updateRecord` nor `updateWalk` has a caller in the app.
+- **Two list fields (TB-42, TB-43; narcis-vibed NV-615, schema v2):** a record's `impacts` and a walk's `transportModes`,
+  string arrays of the fixed lists `kDisturbanceImpacts` and `kWalkTransportModes`. Absent-on-null both ways: the app
+  sends the key only when something is chosen, and reads an absent key as "not stated". **NV-615 must be live before a
+  build that sends them ships:** an older server drops unknown keys and answers 201, and a walk has no update call.
+  STATUS (2026-11-23): built in narcis-vibed, not deployed.
 - **`POST tezave` (TB-59, narcis-racun RN-22 S3):** `{tezave: [{pot, koda, stevilo}]}`, 1–50 entries, `stevilo` 1–1000,
   `pot` `^/[A-Za-z0-9/_:.[\]-]{0,199}$`, `koda` `^[A-Za-z0-9_.:-]{1,60}$`; Bearer as every call; **204** when taken.
   narcis-vibed forwards each entry to prijava's problem sink (`/api/tezava`) under the account id. The phone's side is §13,
@@ -594,6 +599,13 @@ The red "+" FAB on `HomeScreen` (lib/screens/home_screen.dart) is a speed dial. 
   - **Save is guarded against double-taps.** `DetailScreen._handleSave` sets a `_saving` flag and disables the button for the whole await. `AppState.addRecord` awaits photo materialisation, the optimistic POST *and* the photo uploads — seconds on a weak link — and the old save button stayed live throughout, so a second tap minted a second UUID and filed a second record. That is the leading candidate for the duplicate field records reported in TB-2.
   - Tests: [test/preview_before_save_test.dart](../test/preview_before_save_test.dart) (preview mode, the double-tap, narrow-screen layout), [test/form_preview_flow_test.dart](../test/form_preview_flow_test.dart) (the round trip, and that *Uredi* returns to a filled form).
 
+- **Vplivi in posledice (TB-42).** A section directly under the šifrant row: eight `FilterChip`s (`kDisturbanceImpacts`,
+  `lib/models/disturbance.dart`), several allowed, optional. *Kršen* and *Domnevna kršitev varstvenega režima* exclude
+  each other (`kExclusiveImpacts`); `toggleInOrder` (`lib/models/option_lists.dart`) keeps the list's order whatever the
+  tapping order. Shown as one pill per impact in `DetailScreen`, the preview included. *Zakonska podlaga* and the
+  create-time *Status obravnave* stay in the form (owner, 2026-11-23). Tests:
+  [test/vplivi_sredstva_test.dart](../test/vplivi_sredstva_test.dart), the TB-42 cases in `form_preview_flow_test.dart`.
+
 Open optimizations (not in scope yet):
 - Quick-save bottom sheet for the trivial case (photo + 1 type + auto-location), skipping the full form.
 - Photo flow could chain into the type-picker before landing on the form, so the form lands prefilled in both paths.
@@ -650,7 +662,10 @@ Implemented across [lib/state/app_state.dart](../lib/state/app_state.dart), [lib
 **Mode pill.** The bottom-bar mode pill on `HomeScreen` carries an `Obhodi` mode (replaces the placeholder `Sprehod` mode that was disabled in earlier builds). Tapping the mode swaps the FAB:
 - **Motnje mode**: existing speed-dial (Foto + Šifrant). FAB icon `+`, rotates to ✕ when expanded.
 - **Obhodi mode + no active walk**: single-tap `directions_walk` FAB → `AppState.startWalk()`. Generates a UUID, stamps `pendingSync=true`, persists the active-walk file, subscribes to `LocationService.watchPosition()` (5 m distance filter, same as the live-dot stream), starts buffering `WalkPoint`s.
-- **Obhodi mode + active walk**: single-tap `stop` FAB → `_EndWalkSheet` bottom sheet (optional name + notes, "Shrani" or "Zavrzi" with confirm). On Shrani the walk moves into `_walks` queued for push; on Zavrzi it's wiped via `cancelWalk()` (no upload, no local row). The records captured during it are kept (TB-55, below).
+- **Obhodi mode + active walk**: single-tap `stop` FAB → `EndWalkSheet` bottom sheet: **Sredstvo obhoda** (TB-43: chips
+  of `kWalkTransportModes`, several allowed, **required**, nothing preselected — *Shrani* stays disabled until one is
+  chosen), then optional name + notes, "Shrani" or "Zavrzi" with confirm. The value rides on the walk's only POST
+  (`transportModes`); `endWalk` is the only path that saves a walk. On Shrani the walk moves into `_walks` queued for push; on Zavrzi it's wiped via `cancelWalk()` (no upload, no local row). The records captured during it are kept (TB-55, below).
 - **Pause / resume (TB-8)**: while a walk exists, a mini button above the `stop` FAB reads *Premor* (⏸) or *Nadaljuj* (▶).
   - `AppState.pauseWalk()` stops the FGS, so the GPS stream and the "Snemanje obhoda" notification stop too. It re-reads `active_walk.json` for points the port never delivered, and saves the walk there with `Walk.pausedAt` set. The walk stays open: records captured during the pause still link to it, and the live track draws grey.
   - `resumeWalk()` clears `pausedAt` in the file first, then restarts the FGS. The handler reloads the walk, points and all.

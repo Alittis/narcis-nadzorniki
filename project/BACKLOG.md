@@ -1751,7 +1751,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** **v1.11.0+21**, archived `~/Releases/terenska-beleznica-1.11.0+21.aab` (signed with the upload key); **rolled out on the Play Closed testing track 2026-10-12** and checked on the A56 by the owner. Web half: narcis-vibed **NV-419**, deployed 2026-10-12.
 
 ### TB-42 · New field *Vplivi in posledice* (impacts and consequences)
-`✨ Enhancement` · `P2` · `Blocked` (two small decisions) · Reporter: Matjaž · Updated: 2026-10-12
+`✨ Enhancement` · `P2` · `Doing` (built 2026-11-23 in both repos; waits on the narcis-vibed NV-615 deploy, then the next release) · Reporter: Matjaž · Updated: 2026-11-23
 - **Want:** a field directly under the šifrant in the form, with these options: (1) Splašene in
   vznemirjene živali · (2) Poškodovan habitat · (3) Poškodovana naravna vrednota · (4) Okrnjena krajina ·
   (5) Onesnaženje okolja · (6) Kršen varstveni režim · (7) Domnevna kršitev varstvenega režima ·
@@ -1773,10 +1773,48 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   - The create-time *Status obravnave* dropdown sets a value the back office now owns. That is the
     open question in TB-25/TB-32, and the cause of TB-2's "locks its own record" edge.
   - Proposal: remove both in the same release (needs the maintainer's yes).
+- **Decided (owner, 2026-11-23), unblocking it:**
+  - (a) several, as chips;
+  - (b) optional;
+  - (6)/(7) exclusive, enforced in the UI;
+  - **both dead controls stay** (*Zakonska podlaga* and the create-time *Status obravnave*), so the form grew by one
+    section.
+- **Built 2026-11-23 (app, uncommitted until the owner's OK):**
+  - The form: a *Vplivi in posledice* section of `FilterChip`s directly under the šifrant.
+  - `Disturbance.impacts` and `RemoteDisturbance.impacts`. `toLocal` carries it, and so does the pull, which
+    rebuilds every synced record from `toLocal`.
+  - The wire key is `impacts`, sent only when non-empty. `DetailScreen` shows one pill per impact, the preview
+    included.
+  - The list lives in `kDisturbanceImpacts`, the exclusive pair in `kExclusiveImpacts`, the helpers in
+    `lib/models/option_lists.dart`.
+- **Server half:** narcis-vibed **NV-615**.
+  - Schema v2 puts it in `motnja.vplivi text[]`; the old plan's ORDS change no longer applies, because the phone's
+    server has been narcis-vibed since TB-46.
+  - The web's detail, editor checkboxes, export column and summary tally, and a filter facet.
+- **Tests:**
+  - `test/vplivi_sredstva_test.dart`: order, the exclusive pair, the stores, the wire both ways.
+  - `form_preview_flow_test.dart`: the pair and the saved order; nothing chosen saves none.
+  - The negative control (`toLocal` without `impacts`) goes red.
+  - The taller form pushed the description field and the *Karta* button below the test viewport's fold. The
+    form-flow and location-picker harnesses now scroll each target fully into view before tapping (`_reveal`,
+    `ensureVisible`).
+  - **Narrow phone, large text** (320 dp, text scale 1.3) found two overflows on this change's path, both fixed:
+    - `_Pill` in `detail_screen.dart`: the long impact pills. Its text is now `Flexible`, so it wraps.
+    - The form's `_section` title Row: the new *Vplivi in posledice* title, and one existing title. The title is
+      now `Flexible`.
+  - Tests: the preview with the longest impacts, and `EndWalkSheet` with every mode ticked.
+  - Already there before this change (the same probe on unchanged code): the *Ukrepanje*, *Zakonska podlaga* and
+    *Status obravnave* dropdowns and the *Tipi motnje* tile header. They overflow at that size in the test font,
+    which draws every glyph a full em wide. Whether they overflow on a real phone: `STATUS: UNKNOWN – REQUIRES
+    CONFIRMATION`. Not changed here.
+  - Suite **308 passed**; analyze adds nothing.
+- **Not proven:** a real phone. The emulator run needs the local Račun NarcIS stack; see TB-43.
+- **Open with Matjaž:** option (8)'s label is stored as written, *Posledice motenj drugo*. Confirm the wording before
+  the first production record, since a later rename leaves the old string in stored data.
 - **Shipped:** —
 
 ### TB-43 · Means of transport for a patrol (*sredstvo obhoda*)
-`✨ Enhancement` · `P2` · `Todo` · Reporter: Matjaž · Updated: 2026-10-12
+`✨ Enhancement` · `P2` · `Doing` (built 2026-11-23 in both repos; waits on the narcis-vibed NV-615 deploy, then the next release) · Reporter: Matjaž · Updated: 2026-11-23
 - **Want:** when ending an obhod, choose how it was done (peš, avto, kolo, čoln, konj, dron), more
   than one allowed. Filter and export by it later.
 - **Shape:** a chip row in the existing end-walk sheet (`_EndWalkSheet`,
@@ -1791,6 +1829,33 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   nothing and the filter Matjaž wants will be incomplete. A remembered default saves the tap, but is
   silently wrong whenever it is stale.
 - *Dron:* the recorded track is the pilot's position, not the drone's. Say so in the reply.
+- **Decided (owner, 2026-11-23):** the recommendation above — required, no preselection, several allowed.
+- **Built 2026-11-23 (app, uncommitted until the owner's OK):**
+  - `EndWalkSheet` (made public, with `EndWalkResult`, for its test) leads with a *Sredstvo obhoda* chip row.
+    *Shrani* stays disabled until one is chosen, and the sheet scrolls when the keyboard is up.
+  - `endWalk(transportModes:)`, `Walk.transportModes` and `RemoteWalk.transportModes` (`toLocal` carries it).
+  - The wire key `transportModes` rides on the walk's only POST.
+  - The walk detail shows *Sredstvo obhoda: …*. Walks from before read as not stated.
+  - `endWalk` is the only path that saves a walk (checked: its only UI caller is the sheet), so "required" has no
+    side door.
+- **Server half:** narcis-vibed **NV-615**.
+  - Schema v2 puts it in `obhod.sredstva_obhoda text[]`.
+  - The walk detail on the web, an Obhodi export column, and a summary tally.
+  - **A walk filter in the web is not built**: walks have no facet surface there yet; filed as narcis-vibed
+    **NV-616**. The Excel column can be filtered meanwhile.
+- **Tests:** `test/vplivi_sredstva_test.dart`.
+  - The sheet: nothing preselected, *Shrani* disabled until a tap, disabled again after the last untick, and the
+    result in list order.
+  - The walk store and the wire both ways.
+  - The negative control (*Shrani* always enabled) goes red.
+- **Rollout order:**
+  1. narcis-vibed NV-615 live (schema v2 first, then the build);
+  2. then the release carrying TB-42/43, with TB-61 in the same upload.
+  A build released earlier would lose every walk's transport for good: the old server drops the key, and walks
+  have no update call.
+- **Not proven: a real phone or the emulator.** Since TB-58 an emulator run needs a local Račun NarcIS
+  (`RACUN_ISSUER`, DEPLOYMENT §2), narcis-vibed redeeming its codes, and the owner's yes to Chrome's first-run terms.
+  Both halves are pinned by contract tests instead: narcis-vibed p4 168/0, and this repo's wire tests.
 - **Shipped:** —
 
 ### TB-44 · Search the šifrant by its explanation (*pojasnilo*), not only by name

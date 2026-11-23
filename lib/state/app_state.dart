@@ -1180,9 +1180,12 @@ class AppState extends ChangeNotifier {
   /// If [discardIfEmpty] is true and no points were captured (the user
   /// tapped Start then Stop without moving), the walk is dropped instead
   /// of saved — saves us from a flood of empty walks on the server.
+  /// [transportModes] (TB-43) is required by the *Končaj obhod* sheet, the
+  /// only UI path here; the default empty list means "not stated".
   Future<Walk?> endWalk({
     String? name,
     String? notes,
+    List<String> transportModes = const [],
     bool discardIfEmpty = true,
   }) async {
     final active = _activeWalk;
@@ -1216,6 +1219,7 @@ class AppState extends ChangeNotifier {
       endedAt: active.pausedAt ?? DateTime.now(),
       name: name,
       notes: notes,
+      transportModes: transportModes,
       points: mergedPoints,
       pendingSync: true,
       clearPausedAt: true,

@@ -11,6 +11,8 @@ import 'package:narcis_nadzorniki/data/map_view_store.dart';
 import 'package:narcis_nadzorniki/data/obmocja_store.dart';
 import 'package:narcis_nadzorniki/data/zos_style_store.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
+import 'package:narcis_nadzorniki/models/option_lists.dart';
+import 'package:narcis_nadzorniki/models/walk.dart';
 import 'package:narcis_nadzorniki/screens/detail_screen.dart';
 import 'package:narcis_nadzorniki/screens/form_screen.dart';
 import 'package:narcis_nadzorniki/screens/place_search_screen.dart';
@@ -408,10 +410,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _openEndWalkSheet(AppState state) async {
-    final result = await showModalBottomSheet<_EndWalkResult>(
+    final result = await showModalBottomSheet<EndWalkResult>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _EndWalkSheet(pointCount: state.activePoints.length),
+      builder: (_) => EndWalkSheet(pointCount: state.activePoints.length),
     );
     if (result == null || !mounted) return;
     if (result.discard) {
@@ -423,6 +425,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final walk = await state.endWalk(
       name: result.name,
       notes: result.notes,
+      transportModes: result.transportModes,
     );
     if (!mounted) return;
     if (walk == null) {
@@ -1593,30 +1596,37 @@ class _MiniSpeedDialButton extends StatelessWidget {
   }
 }
 
-class _EndWalkResult {
-  const _EndWalkResult({
+/// What the *Končaj obhod* sheet hands back. Public, with [EndWalkSheet], only
+/// so a test can open the sheet on its own (TB-43); nothing else uses them.
+class EndWalkResult {
+  const EndWalkResult({
     required this.discard,
     this.name,
     this.notes,
+    this.transportModes = const [],
   });
 
   final bool discard;
   final String? name;
   final String? notes;
+  final List<String> transportModes;
 }
 
-class _EndWalkSheet extends StatefulWidget {
-  const _EndWalkSheet({required this.pointCount});
+class EndWalkSheet extends StatefulWidget {
+  const EndWalkSheet({super.key, required this.pointCount});
 
   final int pointCount;
 
   @override
-  State<_EndWalkSheet> createState() => _EndWalkSheetState();
+  State<EndWalkSheet> createState() => _EndWalkSheetState();
 }
 
-class _EndWalkSheetState extends State<_EndWalkSheet> {
+class _EndWalkSheetState extends State<EndWalkSheet> {
   final _nameController = TextEditingController();
   final _notesController = TextEditingController();
+  // TB-43: required, nothing preselected (owner, 2026-11-23). A remembered
+  // default would be silently wrong whenever the warden changed transport.
+  List<String> _modes = const [];
 
   @override
   void dispose() {
@@ -1629,11 +1639,14 @@ class _EndWalkSheetState extends State<_EndWalkSheet> {
   Widget build(BuildContext context) {
     final viewInsets = MediaQuery.viewInsetsOf(context).bottom;
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
+    final textTheme = Theme.of(context).textTheme;
     return Padding(
       padding: EdgeInsets.only(bottom: viewInsets),
       child: SafeArea(
         top: false,
-        child: Padding(
+        // Scrolls once the keyboard is up on a short phone: the chips made the
+        // sheet taller than name + notes alone.
+        child: SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottomInset),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1641,13 +1654,37 @@ class _EndWalkSheetState extends State<_EndWalkSheet> {
             children: [
               Text(
                 'Končaj obhod',
-                style: Theme.of(context).textTheme.titleLarge,
+                style: textTheme.titleLarge,
               ),
               const SizedBox(height: 4),
               Text(
                 '${widget.pointCount} zajetih točk.',
-                style: Theme.of(context).textTheme.bodySmall,
+                style: textTheme.bodySmall,
               ),
+              const SizedBox(height: 16),
+              Text('Sredstvo obhoda', style: textTheme.titleSmall),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  for (final m in kWalkTransportModes)
+                    FilterChip(
+                      label: Text(m),
+                      selected: _modes.contains(m),
+                      onSelected: (_) => setState(() {
+                        _modes = toggleInOrder(_modes, m, kWalkTransportModes);
+                      }),
+                    ),
+                ],
+              ),
+              if (_modes.isEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Izberite vsaj eno; več jih je lahko.',
+                  style: textTheme.bodySmall,
+                ),
+              ],
               const SizedBox(height: 16),
               TextField(
                 controller: _nameController,
@@ -1698,7 +1735,7 @@ class _EndWalkSheetState extends State<_EndWalkSheet> {
                         if (confirm != true) return;
                         if (!context.mounted) return;
                         Navigator.of(context).pop(
-                          const _EndWalkResult(discard: true),
+                          const EndWalkResult(discard: true),
                         );
                       },
                       child: const Text('Zavrzi'),
@@ -1707,17 +1744,21 @@ class _EndWalkSheetState extends State<_EndWalkSheet> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: FilledButton(
-                      onPressed: () {
-                        final name = _nameController.text.trim();
-                        final notes = _notesController.text.trim();
-                        Navigator.of(context).pop(
-                          _EndWalkResult(
-                            discard: false,
-                            name: name.isEmpty ? null : name,
-                            notes: notes.isEmpty ? null : notes,
-                          ),
-                        );
-                      },
+                      // TB-43: no save until the means of transport is chosen.
+                      onPressed: _modes.isEmpty
+                          ? null
+                          : () {
+                              final name = _nameController.text.trim();
+                              final notes = _notesController.text.trim();
+                              Navigator.of(context).pop(
+                                EndWalkResult(
+                                  discard: false,
+                                  name: name.isEmpty ? null : name,
+                                  notes: notes.isEmpty ? null : notes,
+                                  transportModes: _modes,
+                                ),
+                              );
+                            },
                       child: const Text('Shrani'),
                     ),
                   ),

@@ -82,6 +82,10 @@ Future<void> _openPicker(WidgetTester tester) async {
     300,
     scrollable: find.byType(Scrollable).first,
   );
+  // scrollUntilVisible can stop with the button at the viewport's edge, where
+  // the tap misses; TB-42's Vplivi section made the form taller and exposed it.
+  await tester.ensureVisible(find.text('Karta'));
+  await tester.pumpAndSettle();
   await tester.tap(find.text('Karta'));
   await tester.pumpAndSettle();
 }

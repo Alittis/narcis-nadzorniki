@@ -180,6 +180,7 @@ class _DetailScreenState extends State<DetailScreen> {
                       actionTaken: live.actionTaken,
                       legalBasis: live.legalBasis,
                       observers: live.observers,
+                      impacts: live.impacts,
                     ),
                     if (!widget.preview) ...[
                       const SizedBox(height: 14),
@@ -557,11 +558,13 @@ class _FooterRow extends StatelessWidget {
     required this.actionTaken,
     required this.legalBasis,
     required this.observers,
+    this.impacts = const [],
   });
 
   final String actionTaken;
   final String? legalBasis;
   final List<String> observers;
+  final List<String> impacts;
 
   @override
   Widget build(BuildContext context) {
@@ -570,6 +573,9 @@ class _FooterRow extends StatelessWidget {
       runSpacing: 6,
       children: [
         _Pill(icon: Icons.gavel_rounded, text: actionTaken),
+        // TB-42: one pill per impact, so a long pair still wraps readably.
+        for (final v in impacts)
+          _Pill(icon: Icons.report_gmailerrorred_rounded, text: v),
         if (legalBasis != null && legalBasis!.isNotEmpty)
           _Pill(icon: Icons.menu_book_outlined, text: legalBasis!),
         if (observers.isNotEmpty)
@@ -757,14 +763,19 @@ class _Pill extends StatelessWidget {
         children: [
           Icon(icon, size: 14, color: colors.onSurfaceVariant),
           const SizedBox(width: 6),
-          Text(
-            text,
-            style: TextStyle(
-              fontSize: 12,
-              color: colors.onSurface,
-              fontWeight: FontWeight.w500,
-              fontFeatures:
-                  tabular ? const [FontFeature.tabularFigures()] : null,
+          // A pill longer than the row wraps rather than overflowing: TB-42's
+          // impact labels are the longest pill texts, and a long observer list
+          // could do the same.
+          Flexible(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 12,
+                color: colors.onSurface,
+                fontWeight: FontWeight.w500,
+                fontFeatures:
+                    tabular ? const [FontFeature.tabularFigures()] : null,
+              ),
             ),
           ),
         ],

@@ -8,6 +8,7 @@ import 'package:narcis_nadzorniki/data/tezave_store.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
 import 'package:narcis_nadzorniki/models/disturbance_photo.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
+import 'package:narcis_nadzorniki/models/option_lists.dart';
 import 'package:narcis_nadzorniki/models/walk.dart';
 
 /// The field-app API on the narcis-vibed host (TB-46, narcis-vibed NV-259),
@@ -113,6 +114,7 @@ class RemoteDisturbance {
     required this.reviewedBy,
     required this.reviewedAt,
     required this.photos,
+    this.impacts = const [],
   });
 
   final String id;
@@ -134,6 +136,9 @@ class RemoteDisturbance {
   final String? reviewedBy;
   final DateTime? reviewedAt;
   final List<DisturbancePhoto> photos;
+  // TB-42 (narcis-vibed NV-615): absent when none is stated, and on a server
+  // that predates it.
+  final List<String> impacts;
 
   /// Convert into a local-store-shaped record. Photos are returned without a
   /// localPath - lazy fetch will populate it on first view.
@@ -158,6 +163,7 @@ class RemoteDisturbance {
       obhodId: obhodId,
       reviewedBy: reviewedBy,
       reviewedAt: reviewedAt,
+      impacts: impacts,
     );
   }
 
@@ -198,6 +204,7 @@ class RemoteDisturbance {
       photos: (json['photos'] as List<dynamic>? ?? const [])
           .map((e) => _readPhoto(e as Map<String, dynamic>))
           .toList(),
+      impacts: readStringList(json['impacts']),
     );
   }
 
@@ -241,6 +248,7 @@ class RemoteWalk {
     this.name,
     this.notes,
     this.createdBy,
+    this.transportModes = const [],
   });
 
   final String id;
@@ -252,6 +260,8 @@ class RemoteWalk {
   final String? name;
   final String? notes;
   final String? createdBy;
+  // TB-43 (narcis-vibed NV-615): absent on walks from before it.
+  final List<String> transportModes;
 
   Walk toLocal() {
     return Walk(
@@ -265,6 +275,7 @@ class RemoteWalk {
       points: const [],
       pointCount: pointCount,
       disturbanceCount: disturbanceCount,
+      transportModes: transportModes,
     );
   }
 
@@ -281,6 +292,7 @@ class RemoteWalk {
       name: json['name'] as String?,
       notes: json['notes'] as String?,
       createdBy: json['createdBy'] as String?,
+      transportModes: readStringList(json['transportModes']),
     );
   }
 }
@@ -546,6 +558,9 @@ class RemoteApi {
         'name': w.name,
         'notes': w.notes,
         'points': w.points.map((p) => p.toJson()).toList(),
+        // TB-43: the walk's only POST is its only chance (no update call). A
+        // server older than narcis-vibed NV-615 would drop it for good.
+        if (w.transportModes.isNotEmpty) 'transportModes': w.transportModes,
       };
 
   Uri _recordUri(String id) => _at(['disturbances', id]);
@@ -598,6 +613,10 @@ class RemoteApi {
         'caseStatus': d.caseStatus,
         'proposedType': d.proposedType,
         'obhodId': d.obhodId,
+        // TB-42: sent only once something is chosen. A server older than
+        // narcis-vibed NV-615 ignores the key, which is why that server half
+        // must be live before a build carrying this ships.
+        if (d.impacts.isNotEmpty) 'impacts': d.impacts,
       };
 
   /// TB-59 (narcis-racun RN-22 S3): reports the counted failures. Completes

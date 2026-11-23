@@ -86,10 +86,21 @@ Future<void> _scrollToDescription(WidgetTester tester) async {
 
 /// The description box is the form's only TextFormField (the observer input is
 /// a plain TextField and the "predlagaj nov tip" one is commented out), so no
-/// key is needed to reach it.
+/// key is needed to reach it. Since TB-42's Vplivi section sits above it, it
+/// starts below the test viewport's fold, and the form's ListView builds lazily.
 Future<void> _describe(WidgetTester tester, String text) async {
+  await _reveal(tester, find.byType(TextFormField));
   await tester.enterText(find.byType(TextFormField), text);
   await tester.pump();
+}
+
+/// Scrolls the form until [f] is built, then fully into view. scrollUntilVisible
+/// alone can stop with the widget at the viewport's edge, where a tap misses
+/// (TB-42 made the form taller and exposed it).
+Future<void> _reveal(WidgetTester tester, Finder f) async {
+  await tester.scrollUntilVisible(f, 200, scrollable: find.byType(Scrollable).first);
+  await tester.ensureVisible(f);
+  await tester.pumpAndSettle();
 }
 
 /// The action sits at the bottom of a long form. Scroll the form's own ListView
@@ -147,11 +158,7 @@ void main() {
     final store = _FakeStore();
     final state = await _openForm(tester, store);
 
-    await tester.scrollUntilVisible(
-      find.text('Brez ukrepa'),
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
+    await _reveal(tester, find.text('Brez ukrepa'));
     await tester.tap(find.text('Brez ukrepa'));
     await tester.pumpAndSettle();
     // Sixteen entries: Sanirano sits below the open menu's fold, and the
@@ -170,6 +177,44 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(state.records.single.actionTaken, 'Sanirano');
+  });
+
+  testWidgets('Vplivi in posledice: the exclusive pair, and what gets saved (TB-42)',
+      (tester) async {
+    final store = _FakeStore();
+    final state = await _openForm(tester, store);
+
+    Future<void> chip(String label) async {
+      final f = find.widgetWithText(FilterChip, label);
+      await _reveal(tester, f);
+      await tester.tap(f);
+      await tester.pumpAndSettle();
+    }
+
+    await chip('Kršen varstveni režim');
+    await chip('Domnevna kršitev varstvenega režima'); // drops the established breach
+    await chip('Poškodovan habitat');
+    expect(tester.widget<FilterChip>(find.widgetWithText(FilterChip, 'Kršen varstveni režim')).selected,
+        isFalse);
+
+    await _tapPreview(tester);
+    expect(find.text('Poškodovan habitat'), findsOneWidget, reason: 'a pill in the preview');
+    await tester.tap(find.text('Shrani zapis'));
+    await tester.pumpAndSettle();
+
+    expect(state.records.single.impacts,
+        ['Poškodovan habitat', 'Domnevna kršitev varstvenega režima'],
+        reason: 'the list order, not the tapping order');
+  });
+
+  testWidgets('a record saved without touching Vplivi states none (TB-42 is optional)',
+      (tester) async {
+    final store = _FakeStore();
+    final state = await _openForm(tester, store);
+    await _tapPreview(tester);
+    await tester.tap(find.text('Shrani zapis'));
+    await tester.pumpAndSettle();
+    expect(state.records.single.impacts, isEmpty);
   });
 
   testWidgets('saving commits once and closes the form', (tester) async {
