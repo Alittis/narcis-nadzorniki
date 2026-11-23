@@ -69,7 +69,7 @@ These fingerprints are public (they're the public-key cert digest). Not the same
 **Hardware features (`<uses-feature>`) philosophy:**
 - The manifest also declares `android.hardware.camera`, `android.hardware.camera.autofocus`, `android.hardware.location`, and `android.hardware.location.gps` as `required="false"`. Without those explicit lines, Google Play implicitly infers them as **required=true** from the `CAMERA` and `ACCESS_FINE_LOCATION` permissions, and silently filters the listing off devices whose system feature manifest (`/system/etc/permissions/*.xml`) doesn't declare every sub-feature — even when the hardware is physically present. This bit a real opted-in internal tester on a Blackview Active 8 Pro (Play showed "Ta izdelek ni na voljo" / "This app is not available for your device" despite the device having both camera and GNSS). Marking the features optional widens device coverage; the app already degrades gracefully at runtime if a feature is genuinely absent. To diagnose future "tester can't install" reports, look up the device model in Play Console → Test and release → Reach and devices → Device catalog — the exclusion reason is shown in plain text.
 
-**Android backup is off (TB-61, from the release after v1.18.0+28):**
+**Android backup is off (TB-61, since v1.19.0+29, rolled out 2026-11-23):**
 - The manifest sets `android:allowBackup="false"` and `android:dataExtractionRules="@xml/data_extraction_rules"`. The rules file
   (`android/app/src/main/res/xml/`) excludes every domain from both `<cloud-backup>` and `<device-transfer>`.
 - Both are needed. `allowBackup="false"` stops the Google cloud backup. On the emulator's android-37.0 image it did
@@ -147,6 +147,7 @@ flutter build appbundle --release
 - **Raising the server's minimum build too early (TB-46)** → narcis-vibed's `BELEZNICA_APP_MIN_BUILD` answers older builds 426
   and a blocking update screen. Raised before the new build is downloadable in Play (review ~1–20 h), it locks testers out
   with nothing to update to. **Raise it only after Play Console shows the build live;** their queue survives either way.
+  **Live value: 29**, since 2026-11-23 12:28:15 UTC (TB-43), set the day v1.19.0+29 went live.
 - **Privacy policy URL drift** → if the policy URL ever 404s, Play can suspend the listing. Edits to the policy must keep the URL stable.
 - **Trader status drift** → the non-trader declaration (§4) covers every app on the account. Publishing a paid, ad-supported or
   in-app-purchase app, or paid client work, under it without switching to trader can get apps removed worldwide (EU UCPD /

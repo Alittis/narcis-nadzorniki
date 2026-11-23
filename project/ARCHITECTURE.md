@@ -94,7 +94,7 @@ skip-if-exists creates, 204 deletes, 404 = done), so the sync engine is unchange
   sends the key only when something is chosen, and reads an absent key as "not stated". **NV-615 must be live before a
   build that sends them ships:** an older server drops unknown keys and answers 201, and a walk has no update call.
   STATUS: **NV-615 live on production since 2026-11-23** (schema v2 applied 09:10:21 UTC, the service restarted 09:12:57
-  UTC). The app build that sends the keys is not released yet.
+  UTC). The app build that sends the keys, v1.19.0+29, rolled out on the Closed testing track 2026-11-23.
 - **`POST tezave` (TB-59, narcis-racun RN-22 S3):** `{tezave: [{pot, koda, stevilo}]}`, 1–50 entries, `stevilo` 1–1000,
   `pot` `^/[A-Za-z0-9/_:.[\]-]{0,199}$`, `koda` `^[A-Za-z0-9_.:-]{1,60}$`; Bearer as every call; **204** when taken.
   narcis-vibed forwards each entry to prijava's problem sink (`/api/tezava`) under the account id. The phone's side is §13,
@@ -458,7 +458,7 @@ STATUS: deployed to ARSO prod (`narcis.gov.si`, NARCIS schema) 2026-05-28 via AP
 
 **Session credentials.** The disturbance endpoints re-authenticate every call via `X-Narcis-Auth`. The preferred credential is the bearer token (§12bis): set on a successful online login, persisted in secure storage, restored on app start, and sent as `Bearer <token>`. `AppState._sessionToken` holds it. `_sessionPassword` is a fallback that holds the plaintext password **in memory only** for the session, used only when the backend didn't mint a token (older deploy). Both are cleared on logout and on a sync 401; the token is also wiped from disk then, never otherwise written. `AppState.canSync` is true iff `_currentUser != null && (_sessionToken != null || _sessionPassword != null)` — note this is now true immediately after a cold-start token restore, so queued records sync as soon as connectivity returns, without a manual re-login (previously, an offline login left `canSync` false until the next online login).
 
-**Nothing leaves the phone through Android backup (TB-61, from the release after v1.18.0+28).** The app's data
+**Nothing leaves the phone through Android backup (TB-61, since v1.19.0+29, rolled out 2026-11-23).** The app's data
 directory is excluded from Google cloud backup and from device-to-device transfer. That covers the stores and photos
 in `app_flutter` and the `flutter_secure_storage` file `shared_prefs/FlutterSecureKeyStorage.xml` with the session
 token. Before this change, both kinds of backup carried them to a new phone (emulator, 2026-11-23). The manifest
@@ -515,6 +515,7 @@ sends it as `X-Beleznica-Generation` on both list GETs; `DatasetGenerationStore`
 (`canSync` false) without touching the session or the queue, and `main.dart` shows `UpdateRequiredScreen` at the root only
 — a form open above it can still be saved, and the record is queued for the updated build. Not persisted: the server says it
 again. `kAppBuild` must equal pubspec's `+N` ([test/app_version_test.dart](../test/app_version_test.dart) fails otherwise).
+The server's minimum is **29** since 2026-11-23 12:28:15 UTC (TB-43): every build before 1.19.0+29 gets the update screen.
 
 **Failure counts for user support (TB-59, narcis-racun RN-22 S3; owner decision 2026-11-11).** The phone counts the
 failures a signed-in person hits and reports the counts, so user support sees them in the person's record (superadmins
