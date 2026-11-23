@@ -116,7 +116,7 @@ The same packaged manifest shows that backup stays off (TB-61). The binary manif
 ```bash
 grep -rhoE 'android:(allowBackup|dataExtractionRules)="[^"]*"' build/app/intermediates/packaged_manifests/release/ | sort -u
 ```
-Expected: `android:allowBackup="false"` and `android:dataExtractionRules="@xml/data_extraction_rules"`. Checked 2026-11-23 on a throwaway `flutter build appbundle --release` (lint passed; the AAB was deleted, not uploaded).
+Expected: `android:allowBackup="false"` and `android:dataExtractionRules="@xml/data_extraction_rules"`. Checked 2026-11-23 on a throwaway `flutter build appbundle --release` (lint passed; the AAB was deleted, not uploaded), then on the v1.19.0+29 release build, the first one to ship it.
 
 Upload the AAB to **Google Play Console → Internal testing → Create new release**, attach the testers list, and roll out. Play App Signing re-signs with the app-signing key automatically.
 

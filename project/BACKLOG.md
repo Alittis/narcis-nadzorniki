@@ -53,7 +53,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Discussion:** none yet.
 
 ### TB-61 · Android backup is left at its default, Play Console two-step is unconfirmed, and no code scan covers the app
-`🐞 Bug` · `P2` · `Doing` (all three parts done 2026-11-23; part 1 ships in the next release) · Reporter: Claude (2026-11-16, security overview of the VPS and the ARSO apps for ARSO management, VPS repo session) · Updated: 2026-11-23
+`🐞 Bug` · `P2` · `Doing` (all three parts done 2026-11-23; part 1 built into v1.19.0+29 2026-11-23, pending upload + rollout) · Reporter: Claude (2026-11-16, security overview of the VPS and the ARSO apps for ARSO management, VPS repo session) · Updated: 2026-11-23
 - **Problem, three parts.**
   1. **Android Auto Backup is on by default.** `android/app/src/main/AndroidManifest.xml` sets no `android:allowBackup`,
      `fullBackupContent` or `dataExtractionRules` (checked 2026-11-16). By Android's documented default, an app's
@@ -114,7 +114,8 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
     from the same day.
 - **Done 2026-11-23, part 2:** the owner confirmed two-step sign-in is on for the Play Console account
   (`admin@alittis.com`), recorded in DEPLOYMENT §4.
-- **Left:** the next release carries part 1, after which this item is `Done`.
+- **Left:** part 1 is built into **v1.19.0+29** (2026-11-23; the release's packaged manifest carries
+  `allowBackup="false"` and the extraction rules), pending upload + rollout; then this item is `Done`.
 - **Discussion:** none yet.
 
 ### TB-60 · Zavarovana območja becomes a parent row over Naravni spomeniki and the rest (TB-37 follow-up)
@@ -1767,7 +1768,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** **v1.11.0+21**, archived `~/Releases/terenska-beleznica-1.11.0+21.aab` (signed with the upload key); **rolled out on the Play Closed testing track 2026-10-12** and checked on the A56 by the owner. Web half: narcis-vibed **NV-419**, deployed 2026-10-12.
 
 ### TB-42 · New field *Vplivi in posledice* (impacts and consequences)
-`✨ Enhancement` · `P2` · `Doing` (built 2026-11-23; server half narcis-vibed NV-615 live 2026-11-23; the app ships in the next release) · Reporter: Matjaž · Updated: 2026-11-23
+`✨ Enhancement` · `P2` · `Doing` (server half narcis-vibed NV-615 live 2026-11-23; built into v1.19.0+29 2026-11-23, pending upload + rollout) · Reporter: Matjaž · Updated: 2026-11-23
 - **Want:** a field directly under the šifrant in the form, with these options: (1) Splašene in
   vznemirjene živali · (2) Poškodovan habitat · (3) Poškodovana naravna vrednota · (4) Okrnjena krajina ·
   (5) Onesnaženje okolja · (6) Kršen varstveni režim · (7) Domnevna kršitev varstvenega režima ·
@@ -1826,11 +1827,14 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   - Suite **308 passed**; analyze adds nothing.
 - **Not proven:** a real phone. The emulator run needs the local Račun NarcIS stack; see TB-43.
 - **Open with Matjaž:** option (8)'s label is stored as written, *Posledice motenj drugo*. Confirm the wording before
-  the first production record, since a later rename leaves the old string in stored data.
-- **Shipped:** —
+  the first production record, since a later rename leaves the old string in stored data. **Asked by mail
+  2026-11-23** (sent by the owner; it also covers the decisions and the drone note): **awaiting Matjaž's answer.** A
+  rename changes `kDisturbanceImpacts` and narcis-vibed `MOTNJA_VPLIVI` together.
+- **Shipped:** built into **v1.19.0+29** 2026-11-23 (archived `~/Releases/terenska-beleznica-1.19.0+29.aab`, signed
+  with the upload key); pending upload + rollout on the Play Closed testing track.
 
 ### TB-43 · Means of transport for a patrol (*sredstvo obhoda*)
-`✨ Enhancement` · `P2` · `Doing` (built 2026-11-23; server half narcis-vibed NV-615 live 2026-11-23; the app ships in the next release) · Reporter: Matjaž · Updated: 2026-11-23
+`✨ Enhancement` · `P2` · `Doing` (server half narcis-vibed NV-615 live 2026-11-23; built into v1.19.0+29 2026-11-23, pending upload + rollout) · Reporter: Matjaž · Updated: 2026-11-23
 - **Want:** when ending an obhod, choose how it was done (peš, avto, kolo, čoln, konj, dron), more
   than one allowed. Filter and export by it later.
 - **Shape:** a chip row in the existing end-walk sheet (`_EndWalkSheet`,
@@ -1883,7 +1887,8 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Not proven: a real phone or the emulator.** Since TB-58 an emulator run needs a local Račun NarcIS
   (`RACUN_ISSUER`, DEPLOYMENT §2), narcis-vibed redeeming its codes, and the owner's yes to Chrome's first-run terms.
   Both halves are pinned by contract tests instead: narcis-vibed p4 168/0, and this repo's wire tests.
-- **Shipped:** —
+- **Shipped:** built into **v1.19.0+29** 2026-11-23 (archived `~/Releases/terenska-beleznica-1.19.0+29.aab`, signed
+  with the upload key); pending upload + rollout on the Play Closed testing track.
 
 ### TB-44 · Search the šifrant by its explanation (*pojasnilo*), not only by name
 `✨ Enhancement` · `P3` · `Done` (shipped v1.11.0+21 + narcis-vibed NV-419; rolled out on the Play Closed testing track 2026-10-12, confirmed on device) · Reporter: Matjaž · Updated: 2026-10-12
