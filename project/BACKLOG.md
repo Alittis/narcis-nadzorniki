@@ -849,18 +849,21 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   signed with the upload key); rolled out on the Play Closed testing track 2026-06-24.
 
 ### TB-20 · Auth-token audit timestamps stored local, mislabeled UTC (TB-14 sibling)
-`🐞 Bug` (latent, audit-only) · `P3` · `Done` (closed without a change 2026-11-23: the table left the phone's path; the same pattern lives on in narcis-vibed, see **Closed**) · Reporter: Claude (found during TB-14, 2026-06-22) · Updated: 2026-11-23
+`🐞 Bug` (latent, audit-only) · `P3` · `Done` (closed without a change 2026-11-23: the table left the phone's path; the same pattern lives on in narcis-vibed as NV-614, and the "same-basis" premise below is corrected) · Reporter: Claude (found during TB-14, 2026-06-22) · Updated: 2026-11-23
 - **Closed (2026-11-23).**
   - `TB_AUTH_TOKENS` and `pkg_tb_auth` stopped serving the phone at the TB-46 cutover (2026-10-15).
   - The `app-auth` module answers 410 since TB-57 (2026-11-05), and narcis-vibed's D8 deletes the table and the package.
   - Nothing in this repo is left to fix.
-- **Where the pattern went.** The phone's Bearer is now a vibed token (narcis-vibed `web/src/lib/beleznica/app.ts`,
-  checked by `verifyBearer`). It is stored in Oracle `VIBED_AUTH_TOKENS`:
-  - `ords/vibed_auth_schema.sql`: tz-naive `TIMESTAMP` columns, `DEFAULT SYSTIMESTAMP`.
-  - `ords/vibed_auth_pkg.sql`: the stamps and expiry comparisons seen (a grep, not a full read) use `SYSTIMESTAMP`.
-
-  That is the same local-digits shape as this item. Not checked: whether anything there sends those values out labelled
-  UTC. No NV item covered it on 2026-11-23, so it belongs in narcis-vibed's backlog.
+- **Where the pattern went** (corrected 2026-11-23, after checking narcis-vibed; see its NV-614).
+  - **2026-10-15 to 2026-11-07:** from the TB-46 cutover, the phone's Bearer was a vibed token in Oracle
+    `VIBED_AUTH_TOKENS`, checked by narcis-vibed's `verifyBearer`.
+  - **Since 2026-11-07 16:48 UTC:** narcis-vibed signs in through Račun NarcIS (`NARCIS_PRIJAVA=racun`, NV-554 P2).
+    The phone's Bearer is now a Postgres `prijava.seja` row (narcis-vibed `web/src/lib/beleznica/app.ts:128`,
+    `web/src/app/api/beleznica/app/v1/prijava/route.ts:128-130`), and the phone no longer touches `VIBED_AUTH_TOKENS`.
+  - **`VIBED_AUTH_TOKENS` today** has this item's shape: tz-naive `TIMESTAMP` columns stamped from `SYSTIMESTAMP`. It now
+    holds mainly the VPS's job tokens. NV-614 checked it:
+    - nothing leaves labelled UTC, since login's `expiresAt` uses `SYS_EXTRACT_UTC`;
+    - four checks compare the local columns with bare `SYSTIMESTAMP`, the same mistake as below.
 - **Problem:** `TB_AUTH_TOKENS.CREATED_AT`/`EXPIRES_AT`/`LAST_USED_AT`/`REVOKED_AT` are stamped from
   `SYSTIMESTAMP` into TZ-naive `TIMESTAMP` columns ([`auth_token_schema.sql:44`](../tools/ords/auth_token_schema.sql);
   [`disturbance_auth_pkg.sql:157`](../tools/ords/disturbance_auth_pkg.sql)`-158`, `:296-297`, `:315`) — local
@@ -872,6 +875,17 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   compares two consistently-local values, so the 30-day sliding lifetime is correct; the server 401 is
   authoritative regardless. Net: an internal audit-readability wart (an operator querying `tb_auth_tokens` sees
   local times that look UTC), not a functional defect.
+- **Correction (2026-11-23): the expiry comparison was not same-basis.** When Oracle compares a zone-less `TIMESTAMP`
+  with `SYSTIMESTAMP` (a `TIMESTAMP WITH TIME ZONE`), it reads the zone-less side in the *session* time zone, not the
+  host's (Oracle NLS guide §4.3.2). The production ORDS session is `+00:00` (narcis-vibed ARCHITECTURE, NV-259 P2), so
+  the stored local digits were read as UTC.
+  - The purge (`disturbance_auth_pkg.sql:289`, SQL) dropped dead rows 1 h (winter) or 2 h (summer) late.
+  - The gate (`:247`) is a PL/SQL `IF`, which the docs do not cover. It is predicted to run 1–2 h late too
+    (**STATUS: UNKNOWN – REQUIRES CONFIRMATION**; NV-614 has a one-block probe).
+
+  So a token lived 30 days plus up to 2 h, never less. That is still latent and audit-only (nothing was exposed and
+  nothing expired early), and moot here now that the table has left the phone's path. The "offset-agnostic" comment
+  that **Discussion** proposes would be wrong.
 - **Caveat for the fix:** NOT a one-liner like TB-14. The stored values **and every comparison site**
   (`< SYSTIMESTAMP`) must move to UTC *together* — fixing only the stored side would shift expiry by the host
   offset and could expire tokens early/late. Coordinated change across the security-critical `pkg_tb_auth`
