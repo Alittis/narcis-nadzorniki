@@ -7,13 +7,19 @@
 - Frontend
   - Flutter UI in `lib/`.
 - Backend
-  - Oracle APEX / ORDS declarative RESTful Services hosted at `https://storitve.igea.si/narcis/ords/narcis/`.
-  - Module `narcis` (base path `narcis/`).
+  - narcis-vibed's field-app API at `https://narcis.alittis.com/api/beleznica/app/v1/` (Next.js on the
+    narcis-vibed VPS; §9.0), since the NV-259 cutover on 2026-10-15.
+  - Until then: Oracle APEX / ORDS declarative RESTful Services, module `narcis` (§9.1–§9.4, kept as the
+    record; the modules are deleted under narcis-vibed NV-259 A4/P6).
 - Database
-  - Oracle database behind APEX/ORDS (managed externally).
+  - narcis-vibed's Postgres on the VPS, schema `beleznica` (§7). The Oracle `TB_*` tables behind ORDS are
+    frozen read-only since the cutover.
 - External Services
-  - ORDS REST endpoints (see §9 below).
-  - Online basemap tile providers (see §10 below).
+  - Račun NarcIS sign-in at `https://prijava.alittis.com`, from 1.16.0 (§9bis).
+  - Protected-area layers as vector tiles from `narcis.alittis.com` (§10.2, TB-47).
+  - Online basemap tile providers and the GURS cadastral WMS (§10, §10.1).
+  - Place search on Nominatim, `https://nominatim.openstreetmap.org`
+    (`lib/services/place_search_service.dart`).
 - Infrastructure Components
   - Flutter toolchain build system.
 
@@ -57,17 +63,22 @@
     of its 2026-11-05 note.
 
 ## 8. Known Unknowns
+- **The ORDS login below is out of the phone's path since 1.14.0** (the phone signs in through narcis-vibed's
+  `app/v1/prijava`, and from 1.16.0 through Račun NarcIS, §9bis). The `app-auth` module is deleted under
+  narcis-vibed NV-259 A4/P6 (D8), still open as of its 2026-11-05 note; the checklist that follows matters only
+  until then. Whether `narcis_auth_debug` still exists on prod: STATUS: UNKNOWN – REQUIRES CONFIRMATION.
 - Login handler still carries debug instrumentation (`narcis_auth_debug` table + per-request env dump). A56 real-device validation passed cleanly on 2026-04-25; credentials are now redacted in the dump (auth-bearing headers logged as `<REDACTED len=NN>`, `auth_hdr_prefix` reduced to `Basic ` for the conformant case), so the instrumentation is safe to keep on while we widen device/carrier coverage. Cleanup checklist, to run once we're satisfied with that coverage:
   1. Strip the `OWA.cgi_var_*` snapshot block and the three dead `HTTP_*` fallbacks from `tools/ords/auth_login.sql`; keep only `OWA_UTIL.get_cgi_env('X-NARCIS-AUTH')`.
   2. Strip the `narcis_auth_debug` INSERT block from the handler.
   3. Redeploy the handler.
   4. `DROP TABLE narcis_auth_debug PURGE;`
   5. Delete `tools/ords/auth_debug_table.sql`.
-- No rate limiting / account lockout on the login endpoint — STATUS: UNKNOWN – REQUIRES CONFIRMATION whether `pkg_narcis_uporabniki.preveri_geslo` enforces this internally.
-- Bearer-token sessions are implemented (§9.1b, §12bis, §9bis). Login mints an opaque token; the CRUD endpoints accept `X-Narcis-Auth: Bearer <token>` and re-derive identity + re-check `TERENSKA-BELEZNICA` per call (no password re-sent). `Basic` is still accepted in parallel (smoke tests + any client that didn't get a token). **STATUS: deployed to ARSO prod 2026-05-28 via APEX SQL Workshop; smoke test 7/7 against `narcis.gov.si`** (failure paths → 401; valid creds → 200 with `token` + `expiresAt`; Bearer GET `/disturbances/` → 200; logout → `{"revoked":true}`; revoked-token replay → 401). `DBMS_CRYPTO` grant was already in place on the NARCIS schema. A `Bearer` call no longer runs `pkg_narcis_uporabniki.preveri_geslo`; it does a hash lookup in `TB_AUTH_TOKENS` plus the same authorization re-check.
-- Codebook fetch endpoint (PDF §6.c.ii — "ob vsakem zagonu aplikacije naj se na telefonu posodobi seznam tipov motenj") is NOT YET IMPLEMENTED. Until it is, `lib/data/disturbance_types.dart` and `tools/ords/disturbance_codebook_seed.sql` are dual-maintained: any change to the Dart codebook must be mirrored in the seed script. Per-org codebook additions (`TB_SIF_MOTNJE_TIPI.ORG_ID` non-null) are not yet visible to the client.
-- Offline updates and offline deletes do not queue: `AppState.updateRecord` / `deleteRecord` only push to ORDS when `isOnline && canSync`. Edits made while offline persist locally but never reach the server. Tracked as a separate follow-up to the offline-create queue.
-- Release pipeline/signing/distribution process.
+- No rate limiting / account lockout on the ORDS login endpoint — STATUS: UNKNOWN – REQUIRES CONFIRMATION whether `pkg_narcis_uporabniki.preveri_geslo` enforces this internally. **This no longer covers the phone:** from 1.16.0 it signs in through Račun NarcIS, which locks an address for 15 min after 5 consecutive failures (doubling, up to 24 h) and refuses an IP after 20 failures in 15 min (narcis-racun `web/src/lib/racun/zaklep.ts`).
+- **Record — the ORDS path, production until T0 (2026-10-15).** Since 1.14.0 the phone's Bearer is narcis-vibed's: a vibed-auth token until NV-554 P2, and from 2026-11-07 narcis-vibed's own phone session, re-checked with Račun NarcIS on every call together with `TERENSKA-BELEZNICA` and the org (narcis-vibed `web/src/lib/beleznica/app.ts`, `appSession`). The rest of this item describes ORDS:
+  Bearer-token sessions are implemented (§9.1b, §12bis, §9bis). Login mints an opaque token; the CRUD endpoints accept `X-Narcis-Auth: Bearer <token>` and re-derive identity + re-check `TERENSKA-BELEZNICA` per call (no password re-sent). `Basic` is still accepted in parallel (smoke tests + any client that didn't get a token). **STATUS: deployed to ARSO prod 2026-05-28 via APEX SQL Workshop; smoke test 7/7 against `narcis.gov.si`** (failure paths → 401; valid creds → 200 with `token` + `expiresAt`; Bearer GET `/disturbances/` → 200; logout → `{"revoked":true}`; revoked-token replay → 401). `DBMS_CRYPTO` grant was already in place on the NARCIS schema. A `Bearer` call no longer runs `pkg_narcis_uporabniki.preveri_geslo`; it does a hash lookup in `TB_AUTH_TOKENS` plus the same authorization re-check.
+- Codebook fetch endpoint (PDF §6.c.ii — "ob vsakem zagonu aplikacije naj se na telefonu posodobi seznam tipov motenj") is NOT YET IMPLEMENTED: the field-app API (`/app/v1`) has no codebook route. Until it is, `lib/data/disturbance_types.dart` and the server codebook are dual-maintained. Since the cutover the server codebook is narcis-vibed's `beleznica.sif_tip` (Postgres, read-only to `app_beleznica`; the desktop reads it through `/api/beleznica/sifrant`), not `tools/ords/disturbance_codebook_seed.sql`, which seeds the frozen Oracle table. How a codebook change is applied to `beleznica.sif_tip`: STATUS: UNKNOWN – REQUIRES CONFIRMATION. Per-org codebook additions (`org_id` non-null) are not yet visible to the client.
+- Offline deletes queue since TB-2: `deleteRecord` marks the row `pendingDelete` and `_drainPendingDeletes` sends it once online. Offline updates still do not queue: `AppState.updateRecord` pushes only when online, and the next pull treats the server as authoritative. Nothing in `lib/` calls `updateRecord` today, because editing on the phone (TB-32) is not built; the gap is TB-32's point 3.
+- Release pipeline, signing and distribution: no longer unknown; documented in DEPLOYMENT §3 and `PLAY_CLOSED_TEST.md`.
 - CI/CD workflow (none detected in repository root scope).
 
 ## 9. Backend Endpoints

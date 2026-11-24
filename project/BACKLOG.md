@@ -1656,7 +1656,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   the TB-60 parent-row layout. No filter by every ZO class asked for, so the open reading above is settled.
 
 ### TB-38 · Forward a record to the head of supervision by e-mail (opt-in)
-`✨ Enhancement` · `P2` · `Blocked` · Reporter: Matjaž · Updated: 2026-10-12
+`✨ Enhancement` · `P2` · `Blocked` · Reporter: Matjaž · Updated: 2026-11-24
 - **Want:** a tick box the observer sets before submitting. When it is set, an e-mail *Obvestilo o
   motnji* goes to the org's head of supervision with every attribute (šifra, observer, location,
   description, photo). For NRP the address is `nadzor@notranjski-park.si`. TB-15's reports also want
@@ -1668,18 +1668,25 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
      one (§13). A mail sent on the record POST would usually go out without its photo. The send needs
      its own step once the photos have drained (a queued `notify` call), or a server job that waits
      for them.
-  2. **The TB stack has no mail yet.** narcis-vibed sends none. The legacy NarcIS APEX app does (mail
-     templates in its prod export), so `APEX_MAIL` is probably configured on that instance. **STATUS:
-     UNKNOWN – REQUIRES CONFIRMATION** that an ORDS handler in the NARCIS schema can call it (outside an
-     APEX session it needs a workspace context) and that the relay delivers to external domains.
+  2. **The TB stack has no mail yet (re-checked 2026-11-24, after the cutover).** narcis-vibed's web
+     source sends none (no nodemailer, sendMail or smtp). On the same VPS, Račun NarcIS (narcis-racun)
+     does: nodemailer over SMTP to Oracle Cloud Email Delivery, signed as alittis.com, through one
+     rate-limited sender (`web/src/lib/racun/posta.ts`) that knows only its own mail kinds (sign-up,
+     reset, help). Its caps are 3 mails an hour and 10 a day per recipient address, so a single
+     head-of-supervision address would hit them if this went through that sender as it stands. Whether
+     narcis-vibed gets its own sender on that relay, or Račun's sender takes a new kind, is undecided.
+     The 2026-10-12 route, an ORDS handler calling `APEX_MAIL`, is moot: since T0 (2026-10-15) records
+     are written to Postgres by narcis-vibed, not by ORDS.
   3. **There is no per-org recipient store.** A small org → address table is needed. Hide the tick box
      for orgs without a recipient rather than offer a choice that does nothing.
-- **Schema:** a flag and a timestamp on `TB_MOTNJE`, plus the recipient table; GET/POST carry the flag.
+- **Schema (corrected 2026-11-24; the 2026-10-12 text targeted Oracle `TB_MOTNJE`):** a flag and a
+  timestamp on `beleznica.motnja`, plus the recipient table, as a numbered block in narcis-vibed
+  `deploy/postgres/beleznica_schema.sql`; the `/app/v1` disturbance GET/POST carry the flag.
   narcis-vibed shows the flag on the record and offers it as an export filter.
 - **UX:** the tick box sits on the preview screen (TB-31) next to *Shrani zapis*, the moment the
   observer commits. The preview names the recipient (*Obvestilo bo poslano: …*).
-- **Blocked on:** (a) the operator confirming that `APEX_MAIL` can be called from ORDS on prod;
-  (b) the recipients for orgs other than NRP.
+- **Blocked on:** (a) a mail path for narcis-vibed (constraint 2; the 2026-10-12 blocker, `APEX_MAIL`
+  from ORDS, is moot); (b) the recipients for orgs other than NRP.
 - **Shipped:** —
 
 ### TB-39 · Hot spots (*vroče točke*) — recurring named points that collect records over time
@@ -1726,7 +1733,8 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Mail (corrected 2026-11-24):** phase 2 was to reuse TB-38's mail path, but TB-38 is blocked on
   `APEX_MAIL` from ORDS, which the cutover made moot. No outbound mail sender was found in
   narcis-vibed's web source on 2026-11-24 (searched nodemailer, sendMail, smtp; the lib files that
-  mention mail only store addresses). *Predlagaj*'s mail needs one built first, as does TB-38.
+  mention mail only store addresses). Račun NarcIS on the same VPS does send mail; see TB-38's
+  constraint 2. *Predlagaj*'s mail needs a narcis-vibed mail path first, as does TB-38.
 - **Hidden scope in example (3)** (Rešeto: "2 boats, 5 anglers, 12 walkers…"): records have **no
   count per type**, since types are a plain multi-select. This is a separate question for
   Matjaž/Tomaž, not part of the hot-spot MVP.
