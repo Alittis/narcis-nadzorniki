@@ -1754,6 +1754,10 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
      button on the speed dial. The ~50 m one-tap suggestion is not part of phase 1.
   Still open, outside phase 1: the count per type (example 3). Next: phase 1 needs a server half in
   narcis-vibed (table, desktop create, `/app/v1` list + the id on a record) before the phone side.
+- **Reporters informed 2026-11-24** (mail to Tomaž and Matjaž, sent by Alexis): the two steps, the
+  create right per org (none ZRSVN-wide), tap-to-attach and nothing attached automatically; no date
+  given. Asked: (1) who at NRP gets the create right, (2) whether they need a count per type, and if
+  so only on hot spots or on every record. **Awaiting their answer.**
 - **Shipped:** —
 
 ### TB-40 · Remember map-layer settings across app restarts
