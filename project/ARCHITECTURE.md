@@ -42,15 +42,19 @@
 ## 7. Architectural Decisions (Initial)
 - Flutter multi-platform project structure.
 - Client-first architecture in current repository.
-- **Planned, not built (owner decision 2026-10-12): the backend moves from Oracle/ORDS to Postgres on
-  the narcis-vibed VPS** (narcis-vibed NV-259, plan `project/NV-259-BELEZNICA-PLAN.md`; phone side
-  TB-46).
-  - The move is a pure copy, made before the server-side wishlist items (TB-36/38/39/42/43).
-  - The map-layer swap off the NarcIS GeoServer is a separate later release (TB-47, built 2026-11-04,
-    unreleased; §10.2).
-  - Identity stays in NarcIS Oracle: login and per-request verification still go through ORDS
-    `vibed-auth`.
-  - Until the cutover, everything in §9–§17 describes production as it is.
+- **Done 2026-10-15 (NV-259 T0; owner decision 2026-10-12): the backend moved from Oracle/ORDS to
+  Postgres on the narcis-vibed VPS** (narcis-vibed NV-259, plan `project/NV-259-BELEZNICA-PLAN.md`;
+  phone side TB-46, released as 1.14.0 (24) at T0). The app calls the field-app API (§9.0); the data
+  lives in narcis-vibed's Postgres schema `beleznica`, and the Oracle `TB_*` tables are frozen read-only.
+  - The move was a pure copy, made before the server-side wishlist items (TB-36/38/39/42/43). TB-42 and
+    TB-43 have since shipped on it (schema v2, narcis-vibed NV-615).
+  - The map-layer swap off the NarcIS GeoServer was a separate later release (TB-47, shipped v1.15.0+25,
+    rolled out 2026-11-05; §10.2).
+  - Sign-in went through ORDS `vibed-auth` until 1.16.0; from 1.16.0 (TB-58, NV-554 P3, 2026-11-07) it
+    goes through Račun NarcIS (§9bis).
+  - §9.0 is the live API. The ORDS handlers and `TB_*` tables described in §9–§17 are the record of
+    production until T0; their ORDS modules are deleted under narcis-vibed NV-259 A4/P6, still open as
+    of its 2026-11-05 note.
 
 ## 8. Known Unknowns
 - Login handler still carries debug instrumentation (`narcis_auth_debug` table + per-request env dump). A56 real-device validation passed cleanly on 2026-04-25; credentials are now redacted in the dump (auth-bearing headers logged as `<REDACTED len=NN>`, `auth_hdr_prefix` reduced to `Basic ` for the conformant case), so the instrumentation is safe to keep on while we widen device/carrier coverage. Cleanup checklist, to run once we're satisfied with that coverage:
@@ -70,8 +74,8 @@
 
 ### 9.0 The field-app API on narcis.alittis.com (TB-46 — built 2026-10-13, live from the cutover)
 From the TB-46 build on, the app calls **`https://narcis.alittis.com/api/beleznica/app/v1/`** (narcis-vibed NV-259; server
-rules and runbook in narcis-vibed `project/OPERATIONS.md` §21.8). §9.1–§9.4 below stay the **production backend until the
-cutover (T0)**, and the shape of every call is theirs: the new API mirrors them handler for handler (the same JSON, statuses,
+rules and runbook in narcis-vibed `project/OPERATIONS.md` §21.8). §9.1–§9.4 below were the **production backend until the
+cutover (T0, 2026-10-15)**, and the shape of every call is theirs: the new API mirrors them handler for handler (the same JSON, statuses,
 skip-if-exists creates, 204 deletes, 404 = done), so the sync engine is unchanged. What differs:
 - **Base URL** from `--dart-define=BELEZNICA_API=…` (`kBeleznicaApi`, `lib/data/remote_api.dart`), default production. **No
   trailing slash** on any path: that host answers `…/disturbances/` with a 308, which a POST does not follow.
