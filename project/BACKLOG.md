@@ -1690,7 +1690,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-39 · Hot spots (*vroče točke*) — recurring named points that collect records over time
-`✨ Enhancement` · `P2` · `Blocked` (scope decisions) · Reporters: Matjaž, Tomaž (proposal *Predlog »Vroča točka«*, 2026-08-27) · Updated: 2026-11-24
+`✨ Enhancement` · `P2` · `Todo` (phase 1 scope decided by the owner 2026-11-24) · Reporters: Matjaž, Tomaž (proposal *Predlog »Vroča točka«*, 2026-08-27) · Updated: 2026-11-24
 - **Want (Tomaž's proposal):** permanent named points (*Zapornica Nova Karlovica*, *Zadrževalnik
   Rešeto*, a dump site) where any warden adds a new record on each visit, instead of creating a new
   one-off point every time. Modelled on eBird hotspots.
@@ -1744,8 +1744,16 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   come. Its cutover (T0) ran on 2026-10-15: production serves Terenska beležnica from Postgres, and
   `TB_*` are frozen read-only (NV-259 D8). Hot spots are narcis-vibed Postgres work plus the phone,
   with no Oracle/ORDS change.
-- **Blocked on:** confirming phase 1 as the first cut, who holds the create right
-  (`TERENSKA-BELEZNICA-ADMIN`?), and the picker-not-third-button UX.
+- **Decided (owner, 2026-11-24)** — the three questions this item was blocked on:
+  1. **Phase 1 is the first cut.** The admin creates hot spots on the desktop; the phone shows them,
+     attaches new records and lists a hot spot's records. *Predlagaj*, its mail and regrouping are
+     phase 2, which also waits on TB-38's mail path.
+  2. **Create right: `TERENSKA-BELEZNICA-ADMIN`, own org only.** ZRSVN-wide creation is not in scope; it
+     would need a cross-org right that does not exist.
+  3. **UX: hot spots drawn on the location picker and the home map; tap one to attach.** No third
+     button on the speed dial. The ~50 m one-tap suggestion is not part of phase 1.
+  Still open, outside phase 1: the count per type (example 3). Next: phase 1 needs a server half in
+  narcis-vibed (table, desktop create, `/app/v1` list + the id on a record) before the phone side.
 - **Shipped:** —
 
 ### TB-40 · Remember map-layer settings across app restarts
