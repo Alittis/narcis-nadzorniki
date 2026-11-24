@@ -1683,7 +1683,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-39 · Hot spots (*vroče točke*) — recurring named points that collect records over time
-`✨ Enhancement` · `P2` · `Blocked` (scope decisions) · Reporters: Matjaž, Tomaž (proposal *Predlog »Vroča točka«*, 2026-08-27) · Updated: 2026-10-12
+`✨ Enhancement` · `P2` · `Blocked` (scope decisions) · Reporters: Matjaž, Tomaž (proposal *Predlog »Vroča točka«*, 2026-08-27) · Updated: 2026-11-24
 - **Want (Tomaž's proposal):** permanent named points (*Zapornica Nova Karlovica*, *Zadrževalnik
   Rešeto*, a dump site) where any warden adds a new record on each visit, instead of creating a new
   one-off point every time. Modelled on eBird hotspots.
@@ -1697,10 +1697,12 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
     unrelated "bike off the trail" record a few metres away).
 - **Mostly back-office work.** Creating, naming, proposing and regrouping are all desktop
   (narcis-vibed). The phone shows hot spots and attaches a new record to one.
-- **Already in place** (narcis-vibed, verified 2026-10-12):
+- **Already in place** (narcis-vibed, verified 2026-10-12, re-checked on the Postgres side 2026-11-24):
   - The org-admin role exists: `TERENSKA-BELEZNICA-ADMIN` already lets its holder edit and delete
-    colleagues' records within the org (NV-222).
-  - The desktop edit handler `motnje/:id/zapis` is where regrouping would go.
+    colleagues' records within the org (NV-222). Constant: `web/src/lib/auth/functions.ts`
+    (`BELEZNICA_ADMIN_FUNCTION`).
+  - The desktop edit handler `web/src/app/api/beleznica/motnje/[id]/zapis/route.ts` is where
+    regrouping would go.
 - **No cross-org (ZRSVN-wide) admin exists.** Every TB handler is org-scoped, and cross-org review is
   an open NV question. "ZRSVN may create anywhere" is therefore a separate decision.
 - **UX recommendation (simplicity):** Tomaž's *first* option — hot spots drawn on the location picker
@@ -1710,18 +1712,30 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Proposed phasing:**
   1. The admin creates hot spots on the desktop. The phone shows them, attaches records and lists a
      hot spot's records.
-  2. *Predlagaj* + the mail to the admin (reusing TB-38's mail path), and regrouping in the desktop
-     edit.
-- **Data:** a new table (id, org, name, lat/lon, creator) and a nullable FK on `TB_MOTNJE`. A record
-  on a hot spot still stores its own lat/lon (copied from the hot spot), so maps, exports and the web
-  keep working unchanged.
+  2. *Predlagaj* + the mail to the admin, and regrouping in the desktop edit. **Needs a mail sender
+     first** (see *Mail* below).
+- **Data (corrected 2026-11-24; the 2026-10-12 text targeted Oracle `TB_MOTNJE`):** a new table in
+  narcis-vibed's Postgres schema `beleznica` (id, org, name, lat/lon, creator) and a nullable FK on
+  `beleznica.motnja`, added as a `v3` block at the bottom of `deploy/postgres/beleznica_schema.sql`
+  with its `beleznica.schema_version` row (v2 is NV-615). `org_id` is a plain integer stamped from
+  the session, as on the other tables (no FK leaves the schema). The field-app API
+  `/api/beleznica/app/v1` needs a hot-spot list and must accept the hot-spot id on a record. The
+  backup already dumps the whole schema (`pg_dump -n beleznica`), so it covers the new table. A
+  record on a hot spot still stores its own lat/lon (copied from the hot spot), so maps, exports and
+  the web keep working unchanged.
+- **Mail (corrected 2026-11-24):** phase 2 was to reuse TB-38's mail path, but TB-38 is blocked on
+  `APEX_MAIL` from ORDS, which the cutover made moot. No outbound mail sender was found in
+  narcis-vibed's web source on 2026-11-24 (searched nodemailer, sendMail, smtp; the lib files that
+  mention mail only store addresses). *Predlagaj*'s mail needs one built first, as does TB-38.
 - **Hidden scope in example (3)** (Rešeto: "2 boats, 5 anglers, 12 walkers…"): records have **no
   count per type**, since types are a plain multi-select. This is a separate question for
   Matjaž/Tomaž, not part of the hot-spot MVP.
 - **Answers TB-9's open question.** "Per monitored point" is exactly a hot spot. A visit with nothing
   found becomes a hot-spot record with no disturbance — revisit TB-9 once phase 1 exists.
-- **Sequencing:** narcis-vibed **NV-259** (Todo) moves all of Terenska beležnica from Oracle to
-  Postgres. A table built in Oracle now gets migrated by it later — not a blocker, but added scope there.
+- **Sequencing (corrected 2026-11-24):** the 2026-10-12 text had narcis-vibed **NV-259** still to
+  come. Its cutover (T0) ran on 2026-10-15: production serves Terenska beležnica from Postgres, and
+  `TB_*` are frozen read-only (NV-259 D8). Hot spots are narcis-vibed Postgres work plus the phone,
+  with no Oracle/ORDS change.
 - **Blocked on:** confirming phase 1 as the first cut, who holds the create right
   (`TERENSKA-BELEZNICA-ADMIN`?), and the picker-not-third-button UX.
 - **Shipped:** —
