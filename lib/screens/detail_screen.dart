@@ -174,6 +174,12 @@ class _DetailScreenState extends State<DetailScreen> {
                       longitude: live.longitude,
                       accuracy: live.locationAccuracy,
                       author: showAuthor ? author : null,
+                      // TB-39: a record names a hot spot this device may not
+                      // hold (not pulled yet), so it still says it is on one.
+                      hotspotName: live.hotspotId == null
+                          ? null
+                          : state.hotspotById(live.hotspotId)?.name ??
+                              'ni na seznamu',
                     ),
                     const SizedBox(height: 10),
                     _FooterRow(
@@ -520,6 +526,7 @@ class _MetaStrip extends StatelessWidget {
     required this.longitude,
     required this.accuracy,
     required this.author,
+    this.hotspotName,
   });
 
   final DateTime observedAt;
@@ -527,6 +534,7 @@ class _MetaStrip extends StatelessWidget {
   final double longitude;
   final String accuracy;
   final String? author;
+  final String? hotspotName;
 
   @override
   Widget build(BuildContext context) {
@@ -547,6 +555,11 @@ class _MetaStrip extends StatelessWidget {
           tabular: true,
         ),
         _Pill(icon: Icons.gps_fixed, text: accuracy),
+        if (hotspotName != null)
+          _Pill(
+            icon: Icons.diamond_outlined,
+            text: 'Vroča točka: $hotspotName',
+          ),
         if (author != null) _Pill(icon: Icons.person_outline, text: author!),
       ],
     );

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:narcis_nadzorniki/data/dataset_generation_store.dart';
 import 'package:narcis_nadzorniki/data/disturbance_types.dart';
+import 'package:narcis_nadzorniki/data/hotspots_store.dart';
 import 'package:narcis_nadzorniki/data/local_store.dart';
 import 'package:narcis_nadzorniki/data/remote_api.dart';
 import 'package:narcis_nadzorniki/data/tezave_store.dart';
@@ -14,6 +15,7 @@ import 'package:narcis_nadzorniki/data/walks_local_store.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
 import 'package:narcis_nadzorniki/models/disturbance_photo.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
+import 'package:narcis_nadzorniki/models/hotspot.dart';
 import 'package:narcis_nadzorniki/models/walk.dart';
 import 'package:narcis_nadzorniki/services/auth_service.dart';
 import 'package:narcis_nadzorniki/services/jpeg_metadata.dart';
@@ -32,6 +34,7 @@ class AppState extends ChangeNotifier {
     PhotoStorage? photoStorage,
     DatasetGenerationStore? generationStore,
     TezaveStore? tezaveStore,
+    HotspotsStore? hotspotsStore,
   })  : _localStore = localStore ?? LocalStore(),
         _walksStore = walksStore ?? WalksLocalStore(),
         _remoteApi = remoteApi ?? RemoteApi(),
@@ -39,7 +42,8 @@ class AppState extends ChangeNotifier {
         _authService = authService ?? AuthService(),
         _photoStorage = photoStorage ?? PhotoStorage(),
         _generationStore = generationStore ?? DatasetGenerationStore(),
-        _tezave = tezaveStore ?? TezaveStore();
+        _tezave = tezaveStore ?? TezaveStore(),
+        _hotspotsStore = hotspotsStore ?? HotspotsStore();
 
   final LocalStore _localStore;
   final WalksLocalStore _walksStore;
@@ -50,9 +54,13 @@ class AppState extends ChangeNotifier {
   final DatasetGenerationStore _generationStore;
   // TB-59 (narcis-racun RN-22 S3): the failures counted since the last report.
   final TezaveStore _tezave;
+  final HotspotsStore _hotspotsStore;
   final _uuid = const Uuid();
 
   List<Disturbance> _records = [];
+  // TB-39 (narcis-vibed NV-622): the org's hot spots, as the last successful
+  // pull listed them; read-only here.
+  List<Hotspot> _hotspots = const [];
   // TB-52: photos dropped because their file was gone, not yet shown to the
   // user. Handed over once by [takeLostPhotos].
   int _lostPhotoCount = 0;
@@ -118,6 +126,21 @@ class AppState extends ChangeNotifier {
   List<Disturbance> get records =>
       List.unmodifiable(_records.where((r) => !r.pendingDelete));
   bool get offlineOverride => _offlineOverride;
+
+  /// TB-39: the org's hot spots, by name (the server's order).
+  List<Hotspot> get hotspots => _hotspots;
+
+  /// TB-39: the hot spot [id] names, if this device knows it. A record can
+  /// name one the cache does not hold (not pulled yet, or gone), so callers
+  /// need a label for null.
+  Hotspot? hotspotById(String? id) {
+    if (id == null) return null;
+    for (final h in _hotspots) {
+      if (h.id == id) return h;
+    }
+    return null;
+  }
+
   bool get isSyncing => _isSyncing;
   List<String> get lastObservers => List.unmodifiable(_lastObservers);
   String? get currentUser => _currentUser;
@@ -228,6 +251,9 @@ class AppState extends ChangeNotifier {
     await _walksStore.save(_walks);
     await _photoStorage.deleteAll();
     await _tezave.clear();
+    // TB-39: org-scoped; the next account may be another org's.
+    _hotspots = const [];
+    await _hotspotsStore.save(const []);
     _lastRemoteIds = null;
     _lastRemoteWalkIds = null;
   }
@@ -363,6 +389,7 @@ class AppState extends ChangeNotifier {
       }
       _walks = await _walksStore.load();
       _knownGeneration = await _generationStore.load();
+      _hotspots = await _hotspotsStore.load();
       await _tezave.load();
       // Resume any in-progress walk. The FGS background isolate is the
       // source of truth for points; if its FGS is still running (Samsung
@@ -729,6 +756,9 @@ class AppState extends ChangeNotifier {
         _knownGeneration = walksGeneration;
         await _generationStore.save(walksGeneration);
       }
+      // TB-39: last, after the D6 bookkeeping above: a failure here keeps the
+      // cached list and changes nothing else.
+      await _pullHotspots();
     } finally {
       _isSyncing = false;
       notifyListeners();
@@ -778,6 +808,9 @@ class AppState extends ChangeNotifier {
     } on RemoteApiException catch (e) {
       debugPrint('[sync] _sendAndMarkSynced ${record.id} FAILED: $e');
       _handleSyncException(e);
+      if (e.isUnknownHotspot && record.hotspotId != null) {
+        return _unlinkUnknownHotspot(record);
+      }
       return false;
     }
     _records = _records
@@ -787,6 +820,37 @@ class AppState extends ChangeNotifier {
     await _localStore.save(_records);
     notifyListeners();
     return true;
+  }
+
+  /// TB-39: the server refused [record]'s hot spot (400 `unknown_hotspot`):
+  /// lost in a restore, or not this org's. Every later POST would be refused
+  /// the same way, stranding the record, so it goes without the link and keeps
+  /// everything else, its own position included. Only the server's answer
+  /// unlinks a record, never the hot spot missing from the cached list.
+  Future<bool> _unlinkUnknownHotspot(Disturbance record) async {
+    debugPrint('[sync] ${record.id}: hot spot ${record.hotspotId} unknown to '
+        'the server, sending without it');
+    _records = _records
+        .map((r) => r.id == record.id ? r.copyWith(clearHotspotId: true) : r)
+        .toList(growable: false);
+    await _localStore.save(_records);
+    notifyListeners();
+    return _sendAndMarkSynced(record.copyWith(clearHotspotId: true));
+  }
+
+  /// TB-39: replaces the cached hot spots with the server's list. A failure
+  /// keeps the cache.
+  Future<void> _pullHotspots() async {
+    final creds = _credentials;
+    if (creds == null) return;
+    try {
+      _hotspots = await _remoteApi.fetchHotspots(creds);
+    } on RemoteApiException catch (e) {
+      _handleSyncException(e);
+      return;
+    }
+    await _hotspotsStore.save(_hotspots);
+    notifyListeners();
   }
 
   Future<void> _drainPendingPhotos() async {

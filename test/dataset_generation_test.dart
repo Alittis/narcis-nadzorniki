@@ -201,6 +201,8 @@ class _Server {
         return _json({'id': id, 'status': 'created'}, 201);
       case ('GET', ['walks', final id, 'points']):
         return _json({'obhodId': id, 'points': points[id] ?? <dynamic>[]});
+      case ('GET', ['hotspots']): // TB-39
+        return _json({'hotspots': <dynamic>[]});
     }
     return _json({'error': 'not_found'}, 404);
   }

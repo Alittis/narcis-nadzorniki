@@ -117,6 +117,17 @@ skip-if-exists creates, 204 deletes, 404 = done), so the sync engine is unchange
   it answers 401 and an unknown path 404 (probed 2026-11-12). The phone side shipped in v1.17.0+27 (rolled out
   2026-11-13); a 204 from it to a released phone: STATUS: UNKNOWN – REQUIRES CONFIRMATION (the app was proven against a
   stub of this contract).
+- **Hot spots (TB-39 phase 1; narcis-vibed NV-622, schema v3, live since 2026-11-25 09:29:57 UTC):**
+  - `GET hotspots` → `{"hotspots":[{id, name, latitude, longitude, createdAt, createdBy}]}`, the caller's org only, by
+    name; the same gate as every route; no generation header (the phone owns no hot spot). Read-only here: the org admin
+    creates hot spots on the desktop.
+  - A record's `hotspotId` (uuid string), absent-on-null both ways: the list carries it, and the app sends it only on a
+    record filed on a hot spot. **The record's `latitude`/`longitude` stay the warden's own position**, never the hot
+    spot's (owner, 2026-11-25; the server stores what the body carries since `62e5d0df`, 12:28:51 UTC).
+  - A POST naming a hot spot the server does not know for the org is **400 `{"error":"unknown_hotspot"}`**, decided after
+    skip-if-exists. The app then drops the link and sends the record again (§13). No update call: a link is set once.
+  - The server half was live before any build sent the key, as NV-622 requires (an older server would drop it and
+    answer 201). A released build that sends it: none yet. STATUS: UNKNOWN – REQUIRES CONFIRMATION against production.
 
 ### 9.1 `GET https://narcis.gov.si/ords/narcis/app-auth/login` (production login)
 - Auth: `X-Narcis-Auth: Basic <base64(email:password)>` over HTTPS only. (Custom header, not the standard `Authorization` — see note below.)
@@ -408,6 +419,13 @@ Unchanged by TB-27, deliberately: **shape encodes authorship** (own = filled dis
 
 **Both maps use this encoding.** The walk-detail map ([walk_detail_screen.dart](../lib/screens/walk_detail_screen.dart)) draws the disturbances linked to a walk and was missed in TB-27's first pass — it kept colouring by age for one release (v1.6.0+15), so the two maps briefly disagreed about the same dot. Fixed in TB-29.
 
+**Hot spots are diamonds (TB-39).** A hot spot draws as a white-edged diamond in the web's `VROCA_TOCKA_COLOR`
+`#C2410C` (`kHotspotColor`, `HotspotMarker` in [basemap.dart](../lib/widgets/basemap.dart)). That orange is close to
+*Odprto*'s amber, so shape, not colour, tells them apart: a record is a disc, a hot spot a diamond. Hot spots ride with
+the Motnje layer, drawn last (above the records, which ring a visited one, and above the blue GPS dot, which would
+otherwise take the tap from a warden standing at the hot spot) and ignoring the Motnje filter, which is about records. A
+tap opens the hot spot's sheet (§14).
+
 **Age colouring is gone entirely (TB-29).** `AgeBucket`, `ageBucketOf`, `allAgeBuckets`, `recordMarkerColorForAge` and the filter's `ageBuckets` dimension were all removed once the map stopped encoding age: three coarse buckets were strictly worse than the **Obdobje** window sitting beside them, which filters the same axis at day granularity with a histogram. (Note for anyone reading v1.6.0-era docs: the claim that `recordMarkerColorForAge` was the Starost swatch source was wrong — the sheet hardcoded `Colors.red/orange/blue` and never called it.)
 
 #### Filter (TB-6)
@@ -558,6 +576,26 @@ only, kept 12 months, on prijava's side). [lib/data/tezave_store.dart](../lib/da
   and AppState end to end against a stub). On the Android emulator against a local stub of the contract (2026-11-12): a
   refused report kept the count on the device and across a cold start, a 204 cleared it (BACKLOG TB-59).
 
+**Hot spots (TB-39 phase 1, §9.0).** `AppState.hotspots` is the org's list as the last successful `GET hotspots` gave it,
+kept in `hotspots.json` ([lib/data/hotspots_store.dart](../lib/data/hotspots_store.dart)) so the map and the picker show
+them offline. `_pullHotspots` runs last in `syncAll`, after the dataset-generation bookkeeping, and replaces the list
+whole; a failure keeps the cache and is counted like any pull (TB-59, `pot` `/api/beleznica/app/v1/hotspots`).
+`_discardLocalData` empties it (logout, TB-48's discard): the list is org-scoped.
+- **A hot spot the server does not know.** `_sendAndMarkSynced` keeps a record queued on any failure, so a hot spot lost
+  in a restore would refuse the record for ever. On 400 `unknown_hotspot` (`RemoteApiException.isUnknownHotspot`, that
+  exact body and nothing else) and only for a record that names one, `_unlinkUnknownHotspot` clears the link, saves, and
+  sends the record once more, its own position and everything else unchanged. Only the server's answer unlinks: a hot
+  spot missing from the cached list is still sent, as the list can lag behind the server.
+- The pull keeps a record's link because `RemoteDisturbance.toLocal()` carries `hotspotId`; the merge rebuilds every
+  synced record from it.
+- Tests: [test/hotspots_test.dart](../test/hotspots_test.dart) (the wire both ways, the cache, the pull, logout, the
+  `unknown_hotspot` path end to end with a control: any other 400 keeps the record queued and linked). Six guards
+  proven by removal 2026-11-25 (the unlink, `toLocal`, the payload key, the logout wipe, the picker not moving the pin,
+  the hot spot drawn above the pin).
+- On the Android emulator against a local stub of the NV-622 contract (2026-11-25): a linked record went out with the
+  warden's own point; a queued record whose hot spot the stub had dropped got 400 `unknown_hotspot`, was resent unlinked
+  and answered 201, and the device's copy lost the link (BACKLOG TB-39).
+
 **`syncAll` (the sync icon's tap-target).** Single entry point that runs four phases under one `_isSyncing` flag:
 1. **Push pending records.** Drain `_records.where(pendingSync)` via POST `/disturbances/`. Server's idempotent-on-UUID semantics mean retries are safe. Rows also carrying `pendingDelete` are **skipped** — see the delete queue below.
 2. **Drain pending photo uploads.** For every record with a `pendingUpload` photo, read the local file and POST it to `/disturbances/:id/photos/:photoId`. Photos can't be uploaded before the parent record exists, hence the strict ordering.
@@ -623,6 +661,24 @@ The red "+" FAB on `HomeScreen` (lib/screens/home_screen.dart) is a speed dial. 
   create-time *Status obravnave* stay in the form (owner, 2026-11-23). Tests:
   [test/vplivi_sredstva_test.dart](../test/vplivi_sredstva_test.dart), the TB-42 cases in `form_preview_flow_test.dart`.
 
+- **Hot spots (TB-39 phase 1; owner, 2026-11-24/25).** Two ways to file a record on one, neither a third speed-dial
+  button, and nothing attached automatically (proximity is not relation):
+  - **From the home map.** A tap on a diamond opens `showHotspotSheet`
+    ([lib/widgets/hotspot_sheet.dart](../lib/widgets/hotspot_sheet.dart)): the name, its records newest first (the
+    org's records on this device with that `hotspotId`, each opening `DetailScreen`), and *Foto* / *Šifrant*, the speed
+    dial's two intents. They run `_startPhotoFlow` / `_startCodebookFlow` with the hot spot's id, at the warden's own
+    position (`_userLocation`), as "+" does.
+  - **In the Karta picker.** `LocationPickerScreen` draws the hot spots last, above the red pin and the blue dot (the
+    record's fix is usually at the hot spot, and either would take the tap); a tap on one attaches it, a second tap or
+    *Odstrani* in the bar under the map takes it off. **The pin does not move and the accuracy is not downgraded**: a
+    linked record keeps the warden's position (owner, 2026-11-25). The picker returns a `LocationPick` (location +
+    hot spot).
+  - The form shows the attached hot spot as a chip under *Lokacija* with ×, or, when the org has hot spots, the hint
+    *Vročo točko izbereš na karti.* `DetailScreen` (the preview too) shows a *Vroča točka* pill, *ni na seznamu* when
+    the id is not in this device's list.
+  - Not built (phase 2 or undecided): *Predlagaj za vročo točko*, regrouping existing records, the ~50 m suggestion, a
+    count per type.
+
 Open optimizations (not in scope yet):
 - Quick-save bottom sheet for the trivial case (photo + 1 type + auto-location), skipping the full form.
 - Photo flow could chain into the type-picker before landing on the form, so the form lands prefilled in both paths.
@@ -659,6 +715,9 @@ Many target devices (e.g. Samsung A56) reserve a strip at the bottom of the scre
 - Pattern 1b (**`bottomNavigationBar` padding**, added TB-31): `detail_screen.dart`'s preview action bar is a `Container` in the `bottomNavigationBar` slot and adds `viewPaddingOf(context).bottom` to its own bottom padding — a Scaffold does **not** apply the gesture inset to that slot for you. Any future bottom action bar must do the same. **Confirmed on an A56 2026-09-02** (v1.8.0+17): the *Uredi* / *Shrani zapis* row clears the navigation bar.
 - Pattern 2 (`SafeArea` wrap): `login_screen.dart`, `type_selection_screen.dart`.
 - N/A (full-bleed map + Scaffold-managed FAB whose default location respects view padding): `home_screen.dart`, `location_picker_screen.dart`.
+- TB-39 (2026-11-25): the picker's hot-spot bar is pattern 1b (a `bottomNavigationBar` adding the inset itself); the
+  hot-spot sheet is pattern 3 (`SafeArea`). Both clear the gesture bar on the Android emulator (gesture navigation);
+  not yet seen on an A56.
 
 ## 16. Walk-around Schema (Oracle, prefix `TB_OBHOD*`)
 *From the cutover (TB-46): `beleznica.obhod` / `obhod_tocka` in narcis-vibed's Postgres, the same shape and FK rules (§12).*

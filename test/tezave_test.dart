@@ -377,10 +377,11 @@ void main() {
       await h.syncAndSettle();
       expect(h.tezaveBodies, isEmpty);
       // The inline push, the push in syncAll and the failed records pull on
-      // one path; the failed walks pull on its own.
+      // one path; the failed walks pull and (TB-39) hot-spot pull on their own.
       expect(h.tezave.pending, const [
         Tezava(pot: _records, koda: 'http_5xx', stevilo: 3),
         Tezava(pot: '$_base/walks', koda: 'http_5xx', stevilo: 1),
+        Tezava(pot: '$_base/hotspots', koda: 'http_5xx', stevilo: 1),
       ]);
     });
 
@@ -482,7 +483,9 @@ class _Harness {
           jsonEncode(
             path.endsWith('/walks')
                 ? {'walks': <dynamic>[]}
-                : {'records': <dynamic>[]},
+                : path.endsWith('/hotspots') // TB-39
+                    ? {'hotspots': <dynamic>[]}
+                    : {'records': <dynamic>[]},
           ),
           200,
           headers: {'content-type': 'application/json; charset=utf-8'},

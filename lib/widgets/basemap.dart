@@ -224,6 +224,48 @@ class RecordMarker extends StatelessWidget {
   }
 }
 
+/// TB-39: a hot spot's colour, the web's `VROCA_TOCKA_COLOR` (narcis-vibed
+/// `VroceTocke.tsx`). Close to the amber of *Odprto*, so the phone tells the
+/// two apart by shape: a record is a disc, a hot spot a diamond.
+const Color kHotspotColor = Color(0xFFC2410C);
+
+/// TB-39: a hot spot on a map. A white-edged diamond, larger than a record
+/// disc; [selected] (the record's own hot spot, in the location picker) adds a
+/// dark ring.
+class HotspotMarker extends StatelessWidget {
+  const HotspotMarker({super.key, this.selected = false});
+
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Transform.rotate(
+        angle: 0.785398, // 45°: a square on its point
+        child: Container(
+          width: selected ? 22 : 18,
+          height: selected ? 22 : 18,
+          decoration: BoxDecoration(
+            color: kHotspotColor,
+            borderRadius: BorderRadius.circular(3),
+            border: Border.all(
+              color: selected ? Colors.black87 : Colors.white,
+              width: selected ? 3 : 2,
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x40000000),
+                blurRadius: 2,
+                offset: Offset(0, 1),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// "Recenter on me" button. Same look on every map screen — 48px circle,
 /// elevated, navigation arrow rotated 45° clockwise; spinner while a GPS
 /// resolve is in flight.

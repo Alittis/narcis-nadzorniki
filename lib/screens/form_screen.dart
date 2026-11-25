@@ -27,6 +27,7 @@ class FormScreen extends StatefulWidget {
     required this.initialBasemap,
     this.initialPhotoPath,
     this.initialTypes,
+    this.initialHotspotId,
   });
 
   final LatLng? initialLocation;
@@ -35,6 +36,10 @@ class FormScreen extends StatefulWidget {
   final BasemapMode initialBasemap;
   final String? initialPhotoPath;
   final List<SelectedDisturbanceType>? initialTypes;
+
+  /// TB-39: the hot spot the record starts on (from its sheet on the home
+  /// map); null = none.
+  final String? initialHotspotId;
 
   @override
   State<FormScreen> createState() => _FormScreenState();
@@ -51,6 +56,7 @@ class _FormScreenState extends State<FormScreen> {
 
   LatLng? _location;
   String _accuracy = 'Natančna';
+  String? _hotspotId; // TB-39
   DateTime _date = DateTime.now();
   TimeOfDay _time = TimeOfDay.now();
   List<SelectedDisturbanceType> _types = [];
@@ -66,6 +72,7 @@ class _FormScreenState extends State<FormScreen> {
   void initState() {
     super.initState();
     _location = widget.initialLocation;
+    _hotspotId = widget.initialHotspotId;
     _observers = [...widget.initialObservers];
     if (widget.initialTypes != null) {
       _types = [...widget.initialTypes!];
@@ -137,22 +144,27 @@ class _FormScreenState extends State<FormScreen> {
     // or an earlier map pick — so the red marker starts on the blue dot. The
     // home map's centre is only the fallback for a record with no fix yet.
     final initial = _location ?? widget.mapCenter;
-    final selected = await Navigator.of(context).push<LatLng>(
+    final pick = await Navigator.of(context).push<LocationPick>(
       MaterialPageRoute(
         builder: (_) => LocationPickerScreen(
           initialLocation: initial,
           initialBasemap: widget.initialBasemap,
+          hotspots: context.read<AppState>().hotspots,
+          initialHotspotId: _hotspotId,
         ),
       ),
     );
-    // Potrdi without a tap returns the location it opened on. Leave the record
-    // as it was then, rather than downgrade a GPS fix to Približna.
-    if (selected == null || selected == _location) {
-      return;
-    }
+    if (pick == null) return;
     setState(() {
-      _location = selected;
-      _accuracy = 'Približna';
+      // TB-39: choosing a hot spot never moves the record; the pin is still
+      // where the warden put it.
+      _hotspotId = pick.hotspotId;
+      // Potrdi without a tap returns the location it opened on. Leave the
+      // record as it was then, rather than downgrade a GPS fix to Približna.
+      if (pick.location != _location) {
+        _location = pick.location;
+        _accuracy = 'Približna';
+      }
     });
   }
 
@@ -386,6 +398,7 @@ class _FormScreenState extends State<FormScreen> {
       observers: _observers,
       actionTaken: _actionTaken,
       impacts: _impacts,
+      hotspotId: _hotspotId,
       legalBasis: _legalBasis,
       caseStatus: _caseStatus,
       pendingSync: true,
@@ -684,6 +697,7 @@ class _FormScreenState extends State<FormScreen> {
                       ),
                     ],
                   ),
+                  ..._hotspotRow(colors),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     value: _accuracy,
@@ -853,6 +867,37 @@ class _FormScreenState extends State<FormScreen> {
         ),
       ),
     );
+  }
+
+  /// TB-39: the hot spot the record is filed on, with a way to take it off;
+  /// or, when the org has hot spots, where to choose one.
+  List<Widget> _hotspotRow(ColorScheme colors) {
+    final state = context.watch<AppState>();
+    final id = _hotspotId;
+    if (id == null) {
+      if (state.hotspots.isEmpty) return const [];
+      return [
+        const SizedBox(height: 6),
+        Text(
+          'Vročo točko izbereš na karti.',
+          style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+        ),
+      ];
+    }
+    final name = state.hotspotById(id)?.name ?? 'ni na seznamu';
+    return [
+      const SizedBox(height: 8),
+      // Left, as the rest of the section; the Column would centre it.
+      Align(
+        alignment: Alignment.centerLeft,
+        child: InputChip(
+          avatar: const HotspotMarker(),
+          label: Text('Vroča točka: $name'),
+          onDeleted: () => setState(() => _hotspotId = null),
+          deleteButtonTooltipMessage: 'Odstrani vročo točko',
+        ),
+      ),
+    ];
   }
 
   Widget _subLabel(String text, ColorScheme colors) {

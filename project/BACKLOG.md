@@ -1690,7 +1690,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-39 · Hot spots (*vroče točke*) — recurring named points that collect records over time
-`✨ Enhancement` · `P2` · `Doing` (phase 1 server half LIVE 2026-11-25 as narcis-vibed NV-622; phone half next) · Reporters: Matjaž, Tomaž (proposal *Predlog »Vroča točka«*, 2026-08-27) · Updated: 2026-11-25
+`✨ Enhancement` · `P2` · `Doing` (phase 1 server half LIVE 2026-11-25 as narcis-vibed NV-622; phone half built 2026-11-25, not released) · Reporters: Matjaž, Tomaž (proposal *Predlog »Vroča točka«*, 2026-08-27) · Updated: 2026-11-25
 - **Want (Tomaž's proposal):** permanent named points (*Zapornica Nova Karlovica*, *Zadrževalnik
   Rešeto*, a dump site) where any warden adds a new record on each visit, instead of creating a new
   one-off point every time. Modelled on eBird hotspots.
@@ -1761,9 +1761,9 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   so only on hot spots or on every record. **Question (1) answered 2026-11-25 (owner): Matjaž and
   Tomaž both get the create right** (`TERENSKA-BELEZNICA-ADMIN`). Checked by NV-622 against the VPS
   nightly mirror of NarcIS grants (2026-11-25, both NRP org 152): Tomaž (user 253) holds it; Matjaž
-  (user 986) holds only `TERENSKA-BELEZNICA` and needs function 642 (`TERENSKA-BELEZNICA-ADMIN`),
-  granted by hand in NarcIS by the owner. Question (2), the count per type, is still awaiting their
-  answer.
+  (user 986) held only `TERENSKA-BELEZNICA` then. **He has function 642 (`TERENSKA-BELEZNICA-ADMIN`) since
+  later on 2026-11-25** and sees *Nova vroča točka* (relayed by the owner; narcis-vibed NV-622, `0e62060a`).
+  Question (2), the count per type, is still awaiting their answer.
 - **Phase 1 server half: narcis-vibed NV-622, LIVE 2026-11-25 09:29:57 UTC** as `469504d5`
   (owner's go: "deploy NV-622"; schema v3 on production 09:09:28 UTC; backup 374 and the restore
   drill passed after it). Schema v3: table `beleznica.vroca_tocka` (uuid minted on the server, names
@@ -1782,14 +1782,52 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
     a restore strands the record.
   - No update call: PUT answers 405, so nothing on the wire can link or unlink a record after it is
     sent.
-  - Not proved on production yet: a real admin's hot spot, and a phone-linked record (no build sends
-    `hotspotId`).
+  - Proved on production later on 2026-11-25: the desktop create. The owner created *ARSO* (org 136, 14:01:55 UTC),
+    **the owner's test hot spot, kept on purpose**: do not remove it, and do not count it as an org's real use
+    (narcis-vibed `2f014a05`). NRP had no hot spot at 14:23 UTC. Not proved yet: a phone-linked record (0 linked at
+    14:23 UTC; no released build sends `hotspotId`).
 - **Decided 2026-11-25 (owner): a linked record keeps the warden's own position.** The link names
   the place; the record keeps where it was taken. The first live build (`469504d5`) stored the hot
   spot's lat/lon instead, reading the *Data* bullet's old "copied from the hot spot" literally; with no
   update call a dropped point could never be recovered. The server fix went live 12:28:51 UTC as
   `62e5d0df` (no schema change), and production held 0 linked records before it, so nothing was lost.
   **Phone half:** send the warden's own lat/lon on a linked record, exactly as for any record.
+- **Phone half built 2026-11-25** (no version bump, no release). Contract checked
+  against narcis-vibed `origin/main` source, not this item's paraphrase: `vroce-tocke.ts` sends numbers as numbers and
+  every field but `id` absent-on-null; `app.ts` answers `{"error":"unknown_hotspot"}` after skip-if-exists.
+  - **Wire:** `Disturbance.hotspotId` / `RemoteDisturbance.hotspotId` (and `toLocal`), sent only when set, beside the
+    warden's own lat/lon; `RemoteApi.fetchHotspots` (`GET hotspots`, entries without a name or coordinate skipped);
+    `hotspots` added to `foldPath`'s resource names (TB-59 counts the route as `/hotspots`, not `/:id`).
+  - **Sync:** the list cached in `hotspots.json`, pulled last in `syncAll`, kept on a failed pull, emptied at logout. On
+    400 `unknown_hotspot` the record is unlinked and sent once more (`_unlinkUnknownHotspot`); nothing else unlinks.
+  - **UI (the owner's UX, 2026-11-24):** diamonds in the web's `#C2410C` on the home map (with the Motnje layer) → a sheet
+    with the name, its records newest first and *Foto* / *Šifrant*; diamonds in the Karta picker, a tap attaches without
+    moving the pin; a removable chip in the form; a *Vroča točka* pill in detail and preview.
+  - **Proof:** suite **341 passed + 1 skipped** (baseline 308 + 33 new in `test/hotspots_test.dart`); six guards proven
+    by removal (the unlink, `toLocal`, the payload key, the logout wipe, the picker not moving the pin, the hot spot
+    drawn above the pin). Found in review after the emulator run, where the pin was always placed away from the diamond:
+    with the warden's fix AT the hot spot (the usual case) the picker's pin, drawn after the hot spots, took the tap and
+    moved instead of attaching. Hot spots are now drawn last in both maps, above the pin and the blue GPS dot; the test
+    for it failed before the change. The home map's order has no test (`HomeScreen` needs GPS, stores and the tile
+    overlay) and was not seen on a device with a GPS dot. Five existing
+    test stubs gained `GET hotspots`, as the live server answers it. `flutter analyze`: the 18 pre-existing infos, none
+    new.
+  - **Android emulator, 2026-11-25** (debug build, against a local stub of the NV-622 handlers and of Račun's browser
+    step; screenshots, stub and log in gitignored `misc/tb39-check/`):
+    1. Home map → *Zadrževalnik Rešeto* → *Šifrant* → Karta (pin placed away from the hot spot) → saved: POST carried
+       `hotspotId` and the warden's own 45.78345, 14.35604 (the hot spot is at 45.7945, 14.3612) → 201; the sheet then
+       listed it (*1 zapis*).
+    2. "+" → *Šifrant* → Karta, tap on *Zapornica Nova Karlovica* (attached, pin unmoved), saved while the stub answered
+       503 → queued; the stub then dropped that hot spot → sync: 400 `unknown_hotspot` → resent unlinked → 201, the
+       device's copy `hotspotId: null`, the hot-spot cache down to one; TB-59 reported the 503 and the 400 (204).
+    3. The form's chip × removes the hot spot. The run found the chip centred under *Lokacija*; now left-aligned.
+    Location Accuracy was declined (privacy default), so the emulator had no GPS fix and positions were placed with
+    Karta. Not done: the *Foto* entry from the sheet (same `_startPhotoFlow` as "+"), an A56 check.
+  - **Choices made here (the owner may overrule):** the picker tap attaches without moving the pin; a dropped link is
+    silent (counted in TB-59, no message to the warden); hot spots ride with the Motnje layer, not a chip of their own,
+    and ignore the Motnje filter.
+  - **Not proved on production:** a phone-linked record. Needs a released build. Production's only hot spot is the
+    owner's test *ARSO* (org 136), kept on purpose: not to be removed or counted as real use.
 - **Shipped:** —
 
 ### TB-40 · Remember map-layer settings across app restarts

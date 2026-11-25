@@ -46,6 +46,7 @@ class Disturbance {
     this.reviewedBy,
     this.reviewedAt,
     this.impacts = const [],
+    this.hotspotId,
   });
 
   final String id;
@@ -90,6 +91,12 @@ class Disturbance {
   // TB-42: values of [kDisturbanceImpacts], in that list's order. Empty = not
   // stated: optional on the form, and absent on records from before TB-42.
   final List<String> impacts;
+  // TB-39 (narcis-vibed NV-622): the hot spot this record was filed on, or
+  // null. Set only when the record is created; nothing on the wire can change
+  // it afterwards (no update call). The record still carries its own
+  // latitude/longitude, the warden's position, not the hot spot's (owner,
+  // 2026-11-25).
+  final String? hotspotId;
 
   bool get hasPendingPhotoUploads => photos.any((p) => p.pendingUpload);
 
@@ -125,6 +132,8 @@ class Disturbance {
     String? reviewedBy,
     DateTime? reviewedAt,
     List<String>? impacts,
+    String? hotspotId,
+    bool clearHotspotId = false,
   }) {
     return Disturbance(
       id: id,
@@ -148,6 +157,7 @@ class Disturbance {
       reviewedBy: reviewedBy ?? this.reviewedBy,
       reviewedAt: reviewedAt ?? this.reviewedAt,
       impacts: impacts ?? this.impacts,
+      hotspotId: clearHotspotId ? null : (hotspotId ?? this.hotspotId),
     );
   }
 
@@ -173,6 +183,7 @@ class Disturbance {
         'reviewedBy': reviewedBy,
         'reviewedAt': reviewedAt?.toIso8601String(),
         'impacts': impacts,
+        'hotspotId': hotspotId,
       };
 
   factory Disturbance.fromJson(Map<String, dynamic> json) {
@@ -210,6 +221,8 @@ class Disturbance {
           : null,
       // Absent on every record cached before TB-42: not stated.
       impacts: readStringList(json['impacts']),
+      // Absent on every record cached before TB-39: not on a hot spot.
+      hotspotId: json['hotspotId'] as String?,
     );
   }
 

@@ -11,6 +11,7 @@ import 'package:narcis_nadzorniki/data/map_view_store.dart';
 import 'package:narcis_nadzorniki/data/obmocja_store.dart';
 import 'package:narcis_nadzorniki/data/zos_style_store.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
+import 'package:narcis_nadzorniki/models/hotspot.dart';
 import 'package:narcis_nadzorniki/models/option_lists.dart';
 import 'package:narcis_nadzorniki/models/walk.dart';
 import 'package:narcis_nadzorniki/screens/detail_screen.dart';
@@ -23,6 +24,7 @@ import 'package:narcis_nadzorniki/services/place_search_service.dart';
 import 'package:narcis_nadzorniki/services/track_polish.dart';
 import 'package:narcis_nadzorniki/state/app_state.dart';
 import 'package:narcis_nadzorniki/widgets/basemap.dart';
+import 'package:narcis_nadzorniki/widgets/hotspot_sheet.dart';
 import 'package:narcis_nadzorniki/widgets/lost_photos_dialog.dart';
 import 'package:narcis_nadzorniki/widgets/motnje_filter_sheet.dart';
 import 'package:narcis_nadzorniki/widgets/obmocja_picker.dart';
@@ -310,6 +312,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     LatLng? location,
     String? initialPhotoPath,
     List<SelectedDisturbanceType>? initialTypes,
+    String? hotspotId,
   }) async {
     final saved = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
@@ -320,6 +323,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           initialBasemap: _basemapMode,
           initialPhotoPath: initialPhotoPath,
           initialTypes: initialTypes,
+          initialHotspotId: hotspotId,
         ),
       ),
     );
@@ -462,7 +466,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     setState(() => _capturedLocation = fresh);
   }
 
-  Future<void> _startPhotoFlow(AppState state) async {
+  /// TB-39: a tap on a hot spot. Its sheet lists its records; a new record
+  /// started there is filed on it, at the warden's own position, through the
+  /// same two flows as "+".
+  Future<void> _openHotspot(AppState state, Hotspot hotspot) async {
+    final entry = await showHotspotSheet(context, hotspot);
+    if (!mounted || entry == null) return;
+    switch (entry) {
+      case HotspotEntry.photo:
+        await _startPhotoFlow(state, hotspotId: hotspot.id);
+      case HotspotEntry.codebook:
+        await _startCodebookFlow(state, hotspotId: hotspot.id);
+    }
+  }
+
+  Future<void> _startPhotoFlow(AppState state, {String? hotspotId}) async {
     final location = _capturedLocation ?? _userLocation;
     setState(() {
       _plusExpanded = false;
@@ -485,10 +503,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       return;
     }
     if (picked == null || !mounted) return;
-    await _openForm(state, location: location, initialPhotoPath: picked.path);
+    await _openForm(
+      state,
+      location: location,
+      initialPhotoPath: picked.path,
+      hotspotId: hotspotId,
+    );
   }
 
-  Future<void> _startCodebookFlow(AppState state) async {
+  Future<void> _startCodebookFlow(AppState state, {String? hotspotId}) async {
     final location = _capturedLocation ?? _userLocation;
     setState(() {
       _plusExpanded = false;
@@ -502,7 +525,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
     if (!mounted) return;
     if (selections == null || selections.isEmpty) return;
-    await _openForm(state, location: location, initialTypes: selections);
+    await _openForm(
+      state,
+      location: location,
+      initialTypes: selections,
+      hotspotId: hotspotId,
+    );
   }
 
   void _showSnack(String message) {
@@ -795,6 +823,26 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
     if (_userLocation != null) {
       markers.add(userLocationMarker(_userLocation!));
+    }
+    // TB-39: hot spots ride with the Motnje layer and ignore the Motnje
+    // filter, which is about records. Drawn last, above the records (a
+    // visited one is ringed by its own records' dots) and above the blue dot:
+    // the warden usually stands at the hot spot, and the dot would take the
+    // tap.
+    if (_showMotnje) {
+      for (final hotspot in state.hotspots) {
+        markers.add(
+          Marker(
+            point: LatLng(hotspot.latitude, hotspot.longitude),
+            width: kRecordMarkerTapDiameter,
+            height: kRecordMarkerTapDiameter,
+            child: GestureDetector(
+              onTap: () => _openHotspot(state, hotspot),
+              child: const HotspotMarker(),
+            ),
+          ),
+        );
+      }
     }
     return markers;
   }

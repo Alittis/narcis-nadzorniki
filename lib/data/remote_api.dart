@@ -8,6 +8,7 @@ import 'package:narcis_nadzorniki/data/tezave_store.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
 import 'package:narcis_nadzorniki/models/disturbance_photo.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
+import 'package:narcis_nadzorniki/models/hotspot.dart';
 import 'package:narcis_nadzorniki/models/option_lists.dart';
 import 'package:narcis_nadzorniki/models/walk.dart';
 
@@ -82,6 +83,22 @@ class RemoteApiException implements Exception {
   bool get isNotFound => statusCode == 404;
   bool get isNetwork => statusCode == null;
 
+  /// TB-39 (narcis-vibed NV-622): a record POST naming a hot spot the server
+  /// does not know for this org — 400 `{"error":"unknown_hotspot"}`. Lost in a
+  /// restore, or never this org's. Only this exact answer counts: any other
+  /// 400 is not a reason to drop a link.
+  bool get isUnknownHotspot {
+    if (statusCode != 400) return false;
+    final b = body;
+    if (b == null) return false;
+    try {
+      final decoded = jsonDecode(b);
+      return decoded is Map && decoded['error'] == 'unknown_hotspot';
+    } on FormatException {
+      return false;
+    }
+  }
+
   @override
   String toString() {
     if (statusCode == null) return 'RemoteApiException(network: $cause)';
@@ -115,6 +132,7 @@ class RemoteDisturbance {
     required this.reviewedAt,
     required this.photos,
     this.impacts = const [],
+    this.hotspotId,
   });
 
   final String id;
@@ -139,6 +157,8 @@ class RemoteDisturbance {
   // TB-42 (narcis-vibed NV-615): absent when none is stated, and on a server
   // that predates it.
   final List<String> impacts;
+  // TB-39 (narcis-vibed NV-622): absent when the record is on no hot spot.
+  final String? hotspotId;
 
   /// Convert into a local-store-shaped record. Photos are returned without a
   /// localPath - lazy fetch will populate it on first view.
@@ -164,6 +184,7 @@ class RemoteDisturbance {
       reviewedBy: reviewedBy,
       reviewedAt: reviewedAt,
       impacts: impacts,
+      hotspotId: hotspotId,
     );
   }
 
@@ -205,6 +226,7 @@ class RemoteDisturbance {
           .map((e) => _readPhoto(e as Map<String, dynamic>))
           .toList(),
       impacts: readStringList(json['impacts']),
+      hotspotId: json['hotspotId'] as String?,
     );
   }
 
@@ -352,6 +374,32 @@ class RemoteApi {
           .toList(),
       _generationOf(response),
     );
+  }
+
+  /// TB-39 (narcis-vibed NV-622): the caller's org hot spots, by name. An
+  /// entry the phone cannot draw (no name or coordinate) is left out; a body
+  /// without the list is an error, so the caller keeps what it had.
+  Future<List<Hotspot>> fetchHotspots(SyncCredentials credentials) async {
+    final url = _at(['hotspots']);
+    final response = await _send(
+      url,
+      () => _client.get(url, headers: _authHeaders(credentials)),
+    );
+    _ensureStatus(response, url, const {200});
+    Object? decoded;
+    try {
+      decoded = jsonDecode(response.body);
+    } on FormatException {
+      decoded = null;
+    }
+    if (decoded is! Map<String, dynamic> || decoded['hotspots'] is! List) {
+      throw RemoteApiException(
+        statusCode: response.statusCode,
+        body: response.body,
+        pot: foldPath(url),
+      );
+    }
+    return Hotspot.listFromJson(decoded['hotspots']);
   }
 
   Future<void> createRecord(
@@ -617,6 +665,9 @@ class RemoteApi {
         // narcis-vibed NV-615 ignores the key, which is why that server half
         // must be live before a build carrying this ships.
         if (d.impacts.isNotEmpty) 'impacts': d.impacts,
+        // TB-39: sent only on a record filed on a hot spot. latitude/longitude
+        // above stay the warden's own position (owner, 2026-11-25).
+        if (d.hotspotId != null) 'hotspotId': d.hotspotId,
       };
 
   /// TB-59 (narcis-racun RN-22 S3): reports the counted failures. Completes
@@ -644,7 +695,13 @@ class RemoteApi {
   /// any request (`photo_lost`, `photo_upload`).
   String get photoPot => foldPath(_photoUri(':id', ':id'));
 
-  static const _resources = {'disturbances', 'photos', 'walks', 'points'};
+  static const _resources = {
+    'disturbances',
+    'photos',
+    'walks',
+    'points',
+    'hotspots',
+  };
 
   /// TB-59: [url]'s path with every id folded: the API base is kept as it is,
   /// and after it any segment that is not one of the API's resource names

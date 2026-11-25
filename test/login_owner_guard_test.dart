@@ -144,6 +144,9 @@ class _Harness {
       requests.add('${req.method} ${req.url.path} '
           '${req.headers['Authorization'] ?? ''}');
       if (req.method == 'GET') {
+        if (req.url.path.endsWith('/hotspots')) {
+          return _json({'hotspots': <dynamic>[]}); // TB-39
+        }
         return req.url.path.contains('/walks')
             ? _json({'walks': <dynamic>[]})
             : _json({'records': <dynamic>[]});

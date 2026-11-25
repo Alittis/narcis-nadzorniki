@@ -20,6 +20,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:narcis_nadzorniki/data/dataset_generation_store.dart';
+import 'package:narcis_nadzorniki/data/hotspots_store.dart';
 import 'package:narcis_nadzorniki/data/local_store.dart';
 import 'package:narcis_nadzorniki/data/remote_api.dart';
 import 'package:narcis_nadzorniki/data/tezave_store.dart';
@@ -164,6 +165,9 @@ class _Harness {
       if (req.url.path.contains('/walks')) {
         return _json({'walks': <dynamic>[]}, 200);
       }
+      if (req.url.path.endsWith('/hotspots')) {
+        return _json({'hotspots': <dynamic>[]}, 200); // TB-39
+      }
       if (req.method == 'DELETE') {
         return http.Response('', deleteStatus);
       }
@@ -194,6 +198,10 @@ class _Harness {
       ),
       // TB-59: the same; the failure counts live in memory only.
       tezaveStore: TezaveStore(
+        directory: () => Future.error(UnsupportedError('no documents dir')),
+      ),
+      // TB-39: the same; the hot spots live in memory only.
+      hotspotsStore: HotspotsStore(
         directory: () => Future.error(UnsupportedError('no documents dir')),
       ),
     );
