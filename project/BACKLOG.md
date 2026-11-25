@@ -1690,7 +1690,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-39 · Hot spots (*vroče točke*) — recurring named points that collect records over time
-`✨ Enhancement` · `P2` · `Doing` (phase 1 server half LIVE 2026-11-25 as narcis-vibed NV-622; phone half built 2026-11-25, not released) · Reporters: Matjaž, Tomaž (proposal *Predlog »Vroča točka«*, 2026-08-27) · Updated: 2026-11-25
+`✨ Enhancement` · `P2` · `Doing` (phase 1 server half LIVE 2026-11-25 as narcis-vibed NV-622; phone half built into v1.20.0+30 2026-11-25, pending upload + rollout) · Reporters: Matjaž, Tomaž (proposal *Predlog »Vroča točka«*, 2026-08-27) · Updated: 2026-11-25
 - **Want (Tomaž's proposal):** permanent named points (*Zapornica Nova Karlovica*, *Zadrževalnik
   Rešeto*, a dump site) where any warden adds a new record on each visit, instead of creating a new
   one-off point every time. Modelled on eBird hotspots.
@@ -1792,7 +1792,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   update call a dropped point could never be recovered. The server fix went live 12:28:51 UTC as
   `62e5d0df` (no schema change), and production held 0 linked records before it, so nothing was lost.
   **Phone half:** send the warden's own lat/lon on a linked record, exactly as for any record.
-- **Phone half built 2026-11-25** (no version bump, no release). Contract checked
+- **Phone half built 2026-11-25** (`cf8ad19`; released in v1.20.0+30, see *Shipped*). Contract checked
   against narcis-vibed `origin/main` source, not this item's paraphrase: `vroce-tocke.ts` sends numbers as numbers and
   every field but `id` absent-on-null; `app.ts` answers `{"error":"unknown_hotspot"}` after skip-if-exists.
   - **Wire:** `Disturbance.hotspotId` / `RemoteDisturbance.hotspotId` (and `toLocal`), sent only when set, beside the
@@ -1828,7 +1828,11 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
     and ignore the Motnje filter.
   - **Not proved on production:** a phone-linked record. Needs a released build. Production's only hot spot is the
     owner's test *ARSO* (org 136), kept on purpose: not to be removed or counted as real use.
-- **Shipped:** —
+- **Shipped:** phase 1 built into **v1.20.0+30** (2026-11-25, `~/Releases/terenska-beleznica-1.20.0+30.aab`, signer
+  and manifest verified), **pending upload + rollout** on the Closed testing track. Phase 2 (*Predlagaj*, regrouping)
+  stays open, so whether TB-39 closes at rollout or stays open for it is the owner's call then. Privacy policy: no
+  edit due. A hot-spot link is a choice from the org's list, like TB-42/43's fields, and the phone does not keep a hot
+  spot's `createdBy`.
 
 ### TB-40 · Remember map-layer settings across app restarts
 `✨ Enhancement` · `P2` · `Done` (shipped v1.11.0+21; rolled out on the Play Closed testing track 2026-10-12, confirmed on device) · Reporter: Matjaž · Updated: 2026-10-12
