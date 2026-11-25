@@ -1690,7 +1690,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-39 · Hot spots (*vroče točke*) — recurring named points that collect records over time
-`✨ Enhancement` · `P2` · `Doing` (phase 1 server half started in narcis-vibed 2026-11-25; phone half after its contract exists) · Reporters: Matjaž, Tomaž (proposal *Predlog »Vroča točka«*, 2026-08-27) · Updated: 2026-11-25
+`✨ Enhancement` · `P2` · `Doing` (phase 1 server half LIVE 2026-11-25 as narcis-vibed NV-622; phone half next) · Reporters: Matjaž, Tomaž (proposal *Predlog »Vroča točka«*, 2026-08-27) · Updated: 2026-11-25
 - **Want (Tomaž's proposal):** permanent named points (*Zapornica Nova Karlovica*, *Zadrževalnik
   Rešeto*, a dump site) where any warden adds a new record on each visit, instead of creating a new
   one-off point every time. Modelled on eBird hotspots.
@@ -1728,8 +1728,9 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   the session, as on the other tables (no FK leaves the schema). The field-app API
   `/api/beleznica/app/v1` needs a hot-spot list and must accept the hot-spot id on a record. The
   backup already dumps the whole schema (`pg_dump -n beleznica`), so it covers the new table. A
-  record on a hot spot still stores its own lat/lon (copied from the hot spot), so maps, exports and
-  the web keep working unchanged.
+  record on a hot spot still stores its own lat/lon, so maps, exports and the web keep working
+  unchanged. That lat/lon is the warden's own point, not a copy of the hot spot's (owner, 2026-11-25;
+  this bullet said "copied from the hot spot" until then — see *Decided 2026-11-25* below).
 - **Mail (corrected 2026-11-24):** phase 2 was to reuse TB-38's mail path, but TB-38 is blocked on
   `APEX_MAIL` from ORDS, which the cutover made moot. No outbound mail sender was found in
   narcis-vibed's web source on 2026-11-24 (searched nodemailer, sendMail, smtp; the lib files that
@@ -1758,13 +1759,37 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   create right per org (none ZRSVN-wide), tap-to-attach and nothing attached automatically; no date
   given. Asked: (1) who at NRP gets the create right, (2) whether they need a count per type, and if
   so only on hot spots or on every record. **Question (1) answered 2026-11-25 (owner): Matjaž and
-  Tomaž both get the create right** (`TERENSKA-BELEZNICA-ADMIN`); whether each already holds it is
-  being checked in narcis-vibed. Question (2), the count per type, is still awaiting their answer.
-- **Phase 1 server half: started 2026-11-25 in narcis-vibed** (own worktree, branch slug
-  `tb39-hot-spots`): NV item, schema v3 (hot-spot table + nullable FK on `beleznica.motnja`), desktop
-  create for the org admin, and in `/app/v1` an org-scoped hot-spot list plus the hot-spot id as an
-  optional, additive key on a record. NV id: — (recorded here once filed). Nothing goes to the VPS
-  without the owner's go.
+  Tomaž both get the create right** (`TERENSKA-BELEZNICA-ADMIN`). Checked by NV-622 against the VPS
+  nightly mirror of NarcIS grants (2026-11-25, both NRP org 152): Tomaž (user 253) holds it; Matjaž
+  (user 986) holds only `TERENSKA-BELEZNICA` and needs function 642 (`TERENSKA-BELEZNICA-ADMIN`),
+  granted by hand in NarcIS by the owner. Question (2), the count per type, is still awaiting their
+  answer.
+- **Phase 1 server half: narcis-vibed NV-622, LIVE 2026-11-25 09:29:57 UTC** as `469504d5`
+  (owner's go: "deploy NV-622"; schema v3 on production 09:09:28 UTC; backup 374 and the restore
+  drill passed after it). Schema v3: table `beleznica.vroca_tocka` (uuid minted on the server, names
+  unique per org case-folded) and nullable `motnja.vroca_tocka_id`, FK'd with `org_id` so a record can
+  only name its own org's hot spot. Desktop: a *Vroče točke* tab with *Nova vroča točka* for
+  `TERENSKA-BELEZNICA-ADMIN` (and SUPERADMIN), own org. NV-622 in narcis-vibed's BACKLOG is canonical
+  for the contract; what the phone half needs from it:
+  - `GET /api/beleznica/app/v1/hotspots` → `{"hotspots":[{"id","name","latitude","longitude",
+    "createdAt","createdBy"}]}`, caller's org only, by name; same gate as every route (401/426/503).
+  - `GET disturbances`: a record carries `hotspotId` (uuid string), absent when none. The phone lists a
+    hot spot's records from this list.
+  - `POST disturbances` may send `hotspotId` (absent, `null` or `""` = none); lat/lon stay required and are stored as sent.
+    Unknown, another org's or malformed → **400 `{"error":"unknown_hotspot"}`**, decided after
+    skip-if-exists. `_sendAndMarkSynced` (`lib/state/app_state.dart`) keeps a record queued on any
+    `RemoteApiException`, so the phone must drop the link on that 400 and resend, or a hot spot lost in
+    a restore strands the record.
+  - No update call: PUT answers 405, so nothing on the wire can link or unlink a record after it is
+    sent.
+  - Not proved on production yet: a real admin's hot spot, and a phone-linked record (no build sends
+    `hotspotId`).
+- **Decided 2026-11-25 (owner): a linked record keeps the warden's own position.** The link names
+  the place; the record keeps where it was taken. The first live build (`469504d5`) stored the hot
+  spot's lat/lon instead, reading the *Data* bullet's old "copied from the hot spot" literally; with no
+  update call a dropped point could never be recovered. The server fix went live 12:28:51 UTC as
+  `62e5d0df` (no schema change), and production held 0 linked records before it, so nothing was lost.
+  **Phone half:** send the warden's own lat/lon on a linked record, exactly as for any record.
 - **Shipped:** —
 
 ### TB-40 · Remember map-layer settings across app restarts
