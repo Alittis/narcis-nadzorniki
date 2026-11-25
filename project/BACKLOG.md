@@ -1690,7 +1690,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-39 · Hot spots (*vroče točke*) — recurring named points that collect records over time
-`✨ Enhancement` · `P2` · `Todo` (phase 1 scope decided by the owner 2026-11-24) · Reporters: Matjaž, Tomaž (proposal *Predlog »Vroča točka«*, 2026-08-27) · Updated: 2026-11-24
+`✨ Enhancement` · `P2` · `Doing` (phase 1 server half started in narcis-vibed 2026-11-25; phone half after its contract exists) · Reporters: Matjaž, Tomaž (proposal *Predlog »Vroča točka«*, 2026-08-27) · Updated: 2026-11-25
 - **Want (Tomaž's proposal):** permanent named points (*Zapornica Nova Karlovica*, *Zadrževalnik
   Rešeto*, a dump site) where any warden adds a new record on each visit, instead of creating a new
   one-off point every time. Modelled on eBird hotspots.
@@ -1757,7 +1757,14 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Reporters informed 2026-11-24** (mail to Tomaž and Matjaž, sent by Alexis): the two steps, the
   create right per org (none ZRSVN-wide), tap-to-attach and nothing attached automatically; no date
   given. Asked: (1) who at NRP gets the create right, (2) whether they need a count per type, and if
-  so only on hot spots or on every record. **Awaiting their answer.**
+  so only on hot spots or on every record. **Question (1) answered 2026-11-25 (owner): Matjaž and
+  Tomaž both get the create right** (`TERENSKA-BELEZNICA-ADMIN`); whether each already holds it is
+  being checked in narcis-vibed. Question (2), the count per type, is still awaiting their answer.
+- **Phase 1 server half: started 2026-11-25 in narcis-vibed** (own worktree, branch slug
+  `tb39-hot-spots`): NV item, schema v3 (hot-spot table + nullable FK on `beleznica.motnja`), desktop
+  create for the org admin, and in `/app/v1` an org-scoped hot-spot list plus the hot-spot id as an
+  optional, additive key on a record. NV id: — (recorded here once filed). Nothing goes to the VPS
+  without the owner's go.
 - **Shipped:** —
 
 ### TB-40 · Remember map-layer settings across app restarts
