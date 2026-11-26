@@ -23,7 +23,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 ## Open
 
 ### TB-64 · A record on a hot spot is at the hot spot, not where the warden stood (TB-39 follow-up)
-`✨ Enhancement` · `P2` · `Doing` · Reporter: owner (2026-11-26) · Updated: 2026-11-26
+`✨ Enhancement` · `P2` · `Done` (**v1.21.0+31 rolled out on the Play Closed testing track, confirmed by the owner 2026-11-26**; minimum build 31 since 13:25:05 UTC) · Reporter: owner (2026-11-26) · Updated: 2026-11-26
 - **Problem:** TB-39's rule of 2026-11-25 kept the warden's own position on a linked record. On 2026-11-26 it showed
   two costs. On the desktop the owner's test record on *ARSO* is a separate point, 15.7 m from the hot spot, and the
   desktop's main map does not draw hot spots, so nothing ties them. A record filed later, away from the place (back
@@ -53,22 +53,39 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
      device's copy was synced, and the hot spot's sheet read *1 zapis*.
   - Not driven: GPS dropping the link. Location Accuracy was declined (the privacy default), so there was no fix; the
     suite's guard covers it.
-- **Built into v1.21.0+31** (2026-11-26, `~/Releases/terenska-beleznica-1.21.0+31.aab`; signer and manifest verified),
-  **pending upload + rollout**. Release notes in `PLAY_CLOSED_TEST.md` §3.3.
+- **Shipped:** **v1.21.0+31** (built 2026-11-26, `~/Releases/terenska-beleznica-1.21.0+31.aab`; signer and manifest
+  verified), **rolled out on the Play Closed testing track, confirmed by the owner 2026-11-26** (commits `8131b2f`,
+  `d298dc2`). Release notes in `PLAY_CLOSED_TEST.md` §3.3.
+- **Minimum build raised to 31 (owner, 2026-11-26),** so no phone keeps sending the warden's position on a linked record:
+  - `BELEZNICA_APP_MIN_BUILD=29` → `31` in the box's `web/.env.local`; `narcis-vibed.service` restarted 13:25:05 UTC
+    (`restart-vibed.sh`, clean on try 1). Rollback: set the line back to 29, restart. The copy of the file taken before
+    was deleted after the check, since the file holds the app's secrets (narcis-vibed DEPLOYMENT §3.5b).
+  - Checked through Caddy: `…/app/v1/disturbances` answers 426 `{"error":"update_required","minBuild":31}` with no
+    `X-App-Build`, with 29 and with 30, and 401 with 31; `POST …/prijava` and `…/walks` 401 with 31; `…/nope` 404; the
+    site 200; the unit's journal has no warning since the restart.
+- **Proved on production 2026-11-26** (owner on the A56 with v1.21.0+31: home map → *ARSO* → *Šifrant*). A read-only
+  query on the VPS (`narcis_spike` as `narcis_owner`) shows record `07b4e7e7…` (org 136), observed 13:33 UTC, stored
+  13:33:31 UTC and never edited, at *ARSO*'s exact point 46.0652930, 14.5137000, *Približna*, linked to it. The minimum
+  build 31 was already live, so only a build 31+ could send it. Counts: 1,617 records, 2 linked (both on *ARSO*, the
+  owner's test hot spot, kept on purpose).
 - **Consequences:** a hot spot's records stack at its point, under the diamond on the phone's map; its sheet lists
-  them. The exact spot within a large hot spot is lost; a warden who needs it files without the hot spot. The owner's
-  test record on *ARSO* stays 15.7 m off (nothing on the wire can move a sent record). Phones on v1.20.0+30 keep
-  sending the warden's position until they update (`BELEZNICA_APP_MIN_BUILD` could force it).
+  them. The exact spot within a large hot spot is lost; a warden who needs it files without the hot spot. ~~The owner's
+  test record on *ARSO* stays 15.7 m off (nothing on the wire can move a sent record).~~ The desktop's *Uredi zapis*
+  moved it onto the hot spot's point at 09:18:46 UTC (narcis-vibed NV-628's production proof). ~~Phones on v1.20.0+30 keep sending the warden's position until they update.~~ Forced: builds below
+  31 get the update screen since 2026-11-26 13:25:05 UTC, their queue kept.
 - **Also:** a record copies the hot spot's coordinates when it is made, so a hot spot moved later would leave its
   records where it was. narcis-vibed left *move* undecided (NV-622); this now bears on that decision.
 - **Follow-ups (narcis-vibed, not edited from here):**
   - Drawing hot spots on the desktop's main map (the owner said yes, 2026-11-26) is paused: with records at the hot
-    spot it may not be needed. The owner decides once TB-64 is released.
-  - NV-622's decision line (*"a linked record keeps the warden's own position"*) and the production column comment on
+    spot it may not be needed. The owner decides once TB-64 is released. **Released 2026-11-26: the owner's call is
+    now open.**
+  - ~~NV-622's decision line (*"a linked record keeps the warden's own position"*) and the production column comment on
     `beleznica.motnja.vroca_tocka_id` (*"the warden's position as the phone sent it"*) are stale. The server's
     behaviour (it stores the body's coordinates) is unchanged and right. Due when TB-64 is released. The manual
-    (`HelpControl.tsx`, *Vroče točke*) states no position rule and needs nothing.
-- **Shipped:** —
+    (`HelpControl.tsx`, *Vroče točke*) states no position rule and needs nothing.~~ **Done by narcis-vibed NV-628
+    (2026-11-26):** the production column comment (read back 2026-11-26) and narcis-vibed ARCHITECTURE's hot-spot
+    bullets carry TB-64's rule, and the manual's *Vroče točke* paragraph states it. NV-622's decision line stays as
+    that Done item's history.
 
 ### TB-63 · The record form's dropdowns and the *Tipi motnje* tile header overflow at 320 dp with large text (widget-test font)
 `🐞 Bug` · `P3` · `Triage` · Reporter: Claude (2026-11-23, found by the TB-42 narrow-phone check) · Updated: 2026-11-23

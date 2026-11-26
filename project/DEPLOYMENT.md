@@ -147,7 +147,8 @@ flutter build appbundle --release
 - **Raising the server's minimum build too early (TB-46)** → narcis-vibed's `BELEZNICA_APP_MIN_BUILD` answers older builds 426
   and a blocking update screen. Raised before the new build is downloadable in Play (review ~1–20 h), it locks testers out
   with nothing to update to. **Raise it only after Play Console shows the build live;** their queue survives either way.
-  **Live value: 29**, since 2026-11-23 12:28:15 UTC (TB-43), set the day v1.19.0+29 went live.
+  **Live value: 31**, since 2026-11-26 13:25:05 UTC (TB-64), set the day v1.21.0+31 went live (29 from 2026-11-23,
+  TB-43). Rollback: set the line back to the previous build, restart.
 - **Privacy policy URL drift** → if the policy URL ever 404s, Play can suspend the listing. Edits to the policy must keep the URL stable.
 - **Trader status drift** → the non-trader declaration (§4) covers every app on the account. Publishing a paid, ad-supported or
   in-app-purchase app, or paid client work, under it without switching to trader can get apps removed worldwide (EU UCPD /

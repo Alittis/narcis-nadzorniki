@@ -92,7 +92,7 @@ valid for offline login until the configured max-offline window expires
 >   after the last backup. A record deleted on the web inside the lost window comes back; delete it again.
 > - **426 `update_required`** below narcis-vibed's `BELEZNICA_APP_MIN_BUILD`: the app stops syncing and shows *Potrebna je
 >   posodobitev*; the queue waits for the update. Raise the minimum only after Play shows the new build live (DEPLOYMENT §5).
->   The live minimum is **29** since 2026-11-23 (TB-43).
+>   The live minimum is **31** since 2026-11-26 13:25:05 UTC (TB-64; 29 from 2026-11-23, TB-43).
 The disturbance CRUD endpoints (ARCHITECTURE.md §9.3) authenticate every call
 with `X-Narcis-Auth` — a bearer token (preferred) or, as a fallback, the
 plaintext password held in memory for the session. With a persisted token the

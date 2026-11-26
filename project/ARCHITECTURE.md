@@ -125,7 +125,7 @@ skip-if-exists creates, 204 deletes, 404 = done), so the sync engine is unchange
     record filed on a hot spot. **A linked record is at the hot spot (TB-64, owner 2026-11-26):** the phone puts the
     record's `latitude`/`longitude` on the hot spot's point, *Približna*, and sends them as for any record. The server
     stores what the body carries (`62e5d0df`), so the rule lives in the phone alone. From 2026-11-25 until TB-64 the
-    rule was the warden's own position, which v1.20.0+30 still sends.
+    rule was the warden's own position, which v1.20.0+30 sent; the minimum build 31 (2026-11-26) refuses it.
   - A POST naming a hot spot the server does not know for the org is **400 `{"error":"unknown_hotspot"}`**, decided after
     skip-if-exists. The app then drops the link and sends the record again (§13). The phone has no update call, so it
     sets a link once. The desktop edit can regroup a sent record onto or off a hot spot (TB-39 phase 2, narcis-vibed
@@ -431,7 +431,7 @@ Unchanged by TB-27, deliberately: **shape encodes authorship** (own = filled dis
 *Odprto*'s amber, so shape, not colour, tells them apart: a record is a disc, a hot spot a diamond. Hot spots ride with
 the Motnje layer, drawn last (above the records, and above the blue GPS dot, which would otherwise take the tap from a
 warden standing at the hot spot) and ignoring the Motnje filter, which is about records. From TB-64 (in v1.21.0+31,
-built 2026-11-26, pending rollout) a hot spot's own records sit at its point, under the diamond; its sheet lists them. A tap opens the hot spot's sheet (§14).
+rolled out 2026-11-26) a hot spot's own records sit at its point, under the diamond; its sheet lists them. A tap opens the hot spot's sheet (§14).
 
 **Age colouring is gone entirely (TB-29).** `AgeBucket`, `ageBucketOf`, `allAgeBuckets`, `recordMarkerColorForAge` and the filter's `ageBuckets` dimension were all removed once the map stopped encoding age: three coarse buckets were strictly worse than the **Obdobje** window sitting beside them, which filters the same axis at day granularity with a histogram. (Note for anyone reading v1.6.0-era docs: the claim that `recordMarkerColorForAge` was the Starost swatch source was wrong — the sheet hardcoded `Colors.red/orange/blue` and never called it.)
 
@@ -555,7 +555,8 @@ sends it as `X-Beleznica-Generation` on both list GETs; `DatasetGenerationStore`
 (`canSync` false) without touching the session or the queue, and `main.dart` shows `UpdateRequiredScreen` at the root only
 — a form open above it can still be saved, and the record is queued for the updated build. Not persisted: the server says it
 again. `kAppBuild` must equal pubspec's `+N` ([test/app_version_test.dart](../test/app_version_test.dart) fails otherwise).
-The server's minimum is **29** since 2026-11-23 12:28:15 UTC (TB-43): every build before 1.19.0+29 gets the update screen.
+The server's minimum is **31** since 2026-11-26 13:25:05 UTC (TB-64; 29 from 2026-11-23, TB-43): every build before
+1.21.0+31 gets the update screen, so no phone sends a linked record at the warden's position any more.
 
 **Failure counts for user support (TB-59, narcis-racun RN-22 S3; owner decision 2026-11-11).** The phone counts the
 failures a signed-in person hits and reports the counts, so user support sees them in the person's record (superadmins
@@ -671,8 +672,8 @@ The red "+" FAB on `HomeScreen` (lib/screens/home_screen.dart) is a speed dial. 
 
 - **Hot spots (TB-39 phase 1; owner, 2026-11-24/25; position rule TB-64, owner 2026-11-26).** Two ways to file a
   record on one, neither a third speed-dial button, and nothing attached automatically (proximity is not relation).
-  The TB-64 behaviour below is built, not yet in a released build: v1.20.0+30 keeps the warden's own position and
-  leaves the pin where it is.
+  The TB-64 behaviour below is released in v1.21.0+31 (rolled out 2026-11-26; the minimum build 31 since then);
+  v1.20.0+30 kept the warden's own position and left the pin where it was.
   - **From the home map.** A tap on a diamond opens `showHotspotSheet`
     ([lib/widgets/hotspot_sheet.dart](../lib/widgets/hotspot_sheet.dart)): the name, its records newest first (the
     org's records on this device with that `hotspotId`, each opening `DetailScreen`), and *Foto* / *Šifrant*, the speed
