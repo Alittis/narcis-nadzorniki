@@ -42,8 +42,19 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Proof:** suite **344 passed + 1 skipped** (3 net new in `test/hotspots_test.dart`; the picker and form tests
   rewritten for the new rule). Four guards proven by removal (the diamond moving the location, a map tap dropping the
   link, GPS dropping it, the sheet start on the hot spot). The diamond's tap is checked past flutter_map's double-tap
-  window, so the map's own tap cannot undo it. `flutter analyze`: the 18 pre-existing infos. Not checked on the
-  emulator or a phone.
+  window, so the map's own tap cannot undo it. `flutter analyze`: the 18 pre-existing infos.
+- **Android emulator, 2026-11-26** (debug build against `misc/tb39-check`'s stub; screenshots and log in gitignored
+  `misc/tb64-check/`):
+  1. Home map → *Zadrževalnik Rešeto* → *Šifrant*: the form started at the hot spot's point, 45.79450, 14.36120,
+     *Približna*, with its chip.
+  2. *Karta*: Rešeto ringed and the pin hidden. A tap in the fields dropped the link and put the pin there.
+  3. A tap on *Zapornica Nova Karlovica*: ringed, pin hidden, named in the bar. It held past the double-tap window.
+  4. Saved: the POST carried its `hotspotId` with the hot spot's own 45.7905, 14.3655 and *Približna* → 201. The
+     device's copy was synced, and the hot spot's sheet read *1 zapis*.
+  - Not driven: GPS dropping the link. Location Accuracy was declined (the privacy default), so there was no fix; the
+    suite's guard covers it.
+- **Built into v1.21.0+31** (2026-11-26, `~/Releases/terenska-beleznica-1.21.0+31.aab`; signer and manifest verified),
+  **pending upload + rollout**. Release notes in `PLAY_CLOSED_TEST.md` §3.3.
 - **Consequences:** a hot spot's records stack at its point, under the diamond on the phone's map; its sheet lists
   them. The exact spot within a large hot spot is lost; a warden who needs it files without the hot spot. The owner's
   test record on *ARSO* stays 15.7 m off (nothing on the wire can move a sent record). Phones on v1.20.0+30 keep

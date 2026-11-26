@@ -430,8 +430,8 @@ Unchanged by TB-27, deliberately: **shape encodes authorship** (own = filled dis
 `#C2410C` (`kHotspotColor`, `HotspotMarker` in [basemap.dart](../lib/widgets/basemap.dart)). That orange is close to
 *Odprto*'s amber, so shape, not colour, tells them apart: a record is a disc, a hot spot a diamond. Hot spots ride with
 the Motnje layer, drawn last (above the records, and above the blue GPS dot, which would otherwise take the tap from a
-warden standing at the hot spot) and ignoring the Motnje filter, which is about records. From TB-64 (built 2026-11-26,
-not in a released build yet) a hot spot's own records sit at its point, under the diamond; its sheet lists them. A tap opens the hot spot's sheet (§14).
+warden standing at the hot spot) and ignoring the Motnje filter, which is about records. From TB-64 (in v1.21.0+31,
+built 2026-11-26, pending rollout) a hot spot's own records sit at its point, under the diamond; its sheet lists them. A tap opens the hot spot's sheet (§14).
 
 **Age colouring is gone entirely (TB-29).** `AgeBucket`, `ageBucketOf`, `allAgeBuckets`, `recordMarkerColorForAge` and the filter's `ageBuckets` dimension were all removed once the map stopped encoding age: three coarse buckets were strictly worse than the **Obdobje** window sitting beside them, which filters the same axis at day granularity with a histogram. (Note for anyone reading v1.6.0-era docs: the claim that `recordMarkerColorForAge` was the Starost swatch source was wrong — the sheet hardcoded `Colors.red/orange/blue` and never called it.)
 
