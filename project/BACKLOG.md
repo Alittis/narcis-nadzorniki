@@ -77,8 +77,10 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   records where it was. narcis-vibed left *move* undecided (NV-622); this now bears on that decision.
 - **Follow-ups (narcis-vibed, not edited from here):**
   - Drawing hot spots on the desktop's main map (the owner said yes, 2026-11-26) is paused: with records at the hot
-    spot it may not be needed. The owner decides once TB-64 is released. **Released 2026-11-26: the owner's call is
-    now open.**
+    spot it may not be needed. The owner decides once TB-64 is released. ~~**Released 2026-11-26: the owner's call is
+    now open.**~~ **Decided 2026-11-26 (owner): yes**, the desktop still marks hot spots apart from records, and they
+    join the filter. Built as narcis-vibed **NV-635**: the phone's orange diamonds on the main map, and a click shows
+    that hot spot's records (the *Vroča točka* facet). Not merged or deployed yet; the phone needs nothing.
   - ~~NV-622's decision line (*"a linked record keeps the warden's own position"*) and the production column comment on
     `beleznica.motnja.vroca_tocka_id` (*"the warden's position as the phone sent it"*) are stale. The server's
     behaviour (it stores the body's coordinates) is unchanged and right. Due when TB-64 is released. The manual
