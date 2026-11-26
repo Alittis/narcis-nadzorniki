@@ -1727,7 +1727,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-39 · Hot spots (*vroče točke*) — recurring named points that collect records over time
-`✨ Enhancement` · `P2` · `Doing` (phase 1 LIVE: server half narcis-vibed NV-622 2026-11-25, phone half v1.20.0+30 rolled out 2026-11-26 and proved on production; phase 2 open) · Reporters: Matjaž, Tomaž (proposal *Predlog »Vroča točka«*, 2026-08-27) · Updated: 2026-11-26
+`✨ Enhancement` · `P2` · `Todo` (phase 1 shipped: server half narcis-vibed NV-622 2026-11-25, phone half v1.20.0+30 rolled out 2026-11-26 and proved on production; kept open for phase 2, owner 2026-11-26; position rule since TB-64) · Reporters: Matjaž, Tomaž (proposal *Predlog »Vroča točka«*, 2026-08-27) · Updated: 2026-11-26
 - **Want (Tomaž's proposal):** permanent named points (*Zapornica Nova Karlovica*, *Zadrževalnik
   Rešeto*, a dump site) where any warden adds a new record on each visit, instead of creating a new
   one-off point every time. Modelled on eBird hotspots.
@@ -1873,6 +1873,9 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   phone; commits `cf8ad19`, `9a4130a`). Privacy policy: no
   edit due. A hot-spot link is a choice from the org's list, like TB-42/43's fields, and the phone does not keep a hot
   spot's `createdBy`.
+- **Kept open for phase 2 (owner, 2026-11-26)**, so `Doing` → `Todo`. Phase 2 is *Predlagaj za vročo točko* with its
+  mail to the admin, which waits on a narcis-vibed mail path (as TB-38), and regrouping existing records in the
+  desktop edit, which does not. The count per type (example 3) is still awaiting Matjaž and Tomaž.
 
 ### TB-40 · Remember map-layer settings across app restarts
 `✨ Enhancement` · `P2` · `Done` (shipped v1.11.0+21; rolled out on the Play Closed testing track 2026-10-12, confirmed on device) · Reporter: Matjaž · Updated: 2026-10-12
