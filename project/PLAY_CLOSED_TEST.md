@@ -706,6 +706,12 @@ Sign-in needs internet; then the app works offline. Walks use a foreground locat
 > the 1.16.0 sign-in was refused with `no_org` after a good password; the owner set ARSO (org 136) in NarcIS the same
 > day and the mirror carried it at 07:28 UTC. Accounts' organisations, roles and codes are still Oracle's (APEX p97)
 > until narcis-vibed NV-554 P5 ships its own admin; a p97 change reaches Račun NarcIS within ~16 minutes.
+>
+> 2026-11-26: **each review files a real record in ARSO (org 136).** The reviewer follows step 4 ("+" adds a record)
+> from a device in California: five records by this account, one per review from 2026-11-13 to 11-26, all at
+> 39.2372, −123.1500, *Natančna*, no description or photo. On the desktop they pulled the notebook's opening frame
+> out over the Atlantic (it frames every record). The owner deleted them the same day. Delete the new one after each
+> review; moving the account to an org of its own would keep them out of ARSO (owner's call, APEX p97).
 
 ### 4.3 Ads
 
