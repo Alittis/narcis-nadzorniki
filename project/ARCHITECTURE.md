@@ -127,7 +127,9 @@ skip-if-exists creates, 204 deletes, 404 = done), so the sync engine is unchange
   - A POST naming a hot spot the server does not know for the org is **400 `{"error":"unknown_hotspot"}`**, decided after
     skip-if-exists. The app then drops the link and sends the record again (§13). No update call: a link is set once.
   - The server half was live before any build sent the key, as NV-622 requires (an older server would drop it and
-    answer 201). A released build that sends it: none yet. STATUS: UNKNOWN – REQUIRES CONFIRMATION against production.
+    answer 201). The first build that sends it is v1.20.0+30, rolled out 2026-11-26. Proved on production the same day: a
+    phone-linked record on the owner's test hot spot *ARSO* (org 136), stored 15.7 m from it with *Natančna* accuracy,
+    i.e. the warden's own position (read-only query on the VPS).
 
 ### 9.1 `GET https://narcis.gov.si/ords/narcis/app-auth/login` (production login)
 - Auth: `X-Narcis-Auth: Basic <base64(email:password)>` over HTTPS only. (Custom header, not the standard `Authorization` — see note below.)
@@ -716,8 +718,9 @@ Many target devices (e.g. Samsung A56) reserve a strip at the bottom of the scre
 - Pattern 2 (`SafeArea` wrap): `login_screen.dart`, `type_selection_screen.dart`.
 - N/A (full-bleed map + Scaffold-managed FAB whose default location respects view padding): `home_screen.dart`, `location_picker_screen.dart`.
 - TB-39 (2026-11-25): the picker's hot-spot bar is pattern 1b (a `bottomNavigationBar` adding the inset itself); the
-  hot-spot sheet is pattern 3 (`SafeArea`). Both clear the gesture bar on the Android emulator (gesture navigation);
-  not yet seen on an A56.
+  hot-spot sheet is pattern 3 (`SafeArea`). Both clear the gesture bar on the Android emulator (gesture navigation).
+  The owner tested v1.20.0+30 on the A56 2026-11-26; whether the picker bar was among what was seen: STATUS: UNKNOWN –
+  REQUIRES CONFIRMATION.
 
 ## 16. Walk-around Schema (Oracle, prefix `TB_OBHOD*`)
 *From the cutover (TB-46): `beleznica.obhod` / `obhod_tocka` in narcis-vibed's Postgres, the same shape and FK rules (§12).*

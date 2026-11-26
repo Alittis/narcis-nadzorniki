@@ -1690,7 +1690,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-39 · Hot spots (*vroče točke*) — recurring named points that collect records over time
-`✨ Enhancement` · `P2` · `Doing` (phase 1 server half LIVE 2026-11-25 as narcis-vibed NV-622; phone half built into v1.20.0+30 2026-11-25, pending upload + rollout) · Reporters: Matjaž, Tomaž (proposal *Predlog »Vroča točka«*, 2026-08-27) · Updated: 2026-11-25
+`✨ Enhancement` · `P2` · `Doing` (phase 1 LIVE: server half narcis-vibed NV-622 2026-11-25, phone half v1.20.0+30 rolled out 2026-11-26 and proved on production; phase 2 open) · Reporters: Matjaž, Tomaž (proposal *Predlog »Vroča točka«*, 2026-08-27) · Updated: 2026-11-26
 - **Want (Tomaž's proposal):** permanent named points (*Zapornica Nova Karlovica*, *Zadrževalnik
   Rešeto*, a dump site) where any warden adds a new record on each visit, instead of creating a new
   one-off point every time. Modelled on eBird hotspots.
@@ -1826,11 +1826,13 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   - **Choices made here (the owner may overrule):** the picker tap attaches without moving the pin; a dropped link is
     silent (counted in TB-59, no message to the warden); hot spots ride with the Motnje layer, not a chip of their own,
     and ignore the Motnje filter.
-  - **Not proved on production:** a phone-linked record. Needs a released build. Production's only hot spot is the
-    owner's test *ARSO* (org 136), kept on purpose: not to be removed or counted as real use.
-- **Shipped:** phase 1 built into **v1.20.0+30** (2026-11-25, `~/Releases/terenska-beleznica-1.20.0+30.aab`, signer
-  and manifest verified), **pending upload + rollout** on the Closed testing track. Phase 2 (*Predlagaj*, regrouping)
-  stays open, so whether TB-39 closes at rollout or stays open for it is the owner's call then. Privacy policy: no
+  - **Proved on production 2026-11-26** (after the v1.20.0+30 rollout; read-only query on the VPS, `narcis_spike` as
+    `app_beleznica`): one phone-linked record on *ARSO* (org 136), observed 06:11 UTC, stored 15.7 m from the hot spot
+    with *Natančna* accuracy, so the warden's own GPS position, not the hot spot's. *ARSO* is the owner's test hot
+    spot, kept on purpose: not to be removed or counted as real use.
+- **Shipped:** phase 1 in **v1.20.0+30** (built 2026-11-25, `~/Releases/terenska-beleznica-1.20.0+30.aab`, signer
+  and manifest verified), **rolled out on the Closed testing track, confirmed by the owner 2026-11-26** (tested on the
+  phone; commits `cf8ad19`, `9a4130a`). Privacy policy: no
   edit due. A hot-spot link is a choice from the org's list, like TB-42/43's fields, and the phone does not keep a hot
   spot's `createdBy`.
 
