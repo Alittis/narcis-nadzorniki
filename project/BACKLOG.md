@@ -1727,7 +1727,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-39 · Hot spots (*vroče točke*) — recurring named points that collect records over time
-`✨ Enhancement` · `P2` · `Doing` (phase 1 shipped: server half narcis-vibed NV-622 2026-11-25, phone half v1.20.0+30 rolled out 2026-11-26 and proved on production; position rule since TB-64; **phase 2 regrouping built 2026-11-26 as narcis-vibed NV-628, not deployed**; *Predlagaj* parked) · Reporters: Matjaž, Tomaž (proposal *Predlog »Vroča točka«*, 2026-08-27) · Updated: 2026-11-26
+`✨ Enhancement` · `P2` · `Blocked` (phase 1 shipped: server half narcis-vibed NV-622 2026-11-25, phone half v1.20.0+30 rolled out 2026-11-26 and proved on production; position rule since TB-64; **phase 2 regrouping LIVE 2026-11-26 08:42:24 UTC as narcis-vibed NV-628**; *Predlagaj* blocked on a narcis-vibed mail sender) · Reporters: Matjaž, Tomaž (proposal *Predlog »Vroča točka«*, 2026-08-27) · Updated: 2026-11-26
 - **Want (Tomaž's proposal):** permanent named points (*Zapornica Nova Karlovica*, *Zadrževalnik
   Rešeto*, a dump site) where any warden adds a new record on each visit, instead of creating a new
   one-off point every time. Modelled on eBird hotspots.
@@ -1881,8 +1881,8 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   - **TB-64's position rule** holds on the desktop too: choosing a hot spot puts the record's location on its point,
     and moving the pin takes it off.
   - Built from this session in an isolated narcis-vibed worktree.
-- **Phase 2 regrouping built 2026-11-26: narcis-vibed NV-628** (`474abd42` on the local branch `claude/nv-628-tb39-regroup`,
-  not pushed; not deployed, not owner-accepted; no schema change). NV-628 is canonical for the server and the editor. In short:
+- **Phase 2 regrouping built 2026-11-26: narcis-vibed NV-628**, **LIVE 2026-11-26 08:42:24 UTC** as `1f9aa238` (rebased
+  from `474abd42`; narcis-vibed DEPLOYMENT §3.6 NV-628). Not owner-accepted; no schema change. NV-628 is canonical for the server and the editor. In short:
   - The desktop *Uredi zapis* gets a *Vroča točka* select. Authors use it on their own records and the org admin on
     colleagues' (the existing `zapis` gate).
   - `zapis` takes an optional `hotspotId`. Absent leaves the link alone; `null` unlinks; anything but the org's own
@@ -1895,8 +1895,17 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
     red when the merge keeps the phone's copy.
   - Suite **345 passed + 1 skipped**; nothing to release.
   - Not checked on a device; the test pins the merge.
-- **Next for phase 2:** the owner's go to deploy NV-628. After that, tell Matjaž and Tomaž that existing records can be
-  regrouped in *Uredi zapis*.
+- **Deployed 2026-11-26** (the owner: *"deploy NV-628"*): build rc 0, restart 08:42:24 UTC, gates 401/405 without
+  credentials. The `vroca_tocka_id` column comment was run as `narcis_owner`. Production then held 1,614 records, 1
+  linked and 1 hot spot, the owner's test *ARSO*. Not proved on production: a regroup by a real user, and its arrival on
+  a phone.
+  - The owner's first check: on the *ARSO* record choose *Brez*, then *ARSO*, and save. The record moves to the hot
+    spot's point. Re-picking the same hot spot alone does nothing.
+  - Then sync the A56 and open *ARSO*'s sheet.
+- **Blocked (2026-11-26):**
+  - *Predlagaj za vročo točko* waits on a narcis-vibed mail sender, the same blocker as TB-38. The owner parked it.
+  - The count per type (example 3) still awaits Matjaž and Tomaž.
+  - Still to do: tell Matjaž and Tomaž that existing records can now be regrouped in *Uredi zapis*.
 
 ### TB-40 · Remember map-layer settings across app restarts
 `✨ Enhancement` · `P2` · `Done` (shipped v1.11.0+21; rolled out on the Play Closed testing track 2026-10-12, confirmed on device) · Reporter: Matjaž · Updated: 2026-10-12
