@@ -1897,11 +1897,14 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   - Not checked on a device; the test pins the merge.
 - **Deployed 2026-11-26** (the owner: *"deploy NV-628"*): build rc 0, restart 08:42:24 UTC, gates 401/405 without
   credentials. The `vroca_tocka_id` column comment was run as `narcis_owner`. Production then held 1,614 records, 1
-  linked and 1 hot spot, the owner's test *ARSO*. Not proved on production: a regroup by a real user, and its arrival on
-  a phone.
-  - The owner's first check: on the *ARSO* record choose *Brez*, then *ARSO*, and save. The record moves to the hot
-    spot's point. Re-picking the same hot spot alone does nothing.
-  - Then sync the A56 and open *ARSO*'s sheet.
+  linked and 1 hot spot, the owner's test *ARSO*.
+- **Proved on production 2026-11-26** (the owner: *"All went as predicted"*). The owner regrouped the *ARSO* test record
+  (`2312051a…`, org 136) on the desktop: *Brez*, then *ARSO*, saved at 09:18:46 UTC.
+  - A read-only query shows it on the hot spot's exact point (46.0652930, 14.5137000), *Približna*, linked. Its
+    UREDITEV row keeps the old point, 15.7 m off with *Natančna*.
+  - The owner reports the A56 showed it at the diamond after a sync. That is the phone's pull taking a desktop
+    regroup, as the new test predicts.
+  - Re-picking the same hot spot alone does nothing (narcis-vibed NV-628).
 - **Blocked (2026-11-26):**
   - *Predlagaj za vročo točko* waits on a narcis-vibed mail sender, the same blocker as TB-38. The owner parked it.
   - The count per type (example 3) still awaits Matjaž and Tomaž.
