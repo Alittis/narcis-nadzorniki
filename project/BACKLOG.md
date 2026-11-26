@@ -82,7 +82,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
     join the filter. Built as narcis-vibed **NV-635**: the phone's orange diamonds on the main map, and a click shows
     that hot spot's records (the *Vroča točka* facet). **LIVE 2026-11-26 14:31:47 UTC** (`ec2f3023`); the phone needs
     nothing. **Proved on production by the owner 2026-11-26** (*"All went as predicted"*); their one follow-up, the
-    facet's swatch as a diamond instead of a dot, is built in narcis-vibed NV-635.
+    facet's swatch as a diamond instead of a dot, is LIVE since 2026-11-26 14:47:28 UTC (narcis-vibed `0c598c16`).
   - ~~NV-622's decision line (*"a linked record keeps the warden's own position"*) and the production column comment on
     `beleznica.motnja.vroca_tocka_id` (*"the warden's position as the phone sent it"*) are stale. The server's
     behaviour (it stores the body's coordinates) is unchanged and right. Due when TB-64 is released. The manual
