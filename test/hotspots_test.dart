@@ -468,6 +468,50 @@ void main() {
       expect(state.records.single.hotspotId, _hsId);
     });
 
+    // TB-39 phase 2 (narcis-vibed NV-628): the desktop edit regroups a record
+    // that is already on the phone. The phone has no regroup of its own; it
+    // takes the server's copy of a synced record on the next pull.
+    test('a desktop regroup reaches the phone on the next pull, both ways',
+        () async {
+      final server = _Server();
+      final rec = <String, dynamic>{
+        'id': 'r1',
+        'latitude': 45.78345,
+        'longitude': 14.35604,
+        'locationAccuracy': 'Natančna',
+        'observedAt': '2026-11-25T09:00:00Z',
+        'actionTaken': 'Brez ukrepa',
+        'createdBy': 'colleague@gov.si',
+      };
+      server.records['r1'] = {...rec};
+      final state = await _boot(server,
+          store: _MemStore(), hotspots: _MemHotspotsStore(), tmp: tmp);
+      expect(state.records.single.hotspotId, isNull);
+
+      // Onto the hot spot: the editor puts the location on it, Približna.
+      server.records['r1'] = {
+        ...rec,
+        'latitude': _hotspot.latitude,
+        'longitude': _hotspot.longitude,
+        'locationAccuracy': 'Približna',
+        'hotspotId': _hsId,
+      };
+      await state.syncAll();
+      final on = state.records.single;
+      expect(on.hotspotId, _hsId);
+      expect((on.latitude, on.longitude), (_hotspot.latitude, _hotspot.longitude));
+      expect(on.locationAccuracy, 'Približna');
+      expect(on.pendingSync, isFalse);
+
+      // Off it again: the server drops the key, the location stays.
+      server.records['r1'] = {
+        ...server.records['r1']!..remove('hotspotId'),
+      };
+      await state.syncAll();
+      expect(state.records.single.hotspotId, isNull);
+      expect(state.records.single.latitude, _hotspot.latitude);
+    });
+
     test('a linked record goes out with its own position, as it is',
         () async {
       final server = _Server();

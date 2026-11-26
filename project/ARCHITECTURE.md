@@ -127,7 +127,10 @@ skip-if-exists creates, 204 deletes, 404 = done), so the sync engine is unchange
     stores what the body carries (`62e5d0df`), so the rule lives in the phone alone. From 2026-11-25 until TB-64 the
     rule was the warden's own position, which v1.20.0+30 still sends.
   - A POST naming a hot spot the server does not know for the org is **400 `{"error":"unknown_hotspot"}`**, decided after
-    skip-if-exists. The app then drops the link and sends the record again (§13). No update call: a link is set once.
+    skip-if-exists. The app then drops the link and sends the record again (§13). The phone has no update call, so it
+    sets a link once. The desktop edit can regroup a sent record onto or off a hot spot (TB-39 phase 2, narcis-vibed
+    NV-628; built 2026-11-26, not deployed). The phone takes that on its next pull, like any server-side edit of a
+    synced record.
   - The server half was live before any build sent the key, as NV-622 requires (an older server would drop it and
     answer 201). The first build that sends it is v1.20.0+30, rolled out 2026-11-26. Proved on production the same day: a
     phone-linked record on the owner's test hot spot *ARSO* (org 136), stored 15.7 m from it with *Natančna* accuracy,
