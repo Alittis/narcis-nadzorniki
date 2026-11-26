@@ -312,7 +312,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     LatLng? location,
     String? initialPhotoPath,
     List<SelectedDisturbanceType>? initialTypes,
-    String? hotspotId,
+    Hotspot? hotspot,
   }) async {
     final saved = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
@@ -323,7 +323,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           initialBasemap: _basemapMode,
           initialPhotoPath: initialPhotoPath,
           initialTypes: initialTypes,
-          initialHotspotId: hotspotId,
+          initialHotspot: hotspot,
         ),
       ),
     );
@@ -467,20 +467,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   /// TB-39: a tap on a hot spot. Its sheet lists its records; a new record
-  /// started there is filed on it, at the warden's own position, through the
+  /// started there is filed on it, at the hot spot's point (TB-64), through the
   /// same two flows as "+".
   Future<void> _openHotspot(AppState state, Hotspot hotspot) async {
     final entry = await showHotspotSheet(context, hotspot);
     if (!mounted || entry == null) return;
     switch (entry) {
       case HotspotEntry.photo:
-        await _startPhotoFlow(state, hotspotId: hotspot.id);
+        await _startPhotoFlow(state, hotspot: hotspot);
       case HotspotEntry.codebook:
-        await _startCodebookFlow(state, hotspotId: hotspot.id);
+        await _startCodebookFlow(state, hotspot: hotspot);
     }
   }
 
-  Future<void> _startPhotoFlow(AppState state, {String? hotspotId}) async {
+  Future<void> _startPhotoFlow(AppState state, {Hotspot? hotspot}) async {
     final location = _capturedLocation ?? _userLocation;
     setState(() {
       _plusExpanded = false;
@@ -507,11 +507,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       state,
       location: location,
       initialPhotoPath: picked.path,
-      hotspotId: hotspotId,
+      hotspot: hotspot,
     );
   }
 
-  Future<void> _startCodebookFlow(AppState state, {String? hotspotId}) async {
+  Future<void> _startCodebookFlow(AppState state, {Hotspot? hotspot}) async {
     final location = _capturedLocation ?? _userLocation;
     setState(() {
       _plusExpanded = false;
@@ -529,7 +529,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       state,
       location: location,
       initialTypes: selections,
-      hotspotId: hotspotId,
+      hotspot: hotspot,
     );
   }
 

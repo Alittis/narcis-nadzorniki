@@ -4,8 +4,9 @@
 //
 // What the server half fixed, and these tests hold the phone to:
 // - `GET hotspots` → `{"hotspots":[{id,name,latitude,longitude,…}]}`.
-// - A record's `hotspotId`, absent when none, both ways. A linked record still
-//   sends the warden's OWN latitude/longitude (owner, 2026-11-25).
+// - A record's `hotspotId`, absent when none, both ways, beside the record's
+//   own latitude/longitude. TB-64 (owner, 2026-11-26): a record on a hot spot is
+//   AT the hot spot (the form puts it there); the wire sends it as it is.
 // - POST naming a hot spot the server does not know for the org → 400
 //   `{"error":"unknown_hotspot"}`. The phone keeps a record queued on any
 //   failure, so without the drop-and-resend here a hot spot lost in a restore
@@ -56,7 +57,7 @@ const _hotspot = Hotspot(
   longitude: 14.36,
 );
 
-/// Where the warden stood: NOT the hot spot's point.
+/// Where the phone is (the warden, or the desk): not the hot spot's point.
 const _fix = LatLng(45.79, 14.36);
 
 const _type = SelectedDisturbanceType(
@@ -300,7 +301,7 @@ void main() {
       expect(remote.toLocal().hotspotId, isNull);
     });
 
-    test('a linked record sends the id and the warden\'s own position',
+    test('a linked record sends the id and its own position, as it is',
         () async {
       final sent = <Map<String, dynamic>>[];
       await _api((req) async {
@@ -467,7 +468,7 @@ void main() {
       expect(state.records.single.hotspotId, _hsId);
     });
 
-    test('a linked record goes out with the warden\'s own position',
+    test('a linked record goes out with its own position, as it is',
         () async {
       final server = _Server();
       final state = await _boot(server,
@@ -475,7 +476,7 @@ void main() {
       await state.addRecord(_rec('r1', hotspotId: _hsId));
       final body = server.posts.single;
       expect(body['hotspotId'], _hsId);
-      expect(body['latitude'], _fix.latitude, reason: 'not the hot spot\'s');
+      expect(body['latitude'], _fix.latitude, reason: 'the record\'s own, as it is');
       expect(body['longitude'], _fix.longitude);
       expect(state.records.single.pendingSync, isFalse);
       expect(state.records.single.hotspotId, _hsId);
@@ -547,7 +548,7 @@ void main() {
     Future<void> openForm(
       WidgetTester tester,
       AppState state, {
-      String? hotspotId,
+      Hotspot? hotspot,
     }) async {
       await tester.pumpWidget(
         ChangeNotifierProvider<AppState>.value(
@@ -564,7 +565,7 @@ void main() {
                         mapCenter: _fix,
                         initialBasemap: BasemapMode.osm,
                         initialTypes: const [_type],
-                        initialHotspotId: hotspotId,
+                        initialHotspot: hotspot,
                       ),
                     ),
                   ),
@@ -586,6 +587,12 @@ void main() {
       await tester.pumpAndSettle();
     }
 
+    Future<void> openPicker(WidgetTester tester) async {
+      await scrollTo(tester, find.text('Karta'));
+      await tester.tap(find.text('Karta'));
+      await tester.pumpAndSettle();
+    }
+
     Future<Disturbance> save(WidgetTester tester, AppState state) async {
       await scrollTo(tester, find.text('Preglej in shrani'));
       await tester.tap(find.text('Preglej in shrani'));
@@ -596,21 +603,25 @@ void main() {
     }
 
     testWidgets(
-        'a tap on a hot spot in the picker files the record on it, '
-        'and the record keeps the warden\'s position', (tester) async {
+        'a tap on a hot spot in the picker puts the record on it '
+        '(TB-64: the hot spot\'s point, Približna)', (tester) async {
       final state = await _bootOffline([_hotspot]);
       await openForm(tester, state);
       await scrollTo(tester, find.text('Karta'));
       expect(find.text('Vročo točko izbereš na karti.'), findsOneWidget);
 
-      await tester.tap(find.text('Karta'));
-      await tester.pumpAndSettle();
-      expect(find.text('Tapni vročo točko, da nanjo vežeš zapis.'),
+      await openPicker(tester);
+      expect(find.text('Tapni vročo točko, da zapis postaviš nanjo.'),
           findsOneWidget);
 
       await tester.tap(_onMap);
+      // Past flutter_map's double-tap window: had the map's own tap fired too,
+      // it would drop the hot spot again (a tap elsewhere does, TB-64).
+      await tester.pump(const Duration(milliseconds: 500));
       await tester.pumpAndSettle();
       expect(find.text('Vroča točka: Zadrževalnik Rešeto'), findsOneWidget);
+      expect(find.byIcon(Icons.location_on), findsNothing,
+          reason: 'the ringed diamond marks the location');
 
       await tester.tap(find.text('Potrdi'));
       await tester.pumpAndSettle();
@@ -619,9 +630,9 @@ void main() {
 
       final record = await save(tester, state);
       expect(record.hotspotId, _hsId);
-      expect(record.latitude, _fix.latitude, reason: 'the pin did not move');
-      expect(record.longitude, _fix.longitude);
-      expect(record.locationAccuracy, 'Natančna', reason: 'not downgraded');
+      expect(record.latitude, _hotspot.latitude, reason: 'on the hot spot');
+      expect(record.longitude, _hotspot.longitude);
+      expect(record.locationAccuracy, 'Približna');
     });
 
     testWidgets(
@@ -636,9 +647,7 @@ void main() {
       );
       final state = await _bootOffline([here]);
       await openForm(tester, state);
-      await scrollTo(tester, find.text('Karta'));
-      await tester.tap(find.text('Karta'));
-      await tester.pumpAndSettle();
+      await openPicker(tester);
 
       await tester.tap(_onMap);
       await tester.pumpAndSettle();
@@ -648,17 +657,42 @@ void main() {
       await tester.pumpAndSettle();
       final record = await save(tester, state);
       expect(record.hotspotId, _hsId);
-      expect(record.latitude, _fix.latitude);
-      expect(record.locationAccuracy, 'Natančna', reason: 'the pin stayed');
+      expect(record.latitude, here.latitude);
     });
 
-    testWidgets('a second tap, or Odstrani, takes the hot spot off again',
-        (tester) async {
+    testWidgets(
+        'a tap anywhere else on the map after it drops the hot spot '
+        '(TB-64: the record is somewhere else)', (tester) async {
       final state = await _bootOffline([_hotspot]);
       await openForm(tester, state);
-      await scrollTo(tester, find.text('Karta'));
-      await tester.tap(find.text('Karta'));
+      await openPicker(tester);
+
+      await tester.tap(_onMap);
       await tester.pumpAndSettle();
+      await tester.tapAt(
+          tester.getCenter(find.byType(FlutterMap)) + const Offset(150, 120));
+      // flutter_map holds a tap back for its double-tap window before onTap.
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
+      expect(find.text('Vroča točka: Zadrževalnik Rešeto'), findsNothing);
+      expect(find.byIcon(Icons.location_on), findsOneWidget,
+          reason: 'the pin is back, where the tap was');
+
+      await tester.tap(find.text('Potrdi'));
+      await tester.pumpAndSettle();
+      final record = await save(tester, state);
+      expect(record.hotspotId, isNull);
+      expect(record.latitude, isNot(_hotspot.latitude));
+      expect(record.latitude, isNot(_fix.latitude));
+      expect(record.locationAccuracy, 'Približna');
+    });
+
+    testWidgets(
+        'a second tap, or Odstrani, drops the hot spot and leaves the '
+        'location on it', (tester) async {
+      final state = await _bootOffline([_hotspot]);
+      await openForm(tester, state);
+      await openPicker(tester);
 
       await tester.tap(_onMap);
       await tester.pumpAndSettle();
@@ -673,27 +707,87 @@ void main() {
       await tester.tap(find.text('Potrdi'));
       await tester.pumpAndSettle();
 
-      expect((await save(tester, state)).hotspotId, isNull);
+      final record = await save(tester, state);
+      expect(record.hotspotId, isNull);
+      expect(record.latitude, _hotspot.latitude);
     });
 
-    testWidgets('a record started on a hot spot can be taken off it in the '
-        'form', (tester) async {
+    testWidgets(
+        'a record started on a hot spot is saved on it, at its point '
+        '(TB-64: right even when filed later, away from the place)',
+        (tester) async {
       final state = await _bootOffline([_hotspot]);
-      await openForm(tester, state, hotspotId: _hsId);
+      // The warden is at _fix (the desk, say), not at the hot spot.
+      await openForm(tester, state, hotspot: _hotspot);
+      final record = await save(tester, state);
+      expect(record.hotspotId, _hsId);
+      expect(record.latitude, _hotspot.latitude);
+      expect(record.longitude, _hotspot.longitude);
+      expect(record.locationAccuracy, 'Približna');
+    });
+
+    testWidgets(
+        'a record started on a hot spot can be taken off it in the form; '
+        'the location stays', (tester) async {
+      final state = await _bootOffline([_hotspot]);
+      await openForm(tester, state, hotspot: _hotspot);
       await scrollTo(tester, find.text('Vroča točka: Zadrževalnik Rešeto'));
       await tester.tap(find.byTooltip('Odstrani vročo točko'));
       await tester.pumpAndSettle();
       expect(find.text('Vroča točka: Zadrževalnik Rešeto'), findsNothing);
-      expect((await save(tester, state)).hotspotId, isNull);
+      final record = await save(tester, state);
+      expect(record.hotspotId, isNull);
+      expect(record.latitude, _hotspot.latitude);
     });
 
-    testWidgets('a record started on a hot spot is saved on it',
+    testWidgets(
+        'GPS drops the hot spot once a fix arrives (TB-64: the record is '
+        'where the phone is)', (tester) async {
+      const desk = LatLng(45.7700, 14.3500);
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(_geolocator, (call) async {
+        switch (call.method) {
+          case 'isLocationServiceEnabled':
+            return true;
+          case 'checkPermission':
+            return 2; // whileInUse
+          case 'getCurrentPosition':
+            return {
+              'latitude': desk.latitude,
+              'longitude': desk.longitude,
+              'timestamp': DateTime.utc(2026, 11, 26).millisecondsSinceEpoch,
+              'accuracy': 5.0,
+              'altitude': 0.0,
+              'heading': 0.0,
+              'speed': 0.0,
+              'speed_accuracy': 0.0,
+            };
+        }
+        return null;
+      });
+      final state = await _bootOffline([_hotspot]);
+      await openForm(tester, state, hotspot: _hotspot);
+      await scrollTo(tester, find.text('GPS'));
+      await tester.tap(find.text('GPS'));
+      await tester.pumpAndSettle();
+      expect(find.text('Vroča točka: Zadrževalnik Rešeto'), findsNothing);
+
+      final record = await save(tester, state);
+      expect(record.hotspotId, isNull);
+      expect(record.latitude, desk.latitude);
+      expect(record.locationAccuracy, 'Natančna');
+    });
+
+    testWidgets('control: GPS without a fix keeps the hot spot',
         (tester) async {
       final state = await _bootOffline([_hotspot]);
-      await openForm(tester, state, hotspotId: _hsId);
+      await openForm(tester, state, hotspot: _hotspot);
+      await scrollTo(tester, find.text('GPS'));
+      await tester.tap(find.text('GPS'));
+      await tester.pumpAndSettle();
       final record = await save(tester, state);
       expect(record.hotspotId, _hsId);
-      expect(record.latitude, _fix.latitude);
+      expect(record.latitude, _hotspot.latitude);
     });
 
     testWidgets('an org with no hot spots sees no hot-spot UI',
@@ -702,10 +796,9 @@ void main() {
       await openForm(tester, state);
       await scrollTo(tester, find.text('Karta'));
       expect(find.text('Vročo točko izbereš na karti.'), findsNothing);
-      await tester.tap(find.text('Karta'));
-      await tester.pumpAndSettle();
+      await openPicker(tester);
       expect(_onMap, findsNothing);
-      expect(find.text('Tapni vročo točko, da nanjo vežeš zapis.'),
+      expect(find.text('Tapni vročo točko, da zapis postaviš nanjo.'),
           findsNothing);
     });
   });

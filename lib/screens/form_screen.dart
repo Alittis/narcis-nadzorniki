@@ -8,6 +8,7 @@ import 'package:narcis_nadzorniki/data/disturbance_group_colors.dart';
 import 'package:narcis_nadzorniki/models/disturbance.dart';
 import 'package:narcis_nadzorniki/models/disturbance_photo.dart';
 import 'package:narcis_nadzorniki/models/disturbance_type.dart';
+import 'package:narcis_nadzorniki/models/hotspot.dart';
 import 'package:narcis_nadzorniki/models/option_lists.dart';
 import 'package:narcis_nadzorniki/screens/detail_screen.dart';
 import 'package:narcis_nadzorniki/screens/location_picker_screen.dart';
@@ -27,7 +28,7 @@ class FormScreen extends StatefulWidget {
     required this.initialBasemap,
     this.initialPhotoPath,
     this.initialTypes,
-    this.initialHotspotId,
+    this.initialHotspot,
   });
 
   final LatLng? initialLocation;
@@ -38,8 +39,9 @@ class FormScreen extends StatefulWidget {
   final List<SelectedDisturbanceType>? initialTypes;
 
   /// TB-39: the hot spot the record starts on (from its sheet on the home
-  /// map); null = none.
-  final String? initialHotspotId;
+  /// map); null = none. TB-64: the record then starts at the hot spot's point,
+  /// whatever [initialLocation] says.
+  final Hotspot? initialHotspot;
 
   @override
   State<FormScreen> createState() => _FormScreenState();
@@ -72,7 +74,14 @@ class _FormScreenState extends State<FormScreen> {
   void initState() {
     super.initState();
     _location = widget.initialLocation;
-    _hotspotId = widget.initialHotspotId;
+    final hotspot = widget.initialHotspot;
+    if (hotspot != null) {
+      // TB-64 (owner, 2026-11-26): a record on a hot spot is at the hot spot,
+      // so a warden who files it later, away from the place, files it right.
+      _hotspotId = hotspot.id;
+      _location = LatLng(hotspot.latitude, hotspot.longitude);
+      _accuracy = 'Približna';
+    }
     _observers = [...widget.initialObservers];
     if (widget.initialTypes != null) {
       _types = [...widget.initialTypes!];
@@ -110,6 +119,9 @@ class _FormScreenState extends State<FormScreen> {
     setState(() {
       _location = location;
       _accuracy = 'Natančna';
+      // TB-64: the record is where the phone is now, so on no hot spot. Only
+      // once a fix arrived: a failed GPS changes nothing.
+      _hotspotId = null;
     });
   }
 
@@ -156,8 +168,8 @@ class _FormScreenState extends State<FormScreen> {
     );
     if (pick == null) return;
     setState(() {
-      // TB-39: choosing a hot spot never moves the record; the pin is still
-      // where the warden put it.
+      // TB-64: the picker put the location on the hot spot it links (or off
+      // any hot spot it dropped).
       _hotspotId = pick.hotspotId;
       // Potrdi without a tap returns the location it opened on. Leave the
       // record as it was then, rather than downgrade a GPS fix to Približna.

@@ -122,8 +122,10 @@ skip-if-exists creates, 204 deletes, 404 = done), so the sync engine is unchange
     name; the same gate as every route; no generation header (the phone owns no hot spot). Read-only here: the org admin
     creates hot spots on the desktop.
   - A record's `hotspotId` (uuid string), absent-on-null both ways: the list carries it, and the app sends it only on a
-    record filed on a hot spot. **The record's `latitude`/`longitude` stay the warden's own position**, never the hot
-    spot's (owner, 2026-11-25; the server stores what the body carries since `62e5d0df`, 12:28:51 UTC).
+    record filed on a hot spot. **A linked record is at the hot spot (TB-64, owner 2026-11-26):** the phone puts the
+    record's `latitude`/`longitude` on the hot spot's point, *Približna*, and sends them as for any record. The server
+    stores what the body carries (`62e5d0df`), so the rule lives in the phone alone. From 2026-11-25 until TB-64 the
+    rule was the warden's own position, which v1.20.0+30 still sends.
   - A POST naming a hot spot the server does not know for the org is **400 `{"error":"unknown_hotspot"}`**, decided after
     skip-if-exists. The app then drops the link and sends the record again (§13). No update call: a link is set once.
   - The server half was live before any build sent the key, as NV-622 requires (an older server would drop it and
@@ -424,9 +426,9 @@ Unchanged by TB-27, deliberately: **shape encodes authorship** (own = filled dis
 **Hot spots are diamonds (TB-39).** A hot spot draws as a white-edged diamond in the web's `VROCA_TOCKA_COLOR`
 `#C2410C` (`kHotspotColor`, `HotspotMarker` in [basemap.dart](../lib/widgets/basemap.dart)). That orange is close to
 *Odprto*'s amber, so shape, not colour, tells them apart: a record is a disc, a hot spot a diamond. Hot spots ride with
-the Motnje layer, drawn last (above the records, which ring a visited one, and above the blue GPS dot, which would
-otherwise take the tap from a warden standing at the hot spot) and ignoring the Motnje filter, which is about records. A
-tap opens the hot spot's sheet (§14).
+the Motnje layer, drawn last (above the records, and above the blue GPS dot, which would otherwise take the tap from a
+warden standing at the hot spot) and ignoring the Motnje filter, which is about records. From TB-64 (built 2026-11-26,
+not in a released build yet) a hot spot's own records sit at its point, under the diamond; its sheet lists them. A tap opens the hot spot's sheet (§14).
 
 **Age colouring is gone entirely (TB-29).** `AgeBucket`, `ageBucketOf`, `allAgeBuckets`, `recordMarkerColorForAge` and the filter's `ageBuckets` dimension were all removed once the map stopped encoding age: three coarse buckets were strictly worse than the **Obdobje** window sitting beside them, which filters the same axis at day granularity with a histogram. (Note for anyone reading v1.6.0-era docs: the claim that `recordMarkerColorForAge` was the Starost swatch source was wrong — the sheet hardcoded `Colors.red/orange/blue` and never called it.)
 
@@ -591,9 +593,10 @@ whole; a failure keeps the cache and is counted like any pull (TB-59, `pot` `/ap
 - The pull keeps a record's link because `RemoteDisturbance.toLocal()` carries `hotspotId`; the merge rebuilds every
   synced record from it.
 - Tests: [test/hotspots_test.dart](../test/hotspots_test.dart) (the wire both ways, the cache, the pull, logout, the
-  `unknown_hotspot` path end to end with a control: any other 400 keeps the record queued and linked). Six guards
-  proven by removal 2026-11-25 (the unlink, `toLocal`, the payload key, the logout wipe, the picker not moving the pin,
-  the hot spot drawn above the pin).
+  `unknown_hotspot` path end to end with a control: any other 400 keeps the record queued and linked). Guards proven
+  by removal: on 2026-11-25 the unlink, `toLocal`, the payload key, the logout wipe and the hot spot drawn above the
+  pin; on 2026-11-26 (TB-64) the diamond moving the location, a map tap dropping the link, GPS dropping it and the
+  sheet start on the hot spot. The 2026-11-25 guard "the picker does not move the pin" was reversed by TB-64.
 - On the Android emulator against a local stub of the NV-622 contract (2026-11-25): a linked record went out with the
   warden's own point; a queued record whose hot spot the stub had dropped got 400 `unknown_hotspot`, was resent unlinked
   and answered 201, and the device's copy lost the link (BACKLOG TB-39).
@@ -663,20 +666,26 @@ The red "+" FAB on `HomeScreen` (lib/screens/home_screen.dart) is a speed dial. 
   create-time *Status obravnave* stay in the form (owner, 2026-11-23). Tests:
   [test/vplivi_sredstva_test.dart](../test/vplivi_sredstva_test.dart), the TB-42 cases in `form_preview_flow_test.dart`.
 
-- **Hot spots (TB-39 phase 1; owner, 2026-11-24/25).** Two ways to file a record on one, neither a third speed-dial
-  button, and nothing attached automatically (proximity is not relation):
+- **Hot spots (TB-39 phase 1; owner, 2026-11-24/25; position rule TB-64, owner 2026-11-26).** Two ways to file a
+  record on one, neither a third speed-dial button, and nothing attached automatically (proximity is not relation).
+  The TB-64 behaviour below is built, not yet in a released build: v1.20.0+30 keeps the warden's own position and
+  leaves the pin where it is.
   - **From the home map.** A tap on a diamond opens `showHotspotSheet`
     ([lib/widgets/hotspot_sheet.dart](../lib/widgets/hotspot_sheet.dart)): the name, its records newest first (the
     org's records on this device with that `hotspotId`, each opening `DetailScreen`), and *Foto* / *Šifrant*, the speed
-    dial's two intents. They run `_startPhotoFlow` / `_startCodebookFlow` with the hot spot's id, at the warden's own
-    position (`_userLocation`), as "+" does.
-  - **In the Karta picker.** `LocationPickerScreen` draws the hot spots last, above the red pin and the blue dot (the
-    record's fix is usually at the hot spot, and either would take the tap); a tap on one attaches it, a second tap or
-    *Odstrani* in the bar under the map takes it off. **The pin does not move and the accuracy is not downgraded**: a
-    linked record keeps the warden's position (owner, 2026-11-25). The picker returns a `LocationPick` (location +
-    hot spot).
-  - The form shows the attached hot spot as a chip under *Lokacija* with ×, or, when the org has hot spots, the hint
-    *Vročo točko izbereš na karti.* `DetailScreen` (the preview too) shows a *Vroča točka* pill, *ni na seznamu* when
+    dial's two intents. They run `_startPhotoFlow` / `_startCodebookFlow` with the hot spot, and `FormScreen`
+    (`initialHotspot`) starts the record at the hot spot's point, *Približna* (TB-64), so a record filed later, away
+    from the place, is still filed there.
+  - **In the Karta picker: a hot spot is a location choice (TB-64, owner 2026-11-26).** `LocationPickerScreen` draws
+    the hot spots last, above the red pin and the blue dot (either would otherwise take the tap). A tap on one puts the
+    location on it and links it; while linked, its ringed diamond marks the location and the red pin is hidden. A tap
+    anywhere else on the map puts the location there and drops the link. A second tap on the chosen one, or
+    *Odstrani* in the bar under the map, drops the link and leaves the location on it. The diamond's tap wins over the
+    map's own (delayed) tap, so it is never undone behind it. The picker returns a `LocationPick` (location + hot
+    spot); the form marks a changed location *Približna*.
+  - The form shows the attached hot spot as a chip under *Lokacija* with × (unlinks, the location stays), or, when the
+    org has hot spots, the hint *Vročo točko izbereš na karti.* *GPS* drops the link once a fix arrives: the record
+    is then where the phone is. `DetailScreen` (the preview too) shows a *Vroča točka* pill, *ni na seznamu* when
     the id is not in this device's list.
   - Not built (phase 2 or undecided): *Predlagaj za vročo točko*, regrouping existing records, the ~50 m suggestion, a
     count per type.

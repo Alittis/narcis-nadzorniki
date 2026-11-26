@@ -26,9 +26,11 @@ class LocationPickerScreen extends StatefulWidget {
   final LatLng initialLocation;
   final BasemapMode initialBasemap;
 
-  /// TB-39: the org's hot spots, drawn as diamonds. A tap on one files the
-  /// record on it, or takes it off again; the pin stays where it is, because a
-  /// linked record keeps the warden's own position (owner, 2026-11-25).
+  /// TB-39: the org's hot spots, drawn as diamonds. TB-64 (owner,
+  /// 2026-11-26): a hot spot is a location choice like any point on the map. A
+  /// tap on one puts the record on it and links it; a tap anywhere else puts the
+  /// record there and drops the link; a second tap on the chosen one, or
+  /// *Odstrani*, drops the link and leaves the location where it is.
   final List<Hotspot> hotspots;
   final String? initialHotspotId;
 
@@ -110,6 +112,8 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
           onTap: (tapPosition, point) {
             setState(() {
               _selected = point;
+              // TB-64: the record is somewhere else, so on no hot spot.
+              _hotspotId = null;
             });
           },
         ),
@@ -118,16 +122,20 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
           MarkerLayer(
             markers: [
               if (_userLocation != null) userLocationMarker(_userLocation!),
-              Marker(
-                point: _selected,
-                width: 44,
-                height: 44,
-                child: const Icon(
-                  Icons.location_on,
-                  color: Colors.red,
-                  size: 40,
+              // TB-64: on a hot spot, its ringed diamond marks the location;
+              // the pin stays when that hot spot is not drawn (not on this
+              // device's list), so the location is always marked.
+              if (_hotspotOf(_hotspotId) == null)
+                Marker(
+                  point: _selected,
+                  width: 44,
+                  height: 44,
+                  child: const Icon(
+                    Icons.location_on,
+                    color: Colors.red,
+                    size: 40,
+                  ),
                 ),
-              ),
               // Last, so on top: the warden usually stands at the hot spot,
               // and the pin or the blue dot drawn over it would take the tap.
               for (final h in widget.hotspots)
@@ -137,7 +145,13 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                   height: kRecordMarkerTapDiameter,
                   child: GestureDetector(
                     onTap: () => setState(() {
-                      _hotspotId = _hotspotId == h.id ? null : h.id;
+                      if (_hotspotId == h.id) {
+                        _hotspotId = null;
+                      } else {
+                        // TB-64: the hot spot is the record's location.
+                        _hotspotId = h.id;
+                        _selected = LatLng(h.latitude, h.longitude);
+                      }
                     }),
                     child: HotspotMarker(selected: _hotspotId == h.id),
                   ),
@@ -211,7 +225,7 @@ class _HotspotBar extends StatelessWidget {
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       )
                     : Text(
-                        'Tapni vročo točko, da nanjo vežeš zapis.',
+                        'Tapni vročo točko, da zapis postaviš nanjo.',
                         style: TextStyle(color: colors.onSurfaceVariant),
                       ),
               ),

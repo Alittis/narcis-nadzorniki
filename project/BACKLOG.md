@@ -22,6 +22,43 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 
 ## Open
 
+### TB-64 · A record on a hot spot is at the hot spot, not where the warden stood (TB-39 follow-up)
+`✨ Enhancement` · `P2` · `Doing` · Reporter: owner (2026-11-26) · Updated: 2026-11-26
+- **Problem:** TB-39's rule of 2026-11-25 kept the warden's own position on a linked record. On 2026-11-26 it showed
+  two costs. On the desktop the owner's test record on *ARSO* is a separate point, 15.7 m from the hot spot, and the
+  desktop's main map does not draw hot spots, so nothing ties them. A record filed later, away from the place (back
+  at the office), carries the office's GPS fix, marked *Natančna*: precise-looking and wrong.
+- **Decided (owner, 2026-11-26):** switch. A linked record takes the hot spot's position: *"tapping on the diamond is
+  actually similar to selecting a location on the map."* Shaped with the owner: a record's location is either a hot
+  spot or a point, never both apart.
+- **Built 2026-11-26 (phone only; the server stores whatever the body carries since narcis-vibed `62e5d0df`, so no
+  narcis-vibed change and no deploy):**
+  - The Karta picker: a tap on a diamond puts the location on it and links it (the ringed diamond marks it, the red
+    pin hidden). A tap elsewhere puts the location there and drops the link. A second tap or *Odstrani* drops the
+    link and leaves the location on the hot spot.
+  - A record started from a hot spot's sheet starts at its point, *Približna* (`FormScreen.initialHotspot`).
+  - *GPS* in the form drops the link once a fix arrives; a failed GPS changes nothing. The chip × unlinks only.
+  - Picking a hot spot marks the location *Približna*: it is the site, not a fix of where exactly.
+- **Proof:** suite **344 passed + 1 skipped** (3 net new in `test/hotspots_test.dart`; the picker and form tests
+  rewritten for the new rule). Four guards proven by removal (the diamond moving the location, a map tap dropping the
+  link, GPS dropping it, the sheet start on the hot spot). The diamond's tap is checked past flutter_map's double-tap
+  window, so the map's own tap cannot undo it. `flutter analyze`: the 18 pre-existing infos. Not checked on the
+  emulator or a phone.
+- **Consequences:** a hot spot's records stack at its point, under the diamond on the phone's map; its sheet lists
+  them. The exact spot within a large hot spot is lost; a warden who needs it files without the hot spot. The owner's
+  test record on *ARSO* stays 15.7 m off (nothing on the wire can move a sent record). Phones on v1.20.0+30 keep
+  sending the warden's position until they update (`BELEZNICA_APP_MIN_BUILD` could force it).
+- **Also:** a record copies the hot spot's coordinates when it is made, so a hot spot moved later would leave its
+  records where it was. narcis-vibed left *move* undecided (NV-622); this now bears on that decision.
+- **Follow-ups (narcis-vibed, not edited from here):**
+  - Drawing hot spots on the desktop's main map (the owner said yes, 2026-11-26) is paused: with records at the hot
+    spot it may not be needed. The owner decides once TB-64 is released.
+  - NV-622's decision line (*"a linked record keeps the warden's own position"*) and the production column comment on
+    `beleznica.motnja.vroca_tocka_id` (*"the warden's position as the phone sent it"*) are stale. The server's
+    behaviour (it stores the body's coordinates) is unchanged and right. Due when TB-64 is released. The manual
+    (`HelpControl.tsx`, *Vroče točke*) states no position rule and needs nothing.
+- **Shipped:** —
+
 ### TB-63 · The record form's dropdowns and the *Tipi motnje* tile header overflow at 320 dp with large text (widget-test font)
 `🐞 Bug` · `P3` · `Triage` · Reporter: Claude (2026-11-23, found by the TB-42 narrow-phone check) · Updated: 2026-11-23
 - **Problem:** at 320 dp with text scale 1.3, a probe over the whole `FormScreen` reports RenderFlex overflows in four
@@ -1792,6 +1829,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   update call a dropped point could never be recovered. The server fix went live 12:28:51 UTC as
   `62e5d0df` (no schema change), and production held 0 linked records before it, so nothing was lost.
   **Phone half:** send the warden's own lat/lon on a linked record, exactly as for any record.
+  **Reversed 2026-11-26 by the owner: a linked record is at the hot spot. See TB-64.**
 - **Phone half built 2026-11-25** (`cf8ad19`; released in v1.20.0+30, see *Shipped*). Contract checked
   against narcis-vibed `origin/main` source, not this item's paraphrase: `vroce-tocke.ts` sends numbers as numbers and
   every field but `id` absent-on-null; `app.ts` answers `{"error":"unknown_hotspot"}` after skip-if-exists.
