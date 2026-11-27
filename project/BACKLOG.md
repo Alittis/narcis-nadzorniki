@@ -1995,6 +1995,10 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
     **The phone needs no change:** *Predlagaj* is desktop only, and schema v4 touches no `/app/v1` route.
     ~~Live only after the owner's OCI steps and a deploy.~~ Not proven on production: a real proposal by a real warden.
     DKIM settled: the test mail is signed `d=alittis.com` and passes DKIM and DMARC (narcis-vibed NV-642).
+    **Unsubscribe, 2026-11-27:** OCI's own one-click unsubscribe would land on its tenancy-wide suppression list and
+    silently stop Račun's mails to that admin too. narcis-vibed NV-651 (the owner: *"Yes, fix it"*, the opt-out recorded)
+    gives each mail its own `List-Unsubscribe`; a test through the relay proved OCI keeps it. **LIVE 2026-11-27
+    16:06:59 UTC** (`04153dde`, schema v5); an opted-out admin is skipped, *Prijavi me znova* undoes it.
   - The count per type (example 3) still awaits Matjaž and Tomaž (asked again 2026-11-27).
   - ~~Still to do: tell Matjaž and Tomaž that existing records can now be regrouped in *Uredi zapis*.~~ **Told
     2026-11-27** (mail to both, sent by the owner). It covered:
