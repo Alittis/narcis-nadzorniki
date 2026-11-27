@@ -1790,8 +1790,8 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
           logins only). A right granted today counts from the next load.
        4. **Caps: 20 mails a day per user, 100 an hour for the whole service.**
        5. **The mail's link opens the record** (owner, 2026-11-27), as `?sloji=tb&motnja=<uuid>`.
-       ~~Next: a narcis-vibed NV item.~~ **Built 2026-11-27 as narcis-vibed NV-642**, on branch
-       `claude/nv-tb39-predlagaj`, not deployed. NV-642 is canonical for the sender. TB-38 can send through
+       ~~Next: a narcis-vibed NV item.~~ **Built 2026-11-27 as narcis-vibed NV-642** and
+       LIVE 2026-11-27 14:26:42 UTC as narcis-vibed NV-642 (`aebaa5cd`, schema v4; mail on 15:15:27 UTC, a test mail arrived; 3 admins in 2 orgs derived, Tomaž and Matjaž among them). NV-642 is canonical for the sender. TB-38 can send through
        `lib/beleznica/posta.ts`; its own recipient (constraint 3) is still its own decision.
   3. **There is no per-org recipient store.** A small org → address table is needed. Hide the tick box
      for orgs without a recipient rather than offer a choice that does nothing.
@@ -1806,7 +1806,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-39 · Hot spots (*vroče točke*) — recurring named points that collect records over time
-`✨ Enhancement` · `P2` · `Doing` (phase 1 shipped: server half narcis-vibed NV-622 2026-11-25, phone half v1.20.0+30 rolled out 2026-11-26 and proved on production; position rule since TB-64; **phase 2 regrouping LIVE 2026-11-26 08:42:24 UTC as narcis-vibed NV-628**; *Predlagaj* built 2026-11-27 as narcis-vibed NV-642, not deployed, waiting on the owner's OCI sender) · Reporters: Matjaž, Tomaž (proposal *Predlog »Vroča točka«*, 2026-08-27) · Updated: 2026-11-27
+`✨ Enhancement` · `P2` · `Doing` (phase 1 shipped: server half narcis-vibed NV-622 2026-11-25, phone half v1.20.0+30 rolled out 2026-11-26 and proved on production; position rule since TB-64; **phase 2 regrouping LIVE 2026-11-26 08:42:24 UTC as narcis-vibed NV-628**; ***Predlagaj* LIVE 2026-11-27 14:26:42 UTC as narcis-vibed NV-642 (`aebaa5cd`, schema v4; mail on 15:15:27 UTC, a test mail arrived; 3 admins in 2 orgs derived, Tomaž and Matjaž among them)**) · Reporters: Matjaž, Tomaž (proposal *Predlog »Vroča točka«*, 2026-08-27) · Updated: 2026-11-27
 - **Want (Tomaž's proposal):** permanent named points (*Zapornica Nova Karlovica*, *Zadrževalnik
   Rešeto*, a dump site) where any warden adds a new record on each visit, instead of creating a new
   one-off point every time. Modelled on eBird hotspots.
@@ -1989,10 +1989,11 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
     **The sender was scoped 2026-11-27**, in TB-38's constraint 2, and the owner decided it the same day: own sender, a
     new alittis.com From address, the org's `TERENSKA-BELEZNICA-ADMIN` holders as recipients, 20 a day per user and 100
     an hour in all. ~~Nothing is built; next is a narcis-vibed NV item.~~ **Built 2026-11-27 as narcis-vibed NV-642**
-    (branch `claude/nv-tb39-predlagaj`, not deployed): the button in a record's detail, the mail to the org's admins
+    and LIVE 2026-11-27 14:26:42 UTC as narcis-vibed NV-642 (`aebaa5cd`, schema v4; mail on 15:15:27 UTC, a test mail arrived; 3 admins in 2 orgs derived, Tomaž and Matjaž among them): the button in a record's detail, the mail to the org's admins
     with a link that opens the record, schema v4, the nightly admin list. NV-642 is canonical for the checks.
     **The phone needs no change:** *Predlagaj* is desktop only, and schema v4 touches no `/app/v1` route.
-    Live only after the owner's OCI steps (an approved sender, an SMTP credential, `setup-mail-env.sh`) and a deploy.
+    ~~Live only after the owner's OCI steps and a deploy.~~ Not proven on production: a real proposal by a real warden.
+    `STATUS: UNKNOWN – REQUIRES CONFIRMATION` the DKIM signing domain of the new sender (TB-38).
   - The count per type (example 3) still awaits Matjaž and Tomaž (asked again 2026-11-27).
   - ~~Still to do: tell Matjaž and Tomaž that existing records can now be regrouped in *Uredi zapis*.~~ **Told
     2026-11-27** (mail to both, sent by the owner). It covered:
