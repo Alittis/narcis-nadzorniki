@@ -1763,8 +1763,9 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
      - **Recipients are resolved on the server, never taken from the request.**
        - *Predlagaj* goes to the holders of `TERENSKA-BELEZNICA-ADMIN` in the proposer's org. Their addresses are in
          the VPS nightly mirror (`raw.narcis_uporabniki.email`, `raw.narcis_uporabniki_funkcionalnosti`). But
-         `app_beleznica` holds grants on schema `beleznica` only, so the lookup needs its own path (a narrow grant or
-         function).
+         `app_beleznica` holds grants on schema `beleznica` only, so the lookup needs its own path. ~~(a narrow grant or
+         function)~~ `raw` asserts that no app role holds a grant (narcis-vibed NV-311), so the path is a served copy
+         derived nightly, as TRŠCA's user picker is: `beleznica.skrbnik` (NV-642).
        - The mirror runs a day behind, so a grant made today is missed until the next load, as Matjaž's was on
          2026-11-25. ~~`email` can also be null.~~ Every NarcIS login is an e-mail (owner, 2026-11-27); the derive
          script already falls back to `app_user`, so every admin has an address.
@@ -1788,7 +1789,10 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
           proposer's org, from the nightly mirror. It needs one narrow read path for `app_beleznica` (one org's admins'
           logins only). A right granted today counts from the next load.
        4. **Caps: 20 mails a day per user, 100 an hour for the whole service.**
-       Next: a narcis-vibed NV item. TB-38's own recipient (constraint 3) is still its own decision.
+       5. **The mail's link opens the record** (owner, 2026-11-27), as `?sloji=tb&motnja=<uuid>`.
+       ~~Next: a narcis-vibed NV item.~~ **Built 2026-11-27 as narcis-vibed NV-642**, on branch
+       `claude/nv-tb39-predlagaj`, not deployed. NV-642 is canonical for the sender. TB-38 can send through
+       `lib/beleznica/posta.ts`; its own recipient (constraint 3) is still its own decision.
   3. **There is no per-org recipient store.** A small org → address table is needed. Hide the tick box
      for orgs without a recipient rather than offer a choice that does nothing.
 - **Schema (corrected 2026-11-24; the 2026-10-12 text targeted Oracle `TB_MOTNJE`):** a flag and a
@@ -1802,7 +1806,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-39 · Hot spots (*vroče točke*) — recurring named points that collect records over time
-`✨ Enhancement` · `P2` · `Blocked` (phase 1 shipped: server half narcis-vibed NV-622 2026-11-25, phone half v1.20.0+30 rolled out 2026-11-26 and proved on production; position rule since TB-64; **phase 2 regrouping LIVE 2026-11-26 08:42:24 UTC as narcis-vibed NV-628**; *Predlagaj* blocked on a narcis-vibed mail sender) · Reporters: Matjaž, Tomaž (proposal *Predlog »Vroča točka«*, 2026-08-27) · Updated: 2026-11-27
+`✨ Enhancement` · `P2` · `Doing` (phase 1 shipped: server half narcis-vibed NV-622 2026-11-25, phone half v1.20.0+30 rolled out 2026-11-26 and proved on production; position rule since TB-64; **phase 2 regrouping LIVE 2026-11-26 08:42:24 UTC as narcis-vibed NV-628**; *Predlagaj* built 2026-11-27 as narcis-vibed NV-642, not deployed, waiting on the owner's OCI sender) · Reporters: Matjaž, Tomaž (proposal *Predlog »Vroča točka«*, 2026-08-27) · Updated: 2026-11-27
 - **Want (Tomaž's proposal):** permanent named points (*Zapornica Nova Karlovica*, *Zadrževalnik
   Rešeto*, a dump site) where any warden adds a new record on each visit, instead of creating a new
   one-off point every time. Modelled on eBird hotspots.
@@ -1984,7 +1988,11 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   - *Predlagaj za vročo točko* waits on a narcis-vibed mail sender, the same blocker as TB-38. The owner parked it.
     **The sender was scoped 2026-11-27**, in TB-38's constraint 2, and the owner decided it the same day: own sender, a
     new alittis.com From address, the org's `TERENSKA-BELEZNICA-ADMIN` holders as recipients, 20 a day per user and 100
-    an hour in all. Nothing is built; next is a narcis-vibed NV item.
+    an hour in all. ~~Nothing is built; next is a narcis-vibed NV item.~~ **Built 2026-11-27 as narcis-vibed NV-642**
+    (branch `claude/nv-tb39-predlagaj`, not deployed): the button in a record's detail, the mail to the org's admins
+    with a link that opens the record, schema v4, the nightly admin list. NV-642 is canonical for the checks.
+    **The phone needs no change:** *Predlagaj* is desktop only, and schema v4 touches no `/app/v1` route.
+    Live only after the owner's OCI steps (an approved sender, an SMTP credential, `setup-mail-env.sh`) and a deploy.
   - The count per type (example 3) still awaits Matjaž and Tomaž (asked again 2026-11-27).
   - ~~Still to do: tell Matjaž and Tomaž that existing records can now be regrouped in *Uredi zapis*.~~ **Told
     2026-11-27** (mail to both, sent by the owner). It covered:
