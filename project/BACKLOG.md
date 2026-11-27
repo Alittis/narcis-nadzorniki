@@ -1725,7 +1725,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   the TB-60 parent-row layout. No filter by every ZO class asked for, so the open reading above is settled.
 
 ### TB-38 · Forward a record to the head of supervision by e-mail (opt-in)
-`✨ Enhancement` · `P2` · `Blocked` · Reporter: Matjaž · Updated: 2026-11-24
+`✨ Enhancement` · `P2` · `Blocked` · Reporter: Matjaž · Updated: 2026-11-27
 - **Want:** a tick box the observer sets before submitting. When it is set, an e-mail *Obvestilo o
   motnji* goes to the org's head of supervision with every attribute (šifra, observer, location,
   description, photo). For NRP the address is `nadzor@notranjski-park.si`. TB-15's reports also want
@@ -1746,6 +1746,45 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
      narcis-vibed gets its own sender on that relay, or Račun's sender takes a new kind, is undecided.
      The 2026-10-12 route, an ORDS handler calling `APEX_MAIL`, is moot: since T0 (2026-10-15) records
      are written to Postgres by narcis-vibed, not by ORDS.
+     **Sender scope (2026-11-27).** The owner asked for it (*"Scope the sender"*) after TB-39's mail. Nothing is
+     decided or built. The scope was read from narcis-vibed and narcis-racun `origin/main`. One sender serves both
+     consumers, TB-39's *Predlagaj* and this item, and each consumer is designed on its own.
+     - **Recommended: narcis-vibed gets its own sender** rather than a new kind on Račun's. Račun's `posta.ts` is
+       bound to its own database, its audit table (`racun.dogodek`) and five closed kinds, so a new kind there would
+       mean a service-to-service endpoint on the identity service. The own sender copies only the transport:
+       nodemailer over SMTP 587 STARTTLS to the same OCI Email Delivery relay (eu-frankfurt-1). narcis-vibed does not
+       yet depend on nodemailer.
+     - **Limits:** a small cap per signed-in sender plus a service-wide cap, not a port of Račun's limiter, which
+       guards anonymous forms. A cap is still required: both apps sign as alittis.com, and Račun's resets are its way
+       in when Oracle is down. The counts need a table in `beleznica` schema v4 (v3 is NV-622).
+     - **Mail text:** *Predlagaj* sends a link to the record behind login, never record content or anything typed
+       (Račun's RN-13 lesson). This item asked for the attributes in the mail. Whether it sends content or only a
+       link is this item's own decision.
+     - **Recipients are resolved on the server, never taken from the request.**
+       - *Predlagaj* goes to the holders of `TERENSKA-BELEZNICA-ADMIN` in the proposer's org. Their addresses are in
+         the VPS nightly mirror (`raw.narcis_uporabniki.email`, `raw.narcis_uporabniki_funkcionalnosti`). But
+         `app_beleznica` holds grants on schema `beleznica` only, so the lookup needs its own path (a narrow grant or
+         function).
+       - The mirror runs a day behind, so a grant made today is missed until the next load, as Matjaž's was on
+         2026-11-25. `email` can also be null.
+       - The alternative is a per-org address set by hand, the same table as constraint 3.
+       - This item: constraint 3's org → address table.
+     - **Owner prerequisites:**
+       - An approved sender in OCI: a new `…@alittis.com` address, or `prijava@alittis.com` reused.
+       - An SMTP credential for it.
+       - `deploy/scripts/setup-mail-env.sh` in narcis-vibed, the same shape as Račun's.
+       - alittis.com's DKIM (selector `apex`) is in place (narcis-racun ARCHITECTURE). Whether it signs a second
+         approved sender too: `STATUS: UNKNOWN – REQUIRES CONFIRMATION`, by a test mail's headers.
+     - **Network:** VPS-82 (2026-11-10) found no egress restriction on any app unit, so narcis-vibed reaches the relay
+       as Račun does. Recheck before the build.
+     - **Privacy:** OCI Email Delivery becomes a processor for narcis-vibed's mail (recipients' addresses, the
+       proposer's name). Which notice needs an edit: `STATUS: UNKNOWN – REQUIRES CONFIRMATION`.
+     - **For the owner to decide:**
+       1. Own sender (recommended) or a kind on Račun's.
+       2. The From address.
+       3. *Predlagaj*'s recipients: from the mirror (needs a read path) or set by hand per org.
+       4. The caps.
+       Then it becomes a narcis-vibed NV item.
   3. **There is no per-org recipient store.** A small org → address table is needed. Hide the tick box
      for orgs without a recipient rather than offer a choice that does nothing.
 - **Schema (corrected 2026-11-24; the 2026-10-12 text targeted Oracle `TB_MOTNJE`):** a flag and a
@@ -1759,7 +1798,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
 - **Shipped:** —
 
 ### TB-39 · Hot spots (*vroče točke*) — recurring named points that collect records over time
-`✨ Enhancement` · `P2` · `Blocked` (phase 1 shipped: server half narcis-vibed NV-622 2026-11-25, phone half v1.20.0+30 rolled out 2026-11-26 and proved on production; position rule since TB-64; **phase 2 regrouping LIVE 2026-11-26 08:42:24 UTC as narcis-vibed NV-628**; *Predlagaj* blocked on a narcis-vibed mail sender) · Reporters: Matjaž, Tomaž (proposal *Predlog »Vroča točka«*, 2026-08-27) · Updated: 2026-11-26
+`✨ Enhancement` · `P2` · `Blocked` (phase 1 shipped: server half narcis-vibed NV-622 2026-11-25, phone half v1.20.0+30 rolled out 2026-11-26 and proved on production; position rule since TB-64; **phase 2 regrouping LIVE 2026-11-26 08:42:24 UTC as narcis-vibed NV-628**; *Predlagaj* blocked on a narcis-vibed mail sender) · Reporters: Matjaž, Tomaž (proposal *Predlog »Vroča točka«*, 2026-08-27) · Updated: 2026-11-27
 - **Want (Tomaž's proposal):** permanent named points (*Zapornica Nova Karlovica*, *Zadrževalnik
   Rešeto*, a dump site) where any warden adds a new record on each visit, instead of creating a new
   one-off point every time. Modelled on eBird hotspots.
@@ -1939,8 +1978,15 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   - Re-picking the same hot spot alone does nothing (narcis-vibed NV-628).
 - **Blocked (2026-11-26):**
   - *Predlagaj za vročo točko* waits on a narcis-vibed mail sender, the same blocker as TB-38. The owner parked it.
-  - The count per type (example 3) still awaits Matjaž and Tomaž.
-  - Still to do: tell Matjaž and Tomaž that existing records can now be regrouped in *Uredi zapis*.
+    **The sender was scoped 2026-11-27**, in TB-38's constraint 2. The owner's four decisions are open; nothing is built.
+  - The count per type (example 3) still awaits Matjaž and Tomaž (asked again 2026-11-27).
+  - ~~Still to do: tell Matjaž and Tomaž that existing records can now be regrouped in *Uredi zapis*.~~ **Told
+    2026-11-27** (mail to both, sent by the owner). It covered:
+    - regrouping in *Uredi zapis* (authors their own records, the admin colleagues'; the phone shows it after a sync);
+    - TB-64's position rule (a record on a hot spot is at its point, *Približna*; changing the location drops the
+      link; from app 1.21.0);
+    - the desktop map's diamonds;
+    - *Predlagaj* still waiting on mail.
 
 ### TB-40 · Remember map-layer settings across app restarts
 `✨ Enhancement` · `P2` · `Done` (shipped v1.11.0+21; rolled out on the Play Closed testing track 2026-10-12, confirmed on device) · Reporter: Matjaž · Updated: 2026-10-12
