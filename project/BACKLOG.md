@@ -1766,7 +1766,8 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
          `app_beleznica` holds grants on schema `beleznica` only, so the lookup needs its own path (a narrow grant or
          function).
        - The mirror runs a day behind, so a grant made today is missed until the next load, as Matjaž's was on
-         2026-11-25. `email` can also be null.
+         2026-11-25. ~~`email` can also be null.~~ Every NarcIS login is an e-mail (owner, 2026-11-27); the derive
+         script already falls back to `app_user`, so every admin has an address.
        - The alternative is a per-org address set by hand, the same table as constraint 3.
        - This item: constraint 3's org → address table.
      - **Owner prerequisites:**
@@ -1779,12 +1780,15 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
        as Račun does. Recheck before the build.
      - **Privacy:** OCI Email Delivery becomes a processor for narcis-vibed's mail (recipients' addresses, the
        proposer's name). Which notice needs an edit: `STATUS: UNKNOWN – REQUIRES CONFIRMATION`.
-     - **For the owner to decide:**
-       1. Own sender (recommended) or a kind on Račun's.
-       2. The From address.
-       3. *Predlagaj*'s recipients: from the mirror (needs a read path) or set by hand per org.
-       4. The caps.
-       Then it becomes a narcis-vibed NV item.
+     - ~~**For the owner to decide:**~~ **Decided (owner, 2026-11-27):**
+       1. **Own sender** in narcis-vibed on the OCI relay; Račun is not touched.
+       2. **A new From address** at alittis.com (e.g. `Terenska beležnica <beleznica@alittis.com>`), apart from
+          `prijava@alittis.com`. The owner approves it in OCI; a test mail's headers settle the DKIM unknown above.
+       3. ***Predlagaj*'s recipients come from NarcIS grants:** the holders of `TERENSKA-BELEZNICA-ADMIN` in the
+          proposer's org, from the nightly mirror. It needs one narrow read path for `app_beleznica` (one org's admins'
+          logins only). A right granted today counts from the next load.
+       4. **Caps: 20 mails a day per user, 100 an hour for the whole service.**
+       Next: a narcis-vibed NV item. TB-38's own recipient (constraint 3) is still its own decision.
   3. **There is no per-org recipient store.** A small org → address table is needed. Hide the tick box
      for orgs without a recipient rather than offer a choice that does nothing.
 - **Schema (corrected 2026-11-24; the 2026-10-12 text targeted Oracle `TB_MOTNJE`):** a flag and a
@@ -1978,7 +1982,9 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
   - Re-picking the same hot spot alone does nothing (narcis-vibed NV-628).
 - **Blocked (2026-11-26):**
   - *Predlagaj za vročo točko* waits on a narcis-vibed mail sender, the same blocker as TB-38. The owner parked it.
-    **The sender was scoped 2026-11-27**, in TB-38's constraint 2. The owner's four decisions are open; nothing is built.
+    **The sender was scoped 2026-11-27**, in TB-38's constraint 2, and the owner decided it the same day: own sender, a
+    new alittis.com From address, the org's `TERENSKA-BELEZNICA-ADMIN` holders as recipients, 20 a day per user and 100
+    an hour in all. Nothing is built; next is a narcis-vibed NV item.
   - The count per type (example 3) still awaits Matjaž and Tomaž (asked again 2026-11-27).
   - ~~Still to do: tell Matjaž and Tomaž that existing records can now be regrouped in *Uredi zapis*.~~ **Told
     2026-11-27** (mail to both, sent by the owner). It covered:
