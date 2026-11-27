@@ -1775,8 +1775,9 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
        - An approved sender in OCI: a new `…@alittis.com` address, or `prijava@alittis.com` reused.
        - An SMTP credential for it.
        - `deploy/scripts/setup-mail-env.sh` in narcis-vibed, the same shape as Račun's.
-       - alittis.com's DKIM (selector `apex`) is in place (narcis-racun ARCHITECTURE). Whether it signs a second
-         approved sender too: `STATUS: UNKNOWN – REQUIRES CONFIRMATION`, by a test mail's headers.
+       - alittis.com's DKIM (selector `apex`) is in place (narcis-racun ARCHITECTURE). ~~Whether it signs a second
+         approved sender too: unknown.~~ **It does (2026-11-27):** the test mail from `beleznica@alittis.com` carries
+         `d=alittis.com`, `dkim=pass`, DMARC pass.
      - **Network:** VPS-82 (2026-11-10) found no egress restriction on any app unit, so narcis-vibed reaches the relay
        as Račun does. Recheck before the build.
      - **Privacy:** OCI Email Delivery becomes a processor for narcis-vibed's mail (recipients' addresses, the
@@ -1993,7 +1994,7 @@ field-test feedback (`Vtisi testne aplikacije motenj`).
     with a link that opens the record, schema v4, the nightly admin list. NV-642 is canonical for the checks.
     **The phone needs no change:** *Predlagaj* is desktop only, and schema v4 touches no `/app/v1` route.
     ~~Live only after the owner's OCI steps and a deploy.~~ Not proven on production: a real proposal by a real warden.
-    `STATUS: UNKNOWN – REQUIRES CONFIRMATION` the DKIM signing domain of the new sender (TB-38).
+    DKIM settled: the test mail is signed `d=alittis.com` and passes DKIM and DMARC (narcis-vibed NV-642).
   - The count per type (example 3) still awaits Matjaž and Tomaž (asked again 2026-11-27).
   - ~~Still to do: tell Matjaž and Tomaž that existing records can now be regrouped in *Uredi zapis*.~~ **Told
     2026-11-27** (mail to both, sent by the owner). It covered:
